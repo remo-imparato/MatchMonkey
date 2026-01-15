@@ -1,0 +1,37 @@
+{
+	"id": "SimilarArtists",
+	"title": "Similar Artists",
+	"description": "Creates a playlist of similar artists from Last.fm",
+	"version": "3.0.0",
+	"minAppVersion": "5.0.0",
+	"type": "script",
+	"author": "trixmoto (rimparato for MM5 port)",
+	"homepage": "",
+	"icon": "sa_auto_on.ico",
+	"files":
+	[
+		{
+			"source": "SimilarArtists.js",
+			"target": "Scripts/Auto/SimilarArtists.js"
+		},
+		{
+			"source": "sa_auto_on.ico",
+			"target": "Scripts/Auto/sa_auto_on.ico"
+		},
+		{
+			"source": "sa_auto_off.ico",
+			"target": "Scripts/Auto/sa_auto_off.ico"
+		},
+		{
+			"source": "Uninstall.js",
+			"target": "Scripts/Auto/Uninstall.js"
+		}
+	],
+	"execute":
+	[
+		{
+			"file": "Scripts/Auto/SimilarArtists.js",
+			"function": "start"
+		}
+	]
+}
