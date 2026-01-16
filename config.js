@@ -158,7 +158,6 @@ window.configInfo = {
 		writeUI('SALimit', parseInt(getSetting('Limit'), 10) || 0);
 		writeUI('SATPA', parseInt(getSetting('TPA'), 10) || 0);
 		writeUI('SATPL', parseInt(getSetting('TPL'), 10) || 0);
-		//*/
 
 		// Parent playlist: populate options dynamically
 		// Prefer DOM select if present; fallback to framework control if it exposes items or setItems
@@ -204,6 +203,8 @@ window.configInfo = {
 		} catch (e) {
 			log('initSettingsPanel error: ' + e.toString());
 		}
+		//*/
+
 	},
 
 	save: function (pnlDiv, addon) {
