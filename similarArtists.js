@@ -425,7 +425,7 @@
 		trackInfo.artist = artists[0];
 		artists = track.albumArtist.split(';', 1);
 		trackInfo.albumArtist = artists[0];
-		ODS('last.fm: prepared trackInfo: ' + JSON.stringify(trackInfo));
+		log('Similar Artists: prepared trackInfo: ' + JSON.stringify(trackInfo));
 		return trackInfo;
 	};
 
@@ -888,6 +888,7 @@
 	 * @param {object} panel - The panel/sheet object from MM5
 	 */
 	function initSettingsPanel(panel) {
+		/*
 		try {
 			const ui = app.ui;
 
@@ -1116,6 +1117,7 @@
 		} catch (e) {
 			log('initSettingsPanel error: ' + e.toString());
 		}
+		*/
 	}
 
 	/**
