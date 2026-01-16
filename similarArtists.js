@@ -393,12 +393,12 @@
 	function collectSeedTracks() {
 		if (typeof app === 'undefined') return [];
 		let list = null;
-		if (app.selection?.getTracklist) {
-			list = app.selection.getTracklist();
+		if (uitools?.getSelectedTracklist) {
+			list = uitools.getSelectedTracklist();
 		}
 		const count = typeof list?.count === 'function' ? list.count() : (list?.count || 0);
 		if (!list || count === 0) {
-			list = app.player?.getCurrentTracklist?.() || app.player?.playlist;
+			list = app.player?.getCurrentTrack?.();// || app.player?.playlist;
 		}
 		if (!list) return [];
 		const tracks = list.toArray ? list.toArray() : list;
@@ -410,6 +410,24 @@
 		});
 		return seeds;
 	}
+
+	var getTrackInfo = function (track) {
+		var trackInfo = {
+			id: track.id,
+			title: track.title,
+			album: track.album,
+			trackNumber: track.trackNumber,
+			duration: Math.floor(track.songLength / 1000), // in seconds
+			timestamp: 0, // will be set later on playback start
+			nowplayingsent: false
+		};
+		var artists = track.artist.split(';', 1);
+		trackInfo.artist = artists[0];
+		artists = track.albumArtist.split(';', 1);
+		trackInfo.albumArtist = artists[0];
+		ODS('last.fm: prepared trackInfo: ' + JSON.stringify(trackInfo));
+		return trackInfo;
+	};
 
 	function uniqueArtists(seeds) {
 		const blacklist = new Set(parseListSetting('Black').map((s) => s.toUpperCase()));

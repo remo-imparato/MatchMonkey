@@ -7,7 +7,7 @@ window.configInfo = {
 		// defaults matching similarArtists.js
 		const defaults = {
 			//Toolbar: 1,
-			ApiKey: '6cfe51c9bf7e77d6449e63ac0db2ac24',
+			ApiKey: app?.utils?.web?.getAPIKey('lastfmApiKey') || '6cfe51c9bf7e77d6449e63ac0db2ac24',
 			Confirm: true,
 			Sort: false,
 			Limit: 5,
