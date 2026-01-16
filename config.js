@@ -6,7 +6,7 @@ window.configInfo = {
 
 		// defaults matching similarArtists.js
 		const defaults = {
-			Toolbar: 1,
+			//Toolbar: 1,
 			ApiKey: '6cfe51c9bf7e77d6449e63ac0db2ac24',
 			Confirm: true,
 			Sort: false,
@@ -21,7 +21,7 @@ window.configInfo = {
 			Rank: false,
 			Rating: 0,
 			Unknown: true,
-			Overwrite: 0,
+			Overwrite: 'Create new playlist',
 			Enqueue: false,
 			Navigate: 0,
 			OnPlay: false,
@@ -33,34 +33,34 @@ window.configInfo = {
 			Genre: '',
 		};
 
-		this.config = app.getValue('SimilarArtist_config', defaults);
+		this.config = app.getValue('SimilarArtist', defaults);
 
 		var UI = getAllUIElements(pnlDiv);
-        //UI.SAToolbar.controlClass.textContent = this.config.Toolbar;
-		UI.SAApiKey.controlClass.textContent = this.config.ApiKey;
+        //UI.SAToolbar.controlClass.value = this.config.Toolbar;
+		UI.SAApiKey.controlClass.value = this.config.ApiKey;
 		UI.SAConfirm.controlClass.checked = this.config.Confirm;
 		UI.SASort.controlClass.checked = this.config.Sort;
-		UI.SALimit.controlClass.textContent = this.config.Limit;
-		UI.SAName.controlClass.textContent = this.config.Name;
-		UI.SATPA.controlClass.textContent = this.config.TPA;
-		UI.SATPL.controlClass.textContent = this.config.TPL;
+		UI.SALimit.controlClass.value = this.config.Limit;
+		UI.SAName.controlClass.value = this.config.Name;
+		UI.SATPA.controlClass.value = this.config.TPA;
+		UI.SATPL.controlClass.value = this.config.TPL;
 		UI.SARandom.controlClass.checked = this.config.Random;
 		UI.SASeed.controlClass.checked = this.config.Seed;
 		UI.SASeed2.controlClass.checked = this.config.Seed2;
 		UI.SABest.controlClass.checked = this.config.Best;
 		UI.SARank.controlClass.checked = this.config.Rank;
-		//UI.SARating.controlClass.textContent = this.config.Rating;
+		UI.SARating.controlClass.value = this.config.Rating;
 		UI.SAUnknown.controlClass.checked = this.config.Unknown;
-		//UI.SAOverwrite.controlClass.textContent = this.config.Overwrite;
+		UI.SAOverwrite.controlClass.value = this.config.Overwrite;
 		UI.SAEnqueue.controlClass.checked = this.config.Enqueue;
-		UI.SANavigate.controlClass.textContent = this.config.Navigate;
+		UI.SANavigate.controlClass.value = this.config.Navigate;
 		UI.SAOnPlay.controlClass.checked = this.config.OnPlay;
 		UI.SAClearNP.controlClass.checked = this.config.ClearNP;
 		UI.SAIgnore.controlClass.checked = this.config.Ignore;
-		//UI.SAParent.controlClass.textContent = this.config.Parent;
-		UI.SABlack.controlClass.textContent = this.config.Black;
-		UI.SAExclude.controlClass.textContent = this.config.Exclude;
-		UI.SAGenre.controlClass.textContent = this.config.Genre;
+		UI.SAParent.controlClass.value = this.config.Parent;
+		UI.SABlack.controlClass.value = this.config.Black;
+		UI.SAExclude.controlClass.value = this.config.Exclude;
+		UI.SAGenre.controlClass.value = this.config.Genre;
 
 		/*
 
@@ -214,33 +214,33 @@ window.configInfo = {
 	save: function (pnlDiv, addon) {
 		var UI = getAllUIElements(pnlDiv);
 
-		this.config.Toolbar = UI.SAToolbar.controlClass.textContent;
-		this.config.ApiKey = UI.SAApiKey.controlClass.textContent;
-		this.config.Confirm = UI.SAConfirm.controlClass.checked;
-		this.config.Sort = UI.SASort.controlClass.checked;
-		this.config.Limit = UI.SALimit.controlClass.textContent;
-		this.config.Name = UI.SAName.controlClass.textContent;
-		this.config.TPA = UI.SATPA.controlClass.textContent;
-		this.config.TPL = UI.SATPL.controlClass.textContent;
-		this.config.Random = UI.SARandom.controlClass.checked;
-		this.config.Seed = UI.SASeed.controlClass.checked;
-		this.config.Seed2 = UI.SASeed2.controlClass.checked;
-		this.config.Best = UI.SABest.controlClass.checked;
-		this.config.Rank = UI.SARank.controlClass.checked;
-		this.config.Rating = UI.SARating.controlClass.textContent;
-		this.config.Unknown = UI.SAUnknown.controlClass.checked;
-		this.config.Overwrite = UI.SAOverwrite.controlClass.textContent;
-		this.config.Enqueue = UI.SAEnqueue.controlClass.checked;
-		this.config.Navigate = UI.SANavigate.controlClass.textContent;
-		this.config.OnPlay = UI.SAOnPlay.controlClass.checked;
-		this.config.ClearNP = UI.SAClearNP.controlClass.checked;
-		this.config.Ignore = UI.SAIgnore.controlClass.checked;
-		this.config.Parent = UI.SAParent.controlClass.textContent;
-		this.config.Black = UI.SABlack.controlClass.textContent;
-		this.config.Exclude = UI.SAExclude.controlClass.textContent;
-		this.config.Genre = UI.SAGenre.controlClass.textContent;
+		//this.config.Toolbar = UI.SAToolbar.controlClass.value;
+		this.config.ApiKey = UI.SAApiKey.controlClass.value;
+		this.config.Confirm = UI.SAConfirm.controlClass.value;
+		this.config.Sort = UI.SASort.controlClass.value;
+		this.config.Limit = UI.SALimit.controlClass.value;
+		this.config.Name = UI.SAName.controlClass.value;
+		this.config.TPA = UI.SATPA.controlClass.value;
+		this.config.TPL = UI.SATPL.controlClass.value;
+		this.config.Random = UI.SARandom.controlClass.value;
+		this.config.Seed = UI.SASeed.controlClass.value;
+		this.config.Seed2 = UI.SASeed2.controlClass.value;
+		this.config.Best = UI.SABest.controlClass.value;
+		this.config.Rank = UI.SARank.controlClass.value;
+		this.config.Rating = UI.SARating.controlClass.value;
+		this.config.Unknown = UI.SAUnknown.controlClass.value;
+		this.config.Overwrite = UI.SAOverwrite.controlClass.value;
+		this.config.Enqueue = UI.SAEnqueue.controlClass.value;
+		this.config.Navigate = UI.SANavigate.controlClass.value;
+		this.config.OnPlay = UI.SAOnPlay.controlClass.value;
+		this.config.ClearNP = UI.SAClearNP.controlClass.value;
+		this.config.Ignore = UI.SAIgnore.controlClass.value;
+		this.config.Parent = UI.SAParent.controlClass.value;
+		this.config.Black = UI.SABlack.controlClass.value;
+		this.config.Exclude = UI.SAExclude.controlClass.value;
+		this.config.Genre = UI.SAGenre.controlClass.value;
 
-		app.setValue('SimilarArtist_config', this.config);
+		app.setValue('SimilarArtist', this.config);
 
 		/*
 		const setValue = (k, v) => { try { app.setValue?.('SimilarArtists', k, v); } catch (e) { } };

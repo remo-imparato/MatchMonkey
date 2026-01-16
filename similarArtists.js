@@ -13,30 +13,30 @@
 	//const API_KEY = app.settings.getValue('ApiKey', '') || '6cfe51c9bf7e77d6449e63ac0db2ac24';
 
 	const defaults = {
-		Toolbar: 1, // 0=none 1=run 2=auto 3=both
-		Confirm: true,
-		Sort: false,
-		Limit: 5,
-		Name: 'Artists similar to %',
-		TPA: 9999,
-		TPL: 9999,
-		Random: false,
-		Seed: false,
-		Seed2: false,
-		Best: false,
-		Rank: false,
-		Rating: 0,
-		Unknown: true,
-		Overwrite: 0, // 0=create, 1=overwrite, 2=do not create playlist (enqueue only)
-		Enqueue: false,
-		Navigate: 0,
-		OnPlay: false,
-		ClearNP: false,
-		Ignore: false,
-		Parent: '',
-		Black: '',
-		Exclude: '',
-		Genre: '',
+	//	Toolbar: 1, // 0=none 1=run 2=auto 3=both
+	//	Confirm: true,
+	//	Sort: false,
+	//	Limit: 5,
+	//	Name: 'Artists similar to %',
+	//	TPA: 9999,
+	//	TPL: 9999,
+	//	Random: false,
+	//	Seed: false,
+	//	Seed2: false,
+	//	Best: false,
+	//	Rank: false,
+	//	Rating: 0,
+	//	Unknown: true,
+	//	Overwrite: 0, // 0=create, 1=overwrite, 2=do not create playlist (enqueue only)
+	//	Enqueue: false,
+	//	Navigate: 0,
+	//	OnPlay: false,
+	//	ClearNP: false,
+	//	Ignore: false,
+	//	Parent: '',
+	//	Black: '',
+	//	Exclude: '',
+	//	Genre: '',
 	};
 
 	const state = {
@@ -118,6 +118,7 @@
 	}
 
 	function ensureDefaults() {
+		return;
 		Object.keys(defaults).forEach((k) => {
 			const val = getSetting(k, null);
 			if (val === null) {
@@ -215,7 +216,7 @@
 		// Actions/menus are registered via `actions_add.js` + `init.js` (window.actions + window._menuItems)
 		// `app.actions` / `app.menu.*` are not stable/available across MM5 builds.
 		return;
-
+		/*
 		// MM5 uses actions.add() to register actions
 		try {
 			// Register the main run action
@@ -309,6 +310,7 @@
 		} catch (e) {
 			log('Error adding toolbar buttons: ' + e.toString());
 		}
+		*/
 	}
 
 	function refreshToggleUI() {

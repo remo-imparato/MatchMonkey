@@ -11,7 +11,7 @@ registerDebuggerEntryPoint.call(this, 'start');
 	window.whenReady(() => {
 
 		// Initialize defaults
-		window.SimilarArtists?.ensureDefaults?.();
+		//window.SimilarArtists?.ensureDefaults?.();
 		window.SimilarArtists?.start();
 	});
 })();
