@@ -9,55 +9,11 @@ function getSetting(key, defaultValue) {
 	return app.getValue(key, defaultValue);
 }
 
-let saveState = function (onlyMode) {
+function log(txt) {
 	try {
-		const getControl = (id) => panel.getChildControl?.(id) || panel[id];
-
-		const apiKeyCtrl = getControl('SAApiKey');
-		if (apiKeyCtrl) {
-			app.settings.setValue('SimilarArtists.ApiKey', apiKeyCtrl.text || '');
-		}
-
-		setSetting('Name', getControl('SAName')?.text || defaults.Name);
-		setSetting('Limit', getControl('SALimit')?.value ?? defaults.Limit);
-		setSetting('TPA', getControl('SATPA')?.value ?? defaults.TPA);
-		setSetting('TPL', getControl('SATPL')?.value ?? defaults.TPL);
-		setSetting('Confirm', getControl('SAConfirm')?.checked ?? defaults.Confirm);
-		setSetting('Toolbar', getControl('SAToolbar')?.selectedIndex ?? defaults.Toolbar);
-		setSetting('Sort', getControl('SASort')?.checked ?? defaults.Sort);
-
-		const parentCtrl = getControl('SAParent');
-		const parentText = parentCtrl?.text || parentCtrl?.items?.[parentCtrl?.selectedIndex] || '';
-		setSetting('Parent', parentText === '[Playlists]' ? '' : parentText);
-
-		setSetting('Black', getControl('SABlack')?.text || '');
-		setSetting('Random', getControl('SARandom')?.checked ?? defaults.Random);
-		setSetting('Seed', getControl('SASeed')?.checked ?? defaults.Seed);
-		setSetting('Seed2', getControl('SASeed2')?.checked ?? defaults.Seed2);
-		setSetting('Best', getControl('SABest')?.checked ?? defaults.Best);
-		setSetting('Rank', getControl('SARank')?.checked ?? defaults.Rank);
-		setSetting('Rating', (getControl('SARating')?.selectedIndex ?? 0) * 10);
-		setSetting('Unknown', getControl('SAUnknown')?.checked ?? defaults.Unknown);
-		setSetting('Genre', getControl('SAGenre')?.text || '');
-		setSetting('Overwrite', getControl('SAOverwrite')?.selectedIndex ?? defaults.Overwrite);
-		setSetting('Enqueue', getControl('SAEnqueue')?.checked ?? defaults.Enqueue);
-		setSetting('Navigate', getControl('SANavigate')?.selectedIndex ?? defaults.Navigate);
-		setSetting('OnPlay', getControl('SAOnPlay')?.checked ?? defaults.OnPlay);
-		setSetting('ClearNP', getControl('SAClearNP')?.checked ?? defaults.ClearNP);
-		setSetting('Exclude', getControl('SAExclude')?.text || '');
-		setSetting('Ignore', getControl('SAIgnore')?.checked ?? defaults.Ignore);
-
-		// Update auto mode based on OnPlay setting
-		if (getSetting('OnPlay', false)) {
-			attachAuto();
-		} else {
-			detachAuto();
-		}
-
-		// Update toolbar visibility
-		refreshToolbarVisibility();
+		console.log('SimilarArtists: ' + txt);
 	} catch (e) {
-		log('saveSettingsPanel error: ' + e.toString());
+		// ignore
 	}
 }
 
@@ -294,7 +250,55 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = function (sett) {
 }
 
 optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function (sett) {
-	saveState();
+	try {
+		const getControl = (id) => panel.getChildControl?.(id) || panel[id];
+
+		const apiKeyCtrl = getControl('SAApiKey');
+		if (apiKeyCtrl) {
+			app.settings.setValue('SimilarArtists.ApiKey', apiKeyCtrl.text || '');
+		}
+
+		setSetting('Name', getControl('SAName')?.text || defaults.Name);
+		setSetting('Limit', getControl('SALimit')?.value ?? defaults.Limit);
+		setSetting('TPA', getControl('SATPA')?.value ?? defaults.TPA);
+		setSetting('TPL', getControl('SATPL')?.value ?? defaults.TPL);
+		setSetting('Confirm', getControl('SAConfirm')?.checked ?? defaults.Confirm);
+		setSetting('Toolbar', getControl('SAToolbar')?.selectedIndex ?? defaults.Toolbar);
+		setSetting('Sort', getControl('SASort')?.checked ?? defaults.Sort);
+
+		const parentCtrl = getControl('SAParent');
+		const parentText = parentCtrl?.text || parentCtrl?.items?.[parentCtrl?.selectedIndex] || '';
+		setSetting('Parent', parentText === '[Playlists]' ? '' : parentText);
+
+		setSetting('Black', getControl('SABlack')?.text || '');
+		setSetting('Random', getControl('SARandom')?.checked ?? defaults.Random);
+		setSetting('Seed', getControl('SASeed')?.checked ?? defaults.Seed);
+		setSetting('Seed2', getControl('SASeed2')?.checked ?? defaults.Seed2);
+		setSetting('Best', getControl('SABest')?.checked ?? defaults.Best);
+		setSetting('Rank', getControl('SARank')?.checked ?? defaults.Rank);
+		setSetting('Rating', (getControl('SARating')?.selectedIndex ?? 0) * 10);
+		setSetting('Unknown', getControl('SAUnknown')?.checked ?? defaults.Unknown);
+		setSetting('Genre', getControl('SAGenre')?.text || '');
+		setSetting('Overwrite', getControl('SAOverwrite')?.selectedIndex ?? defaults.Overwrite);
+		setSetting('Enqueue', getControl('SAEnqueue')?.checked ?? defaults.Enqueue);
+		setSetting('Navigate', getControl('SANavigate')?.selectedIndex ?? defaults.Navigate);
+		setSetting('OnPlay', getControl('SAOnPlay')?.checked ?? defaults.OnPlay);
+		setSetting('ClearNP', getControl('SAClearNP')?.checked ?? defaults.ClearNP);
+		setSetting('Exclude', getControl('SAExclude')?.text || '');
+		setSetting('Ignore', getControl('SAIgnore')?.checked ?? defaults.Ignore);
+
+		// Update auto mode based on OnPlay setting
+		if (getSetting('OnPlay', false)) {
+			attachAuto();
+		} else {
+			detachAuto();
+		}
+
+		// Update toolbar visibility
+		refreshToolbarVisibility();
+	} catch (e) {
+		log('saveSettingsPanel error: ' + e.toString());
+	}
 }
 
 
