@@ -1,5 +1,9 @@
 window.configInfo = {
+
 	load: function (pnlDiv, addon) {
+		requirejs('helpers/debugTools');
+		registerDebuggerEntryPoint.call(this, 'start');
+
 		// defaults matching similarArtists.js
 		const defaults = {
 			Toolbar: 1,
