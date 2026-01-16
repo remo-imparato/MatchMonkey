@@ -63,17 +63,17 @@
 
 			<div class="uiRow">
 				<label class="inline">Artist limit:</label>
-				<div data-id="SALimit" data-control-class="SpinEdit" data-init-params='{"minValue":0,"maxValue":9999}'></div>
+				<div data-id="SALimit" data-control-class="Edit" data-init-params="{type: 'number', min:1, max:9999}"></div>
 			</div>
 
 			<div class="uiRow">
 				<label class="inline">Tracks/artist:</label>
-				<div data-id="SATPA" data-control-class="SpinEdit" data-init-params='{"minValue":0,"maxValue":9999}'></div>
+				<div data-id="SATPA" data-control-class="Edit" data-init-params="{type: 'number', min:1, max:9999}"></div>
 			</div>
 
 			<div class="uiRow">
 				<label class="inline">Tracks/playlist:</label>
-				<div data-id="SATPL" data-control-class="SpinEdit" data-init-params='{"minValue":0,"maxValue":9999}'></div>
+				<div data-id="SATPL" data-control-class="Edit" data-init-params="{type: 'number', min:1, max:9999}"></div>
 			</div>
 
 			<div class="uiRow">
@@ -108,8 +108,8 @@
 
 			<div class="uiRow">
 				<label class="inline">Minimum rating:</label>
-				<div data-id="SARating" data-control-class="Dropdown">
-					<option>0 stars</option>
+				<div data-id="SARating" data-control-class="Rating">
+					<!--<option>0 stars</option>
 					<option>0.5 stars</option>
 					<option>1 star</option>
 					<option>1.5 stars</option>
@@ -119,7 +119,7 @@
 					<option>3.5 stars</option>
 					<option>4 stars</option>
 					<option>4.5 stars</option>
-					<option>5 stars</option>
+					<option>5 stars</option>-->
 				</div>
 				<div data-id="SAUnknown" data-control-class="Checkbox">Include unknown rating?</div>
 			</div>
