@@ -53,6 +53,34 @@
 		}
 	}
 
+	function showToast(text, options = {}) {
+		try {
+			// Prefer uitools.toastMessage.show (newer API)
+			if (typeof uitools !== 'undefined' && uitools?.toastMessage?.show) {
+				uitools.toastMessage.show(text, options);
+				return;
+			}
+			// Some environments may expose uitool (older) implementation
+			if (typeof uitool !== 'undefined' && uitool?.toastMessage?.show) {
+				uitool.toastMessage.show(text, options);
+				return;
+			}
+			// Fallback to app.messageBox if available (synchronous/modal)
+			if (typeof app !== 'undefined') {
+				try {
+					showToast(text);
+				}
+				catch (e) {
+					log('showToast fallback failed: ' + e.toString());
+				}
+				return;
+			}
+			// Last resort: log to console
+			log(text);
+		} catch (e) {
+			log('showToast error: ' + e.toString());
+		}
+	}
 
 	// At top of js/similarArtists.js (or in your existing file)
 	function getApiKey() {
@@ -403,9 +431,7 @@
 		const seedsRaw = collectSeedTracks();
 		const seeds = uniqueArtists(seedsRaw);
 		if (!seeds.length) {
-			if (app.messageBox) {
-				app.messageBox('SimilarArtists: Select at least one track to seed the playlist.');
-			}
+			showToast('SimilarArtists: Select at least one track to seed the playlist.');
 			return;
 		}
 
@@ -440,7 +466,7 @@
 			if (progress?.terminate || state.cancelled) {
 				if (progress?.close) progress.close();
 				if (confirm) {
-					app.messageBox?.('SimilarArtists: Process cancelled by user.');
+					showToast('SimilarArtists: Process cancelled by user.');
 				}
 				return;
 			}
@@ -484,9 +510,7 @@
 
 		if (!allTracks.length) {
 			if (progress?.close) progress.close();
-			if (app.messageBox) {
-				app.messageBox('SimilarArtists: No matching tracks found in library.');
-			}
+			showToast('SimilarArtists: No matching tracks found in library.');
 			return;
 		}
 
@@ -507,18 +531,17 @@
 		if (confirm && !autoRun) {
 			const count = seedSlice.length;
 			if (count === 1) {
-				app.messageBox?.('SimilarArtists: Artist has been processed.');
+				showToast('SimilarArtists: Artist has been processed.');
 			} else {
-				app.messageBox?.(`SimilarArtists: All ${count} artists have been processed.`);
+				showToast(`SimilarArtists: All ${count} artists have been processed.`);
 			}
 		}
 	}
 
 	async function confirmPlaylist(seedName, overwriteMode) {
-		if (!app.messageBox) return true;
 		const baseName = stringSetting('Name').replace('%', seedName || '');
 		const action = overwriteMode === 1 ? 'overwrite' : 'create';
-		const res = await app.messageBox(`SimilarArtists: Do you wish to ${action} playlist '${baseName}'?`, ['yes', 'no']);
+		const res = await showToast(`SimilarArtists: Do you wish to ${action} playlist '${baseName}'?`, ['yes', 'no']);
 		return res === 'yes';
 	}
 
