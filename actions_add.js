@@ -7,7 +7,7 @@ if (!window.actionCategories.hasOwnProperty('addons')) {
 
 window.actions = window.actions || {};
 */
-window.actions['SimilarArtists.run'] = {
+window.actions.SimilarArtistsRun = {
 	title: () => _('&Similar Artists'),
 	icon: 'script',
 	hotkeyAble: true,
@@ -16,7 +16,7 @@ window.actions['SimilarArtists.run'] = {
 	execute: () => window.SimilarArtists?.runSimilarArtists(false)
 };
 
-window.actions['SimilarArtists.toggleAuto'] = {
+window.actions.SimilarArtistsToggleAuto = {
 	title: () => _('Similar Artists: &Auto On/Off'),
 	icon: 'script',
 	hotkeyAble: true,
@@ -27,13 +27,13 @@ window.actions['SimilarArtists.toggleAuto'] = {
 };
 
 window._menuItems.tools.action.submenu.push({
-	action: SimilarArtists.run,
+	action: actions.SimilarArtistsRun,
 	order: 40,
 	grouporder: 10,
 });
 
 window._menuItems.tools.action.submenu.push({
-	action: SimilarArtists.toggleAuto,
+	action: actions.SimilarArtistsToggleAuto,
 	order: 50,
 	grouporder: 10,
 });

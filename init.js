@@ -1,7 +1,7 @@
 // init.js
 // Load your local module(s) first
 localRequirejs('similarArtists'); // -> window.SimilarArtists
-requirejs('actions');
+//requirejs('actions');
 
 (function () {
 

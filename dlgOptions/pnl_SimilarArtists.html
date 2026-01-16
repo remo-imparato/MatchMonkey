@@ -1,0 +1,195 @@
+<!-- 'This file is part of MediaMonkey licensed for use under the Ventis Media End User License Agreement, and for the creation of derivative works under the less restrictive Ventis Limited Reciprocal License. See: https://www.mediamonkey.com/sw/mmw/5/Ventis_limited_reciprocal_license.txt' -->
+
+<div data-id='SimArtSettings'>
+
+
+<div data-id="SimilarArtistsOptions" style="position:relative; width:420px; height:480px; font-family: sans-serif;">
+
+	<!-- Toolbar dropdown -->
+	<label for="SAToolbar" style="position:absolute; left:5px; top:10px; width:80px;">Toolbar buttons:</label>
+	<select id="SAToolbar" style="position:absolute; left:90px; top:7px; width:100px;"
+			data-selected-index="intSetting('Toolbar')">
+		<option>None</option>
+		<option>Run script</option>
+		<option>Auto on/off</option>
+		<option>Both</option>
+	</select>
+
+	<!-- Last.fm API key -->
+	<label for="SAApiKey" style="position:absolute; left:5px; top:440px; width:120px;">Last.fm API key:</label>
+	<input id="SAApiKey" type="text" style="position:absolute; left:130px; top:437px; width:260px;"
+		   placeholder="Enter your Last.fm API key"
+		   data-value="app.settings?.getValue?.('SimilarArtists.ApiKey', '') || ''" />
+
+	<!-- Confirm checkbox -->
+	<label style="position:absolute; left:5px; top:35px; width:200px;">
+		<input id="SAConfirm" type="checkbox" style="vertical-align:middle;"
+			   data-checked="boolSetting('Confirm')" />
+		Show confirmation prompt?
+	</label>
+
+	<!-- Sort checkbox -->
+	<label style="position:absolute; left:5px; top:60px; width:200px;">
+		<input id="SASort" type="checkbox" style="vertical-align:middle;"
+			   data-checked="boolSetting('Sort')" />
+		Sort artists before processing?
+	</label>
+
+	<!-- Random checkbox -->
+	<label style="position:absolute; left:225px; top:10px; width:200px;">
+		<input id="SARandom" type="checkbox" style="vertical-align:middle;"
+			   data-checked="boolSetting('Random')" />
+		Randomise playlists?
+	</label>
+
+	<!-- Seed artist checkbox -->
+	<label style="position:absolute; left:225px; top:35px; width:200px;">
+		<input id="SASeed" type="checkbox" style="vertical-align:middle;"
+			   data-checked="boolSetting('Seed')" />
+		Include seed artist?
+	</label>
+
+	<!-- Seed track checkbox -->
+	<label style="position:absolute; left:225px; top:60px; width:200px;">
+		<input id="SASeed2" type="checkbox" style="vertical-align:middle;"
+			   data-checked="boolSetting('Seed2')" />
+		Include seed track (if only one)?
+	</label>
+
+	<!-- Overwrite dropdown -->
+	<label for="SAOverwrite" style="position:absolute; left:5px; top:85px; width:80px;">Playlist creation:</label>
+	<select id="SAOverwrite" style="position:absolute; left:90px; top:82px; width:300px;"
+			data-selected-index="intSetting('Overwrite')">
+		<option>Create new playlist</option>
+		<option>Overwrite existing playlist</option>
+		<option>Do not create playlist</option>
+	</select>
+
+	<!-- Playlist name -->
+	<label for="SAName" style="position:absolute; left:5px; top:110px; width:80px;">Playlist name:</label>
+	<input id="SAName" type="text" style="position:absolute; left:90px; top:107px; width:300px;"
+		   placeholder="Use % to represent the artist name"
+		   data-value="stringSetting('Name')" />
+
+	<!-- Artist limit (spin) -->
+	<label for="SALimit" style="position:absolute; left:5px; top:135px; width:80px;">Artist limit:</label>
+	<input id="SALimit" type="number" style="position:absolute; left:90px; top:132px; width:50px;"
+		   min="0" max="9999" data-value="intSetting('Limit')" />
+
+	<!-- Tracks per artist (spin) -->
+	<label for="SATPA" style="position:absolute; left:5px; top:160px; width:80px;">Tracks/artist:</label>
+	<input id="SATPA" type="number" style="position:absolute; left:90px; top:157px; width:50px;"
+		   min="0" max="9999" data-value="intSetting('TPA')"
+		   title="Maximum number of tracks from a single artist in a playlist" />
+
+	<!-- Best checkbox -->
+	<label style="position:absolute; left:225px; top:135px; width:200px;">
+		<input id="SABest" type="checkbox" style="vertical-align:middle;"
+			   data-checked="boolSetting('Best')" />
+		Select highest rated in library?
+	</label>
+
+	<!-- Rank checkbox -->
+	<label style="position:absolute; left:225px; top:160px; width:200px;">
+		<input id="SARank" type="checkbox" style="vertical-align:middle;"
+			   data-checked="boolSetting('Rank')" />
+		Select highest ranked by Last.Fm?
+	</label>
+
+	<!-- Tracks per playlist (spin) -->
+	<label for="SATPL" style="position:absolute; left:5px; top:186px; width:80px;">Tracks/playlist:</label>
+	<input id="SATPL" type="number" style="position:absolute; left:90px; top:182px; width:50px;"
+		   min="0" max="9999" data-value="intSetting('TPL')"
+		   title="Maximum number of tracks in total in a playlist" />
+
+	<!-- Parent playlist -->
+	<label for="SAParent" style="position:absolute; left:5px; top:210px; width:80px;">Parent playlist:</label>
+	<select id="SAParent" style="position:absolute; left:90px; top:207px; width:300px;"
+			data-selected-index="parentIndex"
+			title="Please select a playlist">
+		<option>[Playlists]</option>
+		<!-- additional options appended from getPlaylistNames() -->
+		<option data-dynamic>...playlists from getPlaylistNames()...</option>
+	</select>
+
+	<!-- Exclude artists (blacklist) -->
+	<label for="SABlack" style="position:absolute; left:5px; top:235px; width:80px;">Exclude artists:</label>
+	<input id="SABlack" type="text" style="position:absolute; left:90px; top:232px; width:300px;"
+		   placeholder="Comma separated list of artists names"
+		   data-value="stringSetting('Black')" />
+
+	<!-- Exclude genres -->
+	<label for="SAGenre" style="position:absolute; left:5px; top:260px; width:80px;">Exclude genres:</label>
+	<input id="SAGenre" type="text" style="position:absolute; left:90px; top:257px; width:300px;"
+		   placeholder="Comma separated list of genres"
+		   data-value="stringSetting('Genre')" />
+
+	<!-- Exclude titles -->
+	<label for="SAExclude" style="position:absolute; left:5px; top:285px; width:80px;">Exclude titles:</label>
+	<input id="SAExclude" type="text" style="position:absolute; left:90px; top:282px; width:300px;"
+		   placeholder="Comma separated list of words in titles"
+		   data-value="stringSetting('Exclude')" />
+
+	<!-- Minimum rating -->
+	<label for="SARating" style="position:absolute; left:5px; top:310px; width:80px;">Minimum rating:</label>
+	<select id="SARating" style="position:absolute; left:90px; top:307px; width:100px;"
+			data-selected-index="Math.floor(intSetting('Rating') / 10)"
+			title="Select minimum rating stars">
+		<option>0 stars</option>
+		<option>0.5 stars</option>
+		<option>1 star</option>
+		<option>1.5 stars</option>
+		<option>2 stars</option>
+		<option>2.5 stars</option>
+		<option>3 stars</option>
+		<option>3.5 stars</option>
+		<option>4 stars</option>
+		<option>4.5 stars</option>
+		<option>5 stars</option>
+	</select>
+
+	<!-- Unknown rating checkbox -->
+	<label style="position:absolute; left:225px; top:310px; width:200px;">
+		<input id="SAUnknown" type="checkbox" style="vertical-align:middle;"
+			   data-checked="boolSetting('Unknown')" />
+		Include unknown rating?
+	</label>
+
+	<!-- Navigation -->
+	<label for="SANavigate" style="position:absolute; left:5px; top:335px; width:80px;">Navigation:</label>
+	<select id="SANavigate" style="position:absolute; left:90px; top:332px; width:300px;"
+			data-selected-index="intSetting('Navigate')">
+		<option>None</option>
+		<option>Navigate to new playlist</option>
+		<option>Navigate to now playing</option>
+	</select>
+
+	<!-- OnPlay checkbox -->
+	<label style="position:absolute; left:5px; top:360px; width:400px;">
+		<input id="SAOnPlay" type="checkbox" style="vertical-align:middle;"
+			   data-checked="boolSetting('OnPlay')" />
+		Automatically run the script when playing the last track?
+	</label>
+
+	<!-- Enqueue checkbox -->
+	<label style="position:absolute; left:5px; top:385px; width:400px;">
+		<input id="SAEnqueue" type="checkbox" style="vertical-align:middle;"
+			   data-checked="boolSetting('Enqueue')" />
+		Automatically enqueue tracks?
+	</label>
+
+	<!-- ClearNP checkbox -->
+	<label style="position:absolute; left:5px; top:410px; width:400px;">
+		<input id="SAClearNP" type="checkbox" style="vertical-align:middle;"
+			   data-checked="boolSetting('ClearNP')" />
+		Clear list before enqueuing tracks?
+	</label>
+
+	<!-- Ignore checkbox -->
+	<label style="position:absolute; left:5px; top:435px; width:400px;">
+		<input id="SAIgnore" type="checkbox" style="vertical-align:middle;"
+			   data-checked="boolSetting('Ignore')" />
+		Ignore recently played tracks when enqueuing?
+	</label>
+
+</div>
