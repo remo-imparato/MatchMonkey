@@ -800,41 +800,41 @@
 		log('SimilarArtists addon started successfully.');
 	}
 
-	// Auto-initialize when script loads
-	(function init() {
-		// Wait for app to be available
-		if (typeof app !== 'undefined') {
-			start();
-		} else if (typeof window !== 'undefined') {
-			// Try to start when window is ready
-			window.addEventListener('load', function () {
-				start();
-			});
-		}
-	})();
+	//// Auto-initialize when script loads
+	//(function init() {
+	//	// Wait for app to be available
+	//	if (typeof app !== 'undefined') {
+	//		start();
+	//	} else if (typeof window !== 'undefined') {
+	//		// Try to start when window is ready
+	//		window.addEventListener('load', function () {
+	//			start();
+	//		});
+	//	}
+	//})();
 
-	// Export functions to window/global scope for info.json access
-	if (typeof window !== 'undefined') {
-		window.start = start;
-		window.runSimilarArtists = runSimilarArtists;
-		window.toggleAuto = toggleAuto;
-	}
+	//// Export functions to window/global scope for info.json access
+	//if (typeof window !== 'undefined') {
+	//	window.start = start;
+	//	window.runSimilarArtists = runSimilarArtists;
+	//	window.toggleAuto = toggleAuto;
+	//}
 
-	// For CommonJS/module environments
-	if (typeof module !== 'undefined' && module.exports) {
-		module.exports = {
-			start: start,
-			runSimilarArtists: runSimilarArtists,
-			toggleAuto: toggleAuto
-		};
-	}
+	//// For CommonJS/module environments
+	//if (typeof module !== 'undefined' && module.exports) {
+	//	module.exports = {
+	//		start: start,
+	//		runSimilarArtists: runSimilarArtists,
+	//		toggleAuto: toggleAuto
+	//	};
+	//}
 
-	// For ES6 module environments
-	if (typeof exports !== 'undefined') {
-		exports.start = start;
-		exports.runSimilarArtists = runSimilarArtists;
-		exports.toggleAuto = toggleAuto;
-	}
+	//// For ES6 module environments
+	//if (typeof exports !== 'undefined') {
+	//	exports.start = start;
+	//	exports.runSimilarArtists = runSimilarArtists;
+	//	exports.toggleAuto = toggleAuto;
+	//}
 
 	/**
 	 * Initialize the settings panel UI

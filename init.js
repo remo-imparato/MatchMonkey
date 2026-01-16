@@ -51,5 +51,7 @@ localRequirejs('js/similarArtists'); // -> window.SimilarArtists
 
 		// (Optional) register the Options sheet if you split it out
 		// window.SimilarArtistsSettings?.registerSettingsSheet?.();
+
+		window.SimilarArtists?.start();
 	});
 })();

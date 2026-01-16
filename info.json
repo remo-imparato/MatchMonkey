@@ -1,5 +1,5 @@
 {
-	"id": "remo_SimilarArtists",
+	"id": "SimilarArtists",
 	"title": "Similar Artists",
 	"description": "Create/enqueue playlists of similar artists using Last.fm and your MediaMonkey library.",
 	"version": "1.0.0",
