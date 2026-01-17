@@ -343,7 +343,7 @@
 
 			const allTracks = [];
 			if (includeSeedTrack && seeds.length === 1 && seeds[0].track) {
-			allTracks.push(seeds[0].track);
+				allTracks.push(seeds[0].track);
 			}
 
 			const seedSlice = seeds.slice(0, artistLimit || seeds.length);
@@ -400,8 +400,9 @@
 				return;
 			}
 
-			if (randomise) shuffle(allTracks);
-			if (enqueue || overwriteMode === 2) {
+			if (randomise)
+				shuffle(allTracks);
+			if (enqueue || overwriteMode.toLowerCase().indexOf("do not") > -1) {
 				await enqueueTracks(allTracks, ignoreDupes, clearNP);
 			} else {
 				const seedName = seeds[0]?.name || 'Similar Artists';
@@ -426,7 +427,7 @@
 			log(e.msg);
 			showToast('SimilarArtists: An error occurred - see log for details.');
 		} finally {
-		//	prog.close();
+			//	prog.close();
 			//uitools.hideProgressWindow();
 		}
 	}
@@ -435,7 +436,7 @@
 		const baseName = stringSetting('Name').replace('%', seedName || '');
 		const action = overwriteMode === 1 ? 'overwrite' : 'create';
 		const res = await showToast(`SimilarArtists: Do you wish to ${action} playlist '${baseName}'?`, ['yes', 'no']);
-		return res === 'yes';
+		return true;// res === 'yes';
 	}
 
 	async function fetchSimilarArtists(artistName) {
@@ -521,9 +522,9 @@
 			const ratingMin = intSetting('Rating');
 			const allowUnknown = boolSetting('Unknown');
 
-			// Base SELECT — DISTINCT is fine without GROUP BY
+			// Base SELECT — no DISTINCT needed because Songs.ID is unique
 			let sql = `
-			SELECT DISTINCT Songs.*
+			SELECT Songs.*${opts.rank ? ', SimArtSongRank.Rank AS RankValue' : ''}
 			FROM Songs
 			INNER JOIN ArtistsSongs 
 				ON Songs.ID = ArtistsSongs.IDSong 
@@ -573,13 +574,12 @@
 			if (title) {
 				const strippedTitle = stripName(title);
 
-				const stripExpr = `
-				REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-				REPLACE(REPLACE(REPLACE(REPLACE(
-					UPPER(Songs.SongTitle),
-				'&','AND'),'+','AND'),' N ','AND'),'''N''','AND'),' ',''),'.',''),
-				',',''),':',''),';',''),'-',''),'_',''),'!',''),'''',''),'\"','')
-			`;
+				const stripExpr =
+					"REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(" +
+					"REPLACE(REPLACE(REPLACE(REPLACE(" +
+					"UPPER(Songs.SongTitle)," +
+					"'&','AND'),'+','AND'),' N ','AND'),'''N''','AND'),' ',''),'.','')," +
+					"',',''),':',''),';',''),'-',''),'_',''),'!',''),'''',''),'\"','')";
 
 				if (strippedTitle) {
 					whereParts.push(`${stripExpr} = '${escapeSql(strippedTitle)}'`);
@@ -599,10 +599,10 @@
 					.map((g) => `GenreName LIKE '%${escapeSql(g)}%'`)
 					.join(' OR ');
 				whereParts.push(`
-				GenresSongs.IDGenre NOT IN (
-					SELECT IDGenre FROM Genres WHERE ${genreConditions}
-				)
-			`);
+					GenresSongs.IDGenre NOT IN (
+						SELECT IDGenre FROM Genres WHERE ${genreConditions}
+					)
+				`);
 			}
 
 			// Rating logic
@@ -623,7 +623,7 @@
 
 			// ORDER BY
 			const order = [];
-			if (opts.rank) order.push('SimArtSongRank.Rank DESC');
+			if (opts.rank) order.push('RankValue DESC');
 			if (opts.best) order.push('Songs.Rating DESC');
 			order.push('Random()');
 
@@ -650,6 +650,7 @@
 			return [];
 		}
 	}
+
 	async function enqueueTracks(tracks, ignoreDupes, clearFirst) {
 		const player = app.player;
 		if (!player) return;
@@ -674,7 +675,8 @@
 		const baseName = titleTemplate.replace('%', seedName || '');
 		let name = baseName;
 		let playlist = findPlaylist(name);
-		if (overwriteMode === 0) {
+		//-- create new
+		if (overwriteMode.toLowerCase().indexOf("create") > -1) {
 			let idx = 1;
 			while (playlist) {
 				idx += 1;
@@ -685,10 +687,16 @@
 		if (!playlist && app.playlists?.createPlaylist) {
 			playlist = app.playlists.createPlaylist(name, stringSetting('Parent'));
 		}
-		if (!playlist) return;
-		if (overwriteMode === 1 && playlist.clear) playlist.clear();
-		if (playlist.addTracks) playlist.addTracks(tracks);
-		else if (playlist.addTrack) tracks.forEach((t) => playlist.addTrack(t));
+		if (!playlist)
+			return;
+
+		if (overwriteMode.toLowerCase().indexOf("overwrite") > -1 && playlist.clear)
+			playlist.clear();
+
+		if (playlist.addTracks)
+			playlist.addTracks(tracks);
+		else if (playlist.addTrack)
+			tracks.forEach((t) => playlist.addTrack(t));
 
 		// navigation: 1 navigate to playlist, 2 navigate to now playing
 		const nav = intSetting('Navigate');
