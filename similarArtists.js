@@ -303,30 +303,52 @@
 
 	/**
 	 * Collect seed tracks either from current selection or current playing track.
-	 * The resulting list is used as starting points for Last.fm similarity queries.
+	 * Supports multiple selected tracks, each contributing their artist as a seed.
+	 * Fallback to current playing track if no selection exists.
 	 * @returns {{name: string, track?: object}[]}
 	 */
 	function collectSeedTracks() {
 		if (typeof app === 'undefined') return [];
-		let list = null;
-		// Try to get selected tracks from the UI
-		if (uitools?.getSelectedTracklist) {
-			list = uitools.getSelectedTracklist();
-		}
-		const count = typeof list?.count === 'function' ? list.count() : (list?.count || 0);
-		// Fallback to current playing track if no selection
-		if (!list || count === 0) {
-			list = app.player?.getCurrentTrack?.();// || app.player?.playlist;
-		}
-		if (!list) return [];
-		const tracks = list.toArray ? list.toArray() : [list];
+
 		const seeds = [];
-		(tracks || []).forEach((t) => {
-			if (t && t.artist) {
-				seeds.push({ name: normalizeName(t.artist), track: t });
+		
+		// Try to get selected tracks from the UI
+		let selectedList = null;
+		if (uitools?.getSelectedTracklist) {
+			selectedList = uitools.getSelectedTracklist();
+		}
+
+		// Check if we have a valid selection with tracks
+		const selectedCount = typeof selectedList?.count === 'function' 
+			? selectedList.count() 
+			: (selectedList?.count || 0);
+
+		if (selectedList && selectedCount > 0) {
+			// Process all selected tracks
+			const selectedTracks = selectedList.toArray ? selectedList.toArray() : [selectedList];
+			log(`collectSeedTracks: Found ${selectedCount} selected track(s)`);
+			
+			(selectedTracks || []).forEach((t) => {
+				if (t && t.artist) {
+					seeds.push({ name: normalizeName(t.artist), track: t });
+				}
+			});
+
+			if (seeds.length > 0) {
+				return seeds;
 			}
-		});
-		return seeds;
+		}
+
+		// Fallback: use current playing track if no selection
+		log('collectSeedTracks: No selection found, falling back to currently playing track');
+		const currentTrack = app.player?.getCurrentTrack?.();
+		if (currentTrack && currentTrack.artist) {
+			seeds.push({ name: normalizeName(currentTrack.artist), track: currentTrack });
+			return seeds;
+		}
+
+		log('collectSeedTracks: No tracks found (no selection and no playing track)');
+		return [];
 	}
 
 	/**
