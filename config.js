@@ -6,7 +6,7 @@ window.configInfo = {
 
 		// defaults matching similarArtists.js
 		const defaults = {
-			ApiKey: app?.utils?.web?.getAPIKey('lastfmApiKey') || '6cfe51c9bf7e77d6449e63ac0db2ac24',
+			ApiKey: app?.utils?.web?.getAPIKey('lastfmApiKey') || '7fd988db0c4e9d8b12aed27d0a91a932' || '6cfe51c9bf7e77d6449e63ac0db2ac24',
 			Confirm: true,
 			Sort: false,
 			Limit: 5,
@@ -35,7 +35,7 @@ window.configInfo = {
 		this.config = app.getValue('SimilarArtists', defaults);
 
 		var UI = getAllUIElements(pnlDiv);
-        //UI.SAToolbar.controlClass.value = this.config.Toolbar;
+		//UI.SAToolbar.controlClass.value = this.config.Toolbar;
 		UI.SAApiKey.controlClass.value = this.config.ApiKey;
 		UI.SAConfirm.controlClass.checked = this.config.Confirm;
 		UI.SASort.controlClass.checked = this.config.Sort;

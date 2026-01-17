@@ -15,7 +15,6 @@
 	const SETTINGS_SHEET_ID = SCRIPT_ID + '.settings';
 	// Last.fm API base endpoint.
 	const API_BASE = 'https://ws.audioscrobbler.com/2.0/';
-	//const API_KEY = app.settings.getValue('ApiKey', '') || '6cfe51c9bf7e77d6449e63ac0db2ac24';
 
 	// Default settings (kept commented-out here because this add-on reads defaults from the Options page).
 	const defaults = {
@@ -82,8 +81,7 @@
 	 * @returns {string} API key.
 	 */
 	function getApiKey() {
-		return getSetting('ApiKey', '6cfe51c9bf7e77d6449e63ac0db2ac24');
-		//return app?.settings?.getValue?.('SimilarArtists.ApiKey', '') || '6cfe51c9bf7e77d6449e63ac0db2ac24';
+		return getSetting('ApiKey', '7fd988db0c4e9d8b12aed27d0a91a932');
 	}
 
 	/**
@@ -115,6 +113,16 @@
 	function setSetting(key, value) {
 		if (typeof app === 'undefined' || !app.setValue) return;
 		app.setValue(SCRIPT_ID, key, value);
+	}
+
+	/**
+	 * Get a setting coerced to integer.
+	 * @param {string} key Setting key.
+	 * @returns {number}
+	 */
+	function intSetting(key) {
+		const v = getSetting(key, defaults[key]);
+		return parseInt(v, 10) || 0;
 	}
 
 	/**
@@ -385,7 +393,7 @@
 				showToast('SimilarArtists: Select at least one track to seed the playlist.');
 				return;
 			}
-			showToast('SimilarArtists: Started');
+			showToast('SimilarArtists: Running');
 
 			// Load config block stored under this script id.
 			var config = app.getValue(SCRIPT_ID, defaults);
@@ -506,7 +514,7 @@
 		} finally {
 			//	prog.close();
 			//uitools.hideProgressWindow();
-			showToast('SimilarArtists: Finished');
+			//showToast('SimilarArtists: Finished');
 
 		}
 	}
@@ -898,7 +906,7 @@
 		}
 
 		// navigation: 1 navigate to playlist, 2 navigate to now playing
-		const nav = getSetting('SANavigate');
+		const nav = getSetting('Navigate');
 		try {
 			if (nav.indexOf('new') > -1 && app.ui?.navigateToPlaylist && playlist.id) {
 				app.ui.navigateToPlaylist(playlist.id);
@@ -1002,7 +1010,11 @@
 	 * Ensures the app API is available and optionally attaches auto-mode.
 	 */
 	function start() {
-		if (state.started) return;
+		requirejs('helpers/debugTools');
+		registerDebuggerEntryPoint.call(this, 'start');
+
+		if (state.started)
+			return;
 		state.started = true;
 		log('Starting SimilarArtists addon...');
 
@@ -1012,9 +1024,6 @@
 			return;
 		}
 
-		ensureDefaults();
-		//registerActions();
-		//registerSettingsSheet();
 		if (getSetting('OnPlay', false))
 			attachAuto();
 
@@ -1130,7 +1139,6 @@
 
 	// Export functions to the global scope
 	globalArg.SimilarArtists = {
-		ensureDefaults,
 		start,
 		runSimilarArtists,
 		toggleAuto,
