@@ -482,6 +482,448 @@
 
 			const allTracks = [];
 			if (includeSeedTrack && seeds.length === 1 && seeds[0].track) {
+			allTracks.push(seeds[0].track);
+			}
+
+			const seedSlice = seeds.slice(0, artistLimit || seeds.length);
+			for (let i = 0; i < seedSlice.length; i++) {
+				// Check for cancellation
+				if (progress?.terminate || state.cancelled) {
+					if (progress?.close) progress.close();
+					if (confirm) {
+						showToast('SimilarArtists: Process cancelled by user.');
+					}
+					return;
+				}
+
+				const seed = seedSlice[i];
+				if (progress) {
+					progress.maxValue = seedSlice.length;
+					progress.value = i;
+					progress.text = `Processing ${seed.name} (${i + 1}/${seedSlice.length})`;
+				}
+
+				// Use fixPrefixes for the API call
+				const artistNameForApi = fixPrefixes(seed.name);
+				const similar = await fetchSimilarArtists(artistNameForApi);
+
+				const artistPool = [];
+				if (includeSeedArtist) artistPool.push(seed.name);
+				similar.slice(0, artistLimit).forEach((a) => {
+					if (a?.name) artistPool.push(a.name);
+				});
+
+				for (const artName of artistPool) {
+					// Check for cancellation
+					if (progress?.terminate || state.cancelled) {
+						break;
+					}
+
+					if (rankEnabled) {
+						await updateRankForArtist(artName);
+					}
+					const titles = await fetchTopTracks(fixPrefixes(artName), tracksPerArtist);
+					for (const title of titles) {
+						const matches = await findLibraryTracks(artName, title, 1, { rank: rankEnabled, best: bestEnabled });
+						matches.forEach((m) => allTracks.push(m));
+						if (allTracks.length >= totalLimit) break;
+					}
+					if (allTracks.length >= totalLimit) break;
+				}
+				if (allTracks.length >= totalLimit) break;
+			}
+
+			if (!allTracks.length) {
+				if (progress?.close) progress.close();
+				showToast('SimilarArtists: No matching tracks found in library.');
+				return;
+			}
+
+			if (randomise) shuffle(allTracks);
+			if (enqueue || overwriteMode === 2) {
+				await enqueueTracks(allTracks, ignoreDupes, clearNP);
+			} else {
+				const seedName = seeds[0]?.name || 'Similar Artists';
+				const proceed = !confirm || (await confirmPlaylist(seedName, overwriteMode));
+				if (proceed) {
+					await createPlaylist(allTracks, seedName, overwriteMode);
+				}
+			}
+
+			if (progress?.close) progress.close();
+
+			// Show completion message if confirm is enabled
+			if (confirm && !autoRun) {
+				const count = seedSlice.length;
+				if (count === 1) {
+					showToast('SimilarArtists: Artist has been processed.');
+				} else {
+					showToast(`SimilarArtists: All ${count} artists have been processed.`);
+				}
+			}
+		} catch (e) {
+			log(e.msg);
+			showToast('SimilarArtists: An error occurred - see log for details.');
+		} finally {
+			prog.close();
+			//uitools.hideProgressWindow();
+		}
+	}
+
+	async function confirmPlaylist(seedName, overwriteMode) {
+		const baseName = stringSetting('Name').replace('%', seedName || '');
+		const action = overwriteMode === 1 ? 'overwrite' : 'create';
+		const res = await showToast(`SimilarArtists: Do you wish to ${action} playlist '${baseName}'?`, ['yes', 'no']);
+		return res === 'yes';
+	}
+
+	async function fetchSimilarArtists(artistName) {
+		try {
+			if (!artistName) return [];
+			const apiKey = getApiKey();
+			const limitVal = parseInt(getSetting('Limit', defaults?.Limit || 0), 10) || undefined;
+			const params = new URLSearchParams({ method: 'artist.getSimilar', api_key: apiKey, format: 'json', artist: artistName });
+			if (limitVal) params.set('limit', String(limitVal));
+			const url = API_BASE + '?' + params.toString();
+			const res = await fetch(url);
+			if (!res || !res.ok) {
+				log(`fetchSimilarArtists: HTTP ${res?.status} ${res?.statusText} for ${artistName}`);
+				return [];
+			}
+			let data;
+			try {
+				data = await res.json();
+			} catch (e) {
+				log('fetchSimilarArtists: invalid JSON response: ' + e.toString());
+				return [];
+			}
+			if (data?.error) {
+				log('fetchSimilarArtists: API error: ' + (data.message || data.error));
+				return [];
+			}
+			const artists = data?.similarartists?.artist || [];
+			if (!Array.isArray(artists) && artists) return [artists];
+			return artists;
+		} catch (e) {
+			log(e.toString());
+			return [];
+		}
+	}
+
+	async function fetchTopTracks(artistName, limit) {
+		try {
+			if (!artistName) return [];
+			const apiKey = getApiKey();
+			const lim = Number(limit) || undefined;
+			const params = new URLSearchParams({ method: 'artist.getTopTracks', api_key: apiKey, format: 'json', artist: artistName });
+			if (lim) params.set('limit', String(lim));
+			const url = API_BASE + '?' + params.toString();
+			const res = await fetch(url);
+			if (!res || !res.ok) {
+				log(`fetchTopTracks: HTTP ${res?.status} ${res?.statusText} for ${artistName}`);
+				return [];
+			}
+			let data;
+			try {
+				data = await res.json();
+			} catch (e) {
+				log('fetchTopTracks: invalid JSON response: ' + e.toString());
+				return [];
+			}
+			if (data?.error) {
+				log('fetchTopTracks: API error: ' + (data.message || data.error));
+				return [];
+			}
+			let tracks = data?.toptracks?.track || [];
+			if (tracks && !Array.isArray(tracks)) tracks = [tracks];
+			const titles = [];
+			tracks.forEach((t) => {
+				if (t && (t.name || t.title)) titles.push(t.name || t.title);
+			});
+			return typeof lim === 'number' ? titles.slice(0, lim) : titles;
+		} catch (e) {
+			log(e.toString());
+			return [];
+		}
+	}
+
+	async function fetchTopTracksForRank(artistName) {
+		return fetchTopTracks(artistName, 100);
+	}
+
+	function getToggleIcon() {
+		return getSetting('OnPlay', false) ? 'checkbox-checked' : 'checkbox-unchecked';
+	}
+
+	function registerActions() {
+		// Actions/menus are registered via `actions_add.js` + `init.js` (window.actions + window._menuItems)
+		// `app.actions` / `app.menu.*` are not stable/available across MM5 builds.
+		return;
+		/*
+		// MM5 uses actions.add() to register actions
+		try {
+			// Register the main run action
+			const actionsApi = app.actions || (typeof actions !== 'undefined' ? actions : null);
+			if (actionsApi && actionsApi.add) {
+				actionsApi.add({
+					id: ACTION_RUN_ID,
+					title: _('Similar Artists'),
+					icon: 'script',
+					disabled: false,
+					visible: true,
+					execute: function () {
+						runSimilarArtists(false);
+					}
+				});
+
+				actionsApi.add({
+					id: ACTION_AUTO_ID,
+					title: _('Similar Artists (Auto On/Off)'),
+					icon: 'script',
+					disabled: false,
+					visible: true,
+					execute: function () {
+						toggleAuto();
+					}
+				});
+
+				log('Actions registered successfully');
+			} else {
+				log('actions.add not available');
+			}
+		} catch (e) {
+			log('Error registering actions: ' + e.toString());
+		}
+
+		try {
+			// Prefer app.menu/tools if available, fall back to menuItems/uitool
+			if (app.menu?.tools?.addItem) {
+				app.menu.tools.addItem({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID });
+				app.menu.tools.addItem({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID });
+				log('Menu items added via app.menu.tools.addItem');
+			} else if (typeof menuItems !== 'undefined' && menuItems.add) {
+				menuItems.add({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID, menuId: 'tools' });
+				menuItems.add({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID, menuId: 'tools' });
+				log('Menu items added via menuItems.add');
+			} else if (typeof uitool !== 'undefined' && uitool.menu) {
+				var toolsMenu = uitool.menu.tools || uitool.menu.getItem('tools');
+				if (toolsMenu && toolsMenu.addItem) {
+					toolsMenu.addItem({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID });
+					toolsMenu.addItem({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID });
+					log('Menu items added to Tools menu via uitool');
+				}
+			}
+		} catch (e) {
+			log('Error adding menu items: ' + e.toString());
+		}
+
+		try {
+			// Add toolbar buttons
+			const toolbarMode = Number(getSetting('Toolbar', defaults.Toolbar));
+			if (app.toolbar?.addButton) {
+				if (toolbarMode === 1 || toolbarMode === 3) {
+					app.toolbar.addButton({ id: TOOLBAR_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID, icon: 'script', visible: true });
+				}
+				if (toolbarMode === 2 || toolbarMode === 3) {
+					app.toolbar.addButton({ id: TOOLBAR_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID, icon: 'script', visible: true });
+				}
+				log('Toolbar buttons added via app.toolbar.addButton');
+			} else if (typeof uitool !== 'undefined' && uitool.toolbar && uitool.toolbar.addButton) {
+				const toolbarMode = Number(getSetting('Toolbar', defaults.Toolbar));
+				if (toolbarMode === 1 || toolbarMode === 3) {
+					uitool.toolbar.addButton({
+						id: TOOLBAR_RUN_ID,
+						title: _('Similar Artists'),
+						action: ACTION_RUN_ID,
+						icon: 'script',
+						visible: true
+					});
+				}
+				if (toolbarMode === 2 || toolbarMode === 3) {
+					uitool.toolbar.addButton({
+						id: TOOLBAR_AUTO_ID,
+						title: _('Similar Artists (Auto On/Off)'),
+						action: ACTION_AUTO_ID,
+						icon: 'script',
+						visible: true
+					});
+				}
+				log('Toolbar buttons added');
+			}
+		} catch (e) {
+			log('Error adding toolbar buttons: ' + e.toString());
+		}
+		*/
+	}
+
+	function refreshToggleUI() {
+		try {
+			const iconNum = getSetting('OnPlay', false) ? 32 : 33;
+			if (app.toolbar?.setButtonIcon) {
+				app.toolbar.setButtonIcon(TOOLBAR_AUTO_ID, iconNum);
+			}
+			// app.actions is not available in some MM5 builds; ignore if missing.
+			if (app.actions?.updateActionIcon) {
+				app.actions.updateActionIcon(ACTION_AUTO_ID, iconNum);
+			}
+		} catch (e) {
+			log(e.toString());
+		}
+	}
+
+	function toggleAuto() {
+		const next = !getSetting('OnPlay', false);
+		setSetting('OnPlay', next);
+		refreshToggleUI();
+		if (next) attachAuto();
+		else detachAuto();
+	}
+
+	function attachAuto() {
+		detachAuto();
+		if (typeof app === 'undefined') return;
+		const player = app.player;
+		if (!player) return;
+		if (app.listen) {
+			state.autoListen = app.listen(player, 'playbackState', (newState) => {
+				if (newState === 'trackChanged') handleAuto();
+			});
+		} else if (player.on) {
+			state.autoListen = player.on('playbackState', (newState) => {
+				if (newState === 'trackChanged') handleAuto();
+			});
+		}
+	}
+
+	function detachAuto() {
+		if (!state.autoListen) return;
+		try {
+			if (app.unlisten) app.unlisten(state.autoListen);
+			else if (state.autoListen.off) state.autoListen.off();
+		} catch (e) {
+			log(e.toString());
+		}
+		state.autoListen = null;
+	}
+
+	async function handleAuto() {
+		try {
+			if (!getSetting('OnPlay', false)) return;
+			const player = app.player;
+			if (!player || !player.playlist) return;
+			const list = player.playlist;
+			if (typeof list.getCursor === 'function' && typeof list.count === 'function') {
+				if (list.getCursor() + 2 > list.count()) {
+					await runSimilarArtists(true);
+				}
+			}
+		} catch (e) {
+			log(e.toString());
+		}
+	}
+
+	function parseListSetting(key) {
+		return stringSetting(key)
+			.split(',')
+			.map((s) => s.trim())
+			.filter((s) => s.length > 0);
+	}
+
+	function normalizeName(name) {
+		return (name || '').trim();
+	}
+
+	function collectSeedTracks() {
+		if (typeof app === 'undefined') return [];
+		let list = null;
+		if (uitools?.getSelectedTracklist) {
+			list = uitools.getSelectedTracklist();
+		}
+		const count = typeof list?.count === 'function' ? list.count() : (list?.count || 0);
+		if (!list || count === 0) {
+			list = app.player?.getCurrentTrack?.();// || app.player?.playlist;
+		}
+		if (!list) return [];
+		const tracks = list.toArray ? list.toArray() : [list];
+		const seeds = [];
+		(tracks || []).forEach((t) => {
+			if (t && t.artist) {
+				seeds.push({ name: normalizeName(t.artist), track: getTrackInfo(t) });
+			}
+		});
+		return seeds;
+	}
+
+	var getTrackInfo = function (track) {
+		var trackInfo = {
+			id: track.id,
+			title: track.title,
+			album: track.album,
+			trackNumber: track.trackNumber,
+			duration: Math.floor(track.songLength / 1000), // in seconds
+			timestamp: 0, // will be set later on playback start
+			nowplayingsent: false
+		};
+		var artists = track.artist.split(';', 1);
+		trackInfo.artist = artists[0];
+		artists = track.albumArtist.split(';', 1);
+		trackInfo.albumArtist = artists[0];
+		log('Similar Artists: prepared trackInfo: ' + JSON.stringify(trackInfo));
+		return trackInfo;
+	};
+
+	function uniqueArtists(seeds) {
+		const blacklist = new Set(parseListSetting('Black').map((s) => s.toUpperCase()));
+		const set = new Set();
+		const res = [];
+		seeds.forEach((s) => {
+			const key = s.name.toUpperCase();
+			if (!set.has(key) && !blacklist.has(key)) {
+				set.add(key);
+				res.push(s);
+			}
+		});
+		if (boolSetting('Sort')) {
+			res.sort((a, b) => a.name.localeCompare(b.name));
+		}
+		return res;
+	}
+
+	async function runSimilarArtists(autoRun) {
+		state.cancelled = false;
+		var prog = uitools.showProgressWindow();
+		try {
+			const seedsRaw = collectSeedTracks();
+			const seeds = uniqueArtists(seedsRaw);
+			if (!seeds.length) {
+				showToast('SimilarArtists: Select at least one track to seed the playlist.');
+				return;
+			}
+
+			var config = app.getValue(SCRIPT_ID, defaults);
+
+			const progress = app.ui?.createProgress?.('SimilarArtists', seeds.length) || null;
+			const artistLimit = config.Limit;// intSetting('Limit');
+			const tracksPerArtist = config.TPA;// intSetting('TPA');
+			const totalLimit = config.TPL;// intSetting('TPL');
+			const includeSeedArtist = config.Seed;// boolSetting('Seed');
+			const includeSeedTrack = config.Seed2;// boolSetting('Seed2');
+			const randomise = config.Random;// boolSetting('Random');
+			const enqueue = config.Enqueue;// boolSetting('Enqueue');
+			const ignoreDupes = config.Ignore;// boolSetting('Ignore');
+			const clearNP = config.ClearNP;// boolSetting('ClearNP');
+			const overwriteMode = config.Overwrite;// intSetting('Overwrite');
+			const confirm = config.Confirm;// boolSetting('Confirm');
+			const rankEnabled = config.Rank;// boolSetting('Rank');
+			const bestEnabled = config.Best;// boolSetting('Best');
+
+			if (rankEnabled) {
+				await ensureRankTable();
+				await resetRankTable();
+			}
+
+			const allTracks = [];
+			if (includeSeedTrack && seeds.length === 1 && seeds[0].track) {
 				allTracks.push(seeds[0].track);
 			}
 
@@ -579,10 +1021,31 @@
 
 	async function fetchSimilarArtists(artistName) {
 		try {
-			const url = `${API_BASE}?method=artist.getSimilar&api_key=${encodeURIComponent(getApiKey())}&format=json&limit=${getSetting('Limit', defaults.Limit)}&artist=${encodeURIComponent(artistName)}`;
+			if (!artistName) return [];
+			const apiKey = getApiKey();
+			const limitVal = parseInt(getSetting('Limit', defaults?.Limit || 0), 10) || undefined;
+			const params = new URLSearchParams({ method: 'artist.getSimilar', api_key: apiKey, format: 'json', artist: artistName });
+			if (limitVal) params.set('limit', String(limitVal));
+			const url = API_BASE + '?' + params.toString();
 			const res = await fetch(url);
-			const data = await res.json();
-			return data?.similarartists?.artist || [];
+			if (!res || !res.ok) {
+				log(`fetchSimilarArtists: HTTP ${res?.status} ${res?.statusText} for ${artistName}`);
+				return [];
+			}
+			let data;
+			try {
+				data = await res.json();
+			} catch (e) {
+				log('fetchSimilarArtists: invalid JSON response: ' + e.toString());
+				return [];
+			}
+			if (data?.error) {
+				log('fetchSimilarArtists: API error: ' + (data.message || data.error));
+				return [];
+			}
+			const artists = data?.similarartists?.artist || [];
+			if (!Array.isArray(artists) && artists) return [artists];
+			return artists;
 		} catch (e) {
 			log(e.toString());
 			return [];
@@ -591,15 +1054,35 @@
 
 	async function fetchTopTracks(artistName, limit) {
 		try {
-			const url = `${API_BASE}?method=artist.getTopTracks&api_key=${encodeURIComponent(getApiKey())}&format=json&limit=${limit}&artist=${encodeURIComponent(artistName)}`;
+			if (!artistName) return [];
+			const apiKey = getApiKey();
+			const lim = Number(limit) || undefined;
+			const params = new URLSearchParams({ method: 'artist.getTopTracks', api_key: apiKey, format: 'json', artist: artistName });
+			if (lim) params.set('limit', String(lim));
+			const url = API_BASE + '?' + params.toString();
 			const res = await fetch(url);
-			const data = await res.json();
-			const tracks = data?.toptracks?.track || [];
+			if (!res || !res.ok) {
+				log(`fetchTopTracks: HTTP ${res?.status} ${res?.statusText} for ${artistName}`);
+				return [];
+			}
+			let data;
+			try {
+				data = await res.json();
+			} catch (e) {
+				log('fetchTopTracks: invalid JSON response: ' + e.toString());
+				return [];
+			}
+			if (data?.error) {
+				log('fetchTopTracks: API error: ' + (data.message || data.error));
+				return [];
+			}
+			let tracks = data?.toptracks?.track || [];
+			if (tracks && !Array.isArray(tracks)) tracks = [tracks];
 			const titles = [];
 			tracks.forEach((t) => {
-				if (t?.name) titles.push(t.name);
+				if (t && (t.name || t.title)) titles.push(t.name || t.title);
 			});
-			return titles.slice(0, limit);
+			return typeof lim === 'number' ? titles.slice(0, lim) : titles;
 		} catch (e) {
 			log(e.toString());
 			return [];
@@ -610,243 +1093,446 @@
 		return fetchTopTracks(artistName, 100);
 	}
 
-	async function findLibraryTracks(artistName, title, limit, opts = {}) {
-		const excludeTitles = parseListSetting('Exclude');
-		const excludeGenres = parseListSetting('Genre');
-		const ratingMin = intSetting('Rating');
-		const allowUnknown = boolSetting('Unknown');
+	function getToggleIcon() {
+		return getSetting('OnPlay', false) ? 'checkbox-checked' : 'checkbox-unchecked';
+	}
 
+	function registerActions() {
+		// Actions/menus are registered via `actions_add.js` + `init.js` (window.actions + window._menuItems)
+		// `app.actions` / `app.menu.*` are not stable/available across MM5 builds.
+		return;
+		/*
+		// MM5 uses actions.add() to register actions
 		try {
-			// Try to use SQL-based search first (more accurate like the VBS version)
-			if (app.db?.getTracklist) {
-				const conds = [];
-				const params = [];
-
-				// Build the base query joining through ArtistsSongs for proper artist matching
-				let sql = 'SELECT DISTINCT Songs.* FROM Songs';
-				sql += ' INNER JOIN ArtistsSongs ON Songs.ID = ArtistsSongs.IDSong AND ArtistsSongs.PersonType = 1';
-				sql += ' INNER JOIN Artists ON ArtistsSongs.IDArtist = Artists.ID';
-
-				if (opts.rank) {
-					sql += ' LEFT OUTER JOIN SimArtSongRank ON Songs.ID = SimArtSongRank.ID';
-				}
-
-				if (excludeGenres.length > 0) {
-					sql += ' LEFT JOIN GenresSongs ON Songs.ID = GenresSongs.IDSong';
-				}
-
-				// Artist condition - handle prefixes
-				const prefixes = getIgnorePrefixes();
-				const artistConditions = [`Artists.Artist = ${artistName}`];
-				params.push(artistName);
-
-				// Add alternate artist name forms for prefix handling
-				for (const prefix of prefixes) {
-					const prefixLower = prefix.toLowerCase();
-					const nameLower = artistName.toLowerCase();
-					if (nameLower.startsWith(prefixLower + ' ')) {
-						// "The Beatles" -> also search "Beatles, The"
-						const withoutPrefix = artistName.slice(prefix.length + 1);
-						artistConditions.push(`Artists.Artist = ${withoutPrefix}, ${prefix}`);
-						params.push(`${withoutPrefix}, ${prefix}`);
+			// Register the main run action
+			const actionsApi = app.actions || (typeof actions !== 'undefined' ? actions : null);
+			if (actionsApi && actionsApi.add) {
+				actionsApi.add({
+					id: ACTION_RUN_ID,
+					title: _('Similar Artists'),
+					icon: 'script',
+					disabled: false,
+					visible: true,
+					execute: function () {
+						runSimilarArtists(false);
 					}
-				}
-				conds.push(`(${artistConditions.join(' OR ')})`);
-
-				// Title condition with fuzzy matching
-				if (title) {
-					const strippedTitle = stripName(title);
-					if (strippedTitle) {
-						// Use SQL function-based strip matching like VBS version
-						conds.push(`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(Songs.SongTitle),'&','AND'),'+','AND'),' N ','AND'),'''N''','AND'),' ',''),'.',''),',',''),':',''),';',''),'-',''),'_',''),'!',''),'''',''),'"','') = ${strippedTitle}`);
-						params.push(strippedTitle);
-					} else {
-						conds.push(`Songs.SongTitle LIKE ${title}`);
-						params.push(title);
-					}
-				}
-
-				// Exclude titles
-				excludeTitles.forEach((t) => {
-					conds.push(`Songs.SongTitle NOT LIKE %${t}%`);
-					params.push(`%${t}%`);
 				});
 
-				// Exclude genres
-				if (excludeGenres.length > 0) {
-					const genreConditions = excludeGenres.map(() => `Genres.GenreName LIKE GenresSongs.IDGenre NOT IN (SELECT IDGenre FROM Genres WHERE ${genreConditions})`);
-					conds.push(`GenresSongs.IDGenre NOT IN (SELECT IDGenre FROM Genres WHERE ${genreConditions.join(' OR ') })`);
-					excludeGenres.forEach((g) => params.push(g));
-				}
-
-				// Rating conditions
-				if (ratingMin > 0) {
-					if (allowUnknown) {
-						conds.push(`(Songs.Rating < 0 OR Songs.Rating > ${ratingMin - 5})`);
-						params.push(ratingMin - 5);
-					} else {
-						conds.push(`(Songs.Rating > ${ratingMin - 5} AND Songs.Rating < 101)`);
-						params.push(ratingMin - 5);
+				actionsApi.add({
+					id: ACTION_AUTO_ID,
+					title: _('Similar Artists (Auto On/Off)'),
+					icon: 'script',
+					disabled: false,
+					visible: true,
+					execute: function () {
+						toggleAuto();
 					}
-				} else if (!allowUnknown) {
-					conds.push('(Songs.Rating > -1 AND Songs.Rating < 101)');
-				}
+				});
 
-				const where = conds.length ? ` WHERE ${conds.join(' AND ')}` : '';
-
-				// Order by
-				const order = [];
-				if (opts.rank)
-					order.push('SimArtSongRank.Rank DESC');
-				if (opts.best)
-					order.push('Songs.Rating DESC');
-				order.push('Random()');
-				const orderBy = ` ORDER BY ${order.join(',')}`;
-
-				sql += where + ' GROUP BY Songs.SongTitle' + orderBy + ` LIMIT ${limit}`;
-
-				log('SQL: ' + sql);
-				const list = app.db.getTracklist(sql, -1);
-				const tl = await list.whenLoaded();
-
-				const lstAry = [];
-				tl.forEach((t) => lstAry.push(t));
-
-				if (tl.length > 0)
-					return typeof limit === 'number' ? lstAry.slice(0, limit) : lstAry;
-				else
-					return [];
+				log('Actions registered successfully');
+			} else {
+				log('actions.add not available');
 			}
-
-			// Fallback to query-based search
-			//if (app.db?.getTracklistByQueryAsync) {
-			//	const queryParts = [];
-			//	if (artistName) queryParts.push(`artist:"${artistName}"`);
-			//	if (title) queryParts.push(`title:"${title}"`);
-			//	excludeTitles.forEach((t) => queryParts.push(`NOT title:${t}`));
-			//	const query = queryParts.join(' AND ');
-			//	const tl = await app.db.getTracklistByQueryAsync(query, { limit });
-			//	return tracklistToArray(tl, limit);
-			//}
 		} catch (e) {
-			log('findLibraryTracks error: ' + e.toString());
+			log('Error registering actions: ' + e.toString());
 		}
-		return [];
+
+		try {
+			// Prefer app.menu/tools if available, fall back to menuItems/uitool
+			if (app.menu?.tools?.addItem) {
+				app.menu.tools.addItem({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID });
+				app.menu.tools.addItem({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID });
+				log('Menu items added via app.menu.tools.addItem');
+			} else if (typeof menuItems !== 'undefined' && menuItems.add) {
+				menuItems.add({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID, menuId: 'tools' });
+				menuItems.add({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID, menuId: 'tools' });
+				log('Menu items added via menuItems.add');
+			} else if (typeof uitool !== 'undefined' && uitool.menu) {
+				var toolsMenu = uitool.menu.tools || uitool.menu.getItem('tools');
+				if (toolsMenu && toolsMenu.addItem) {
+					toolsMenu.addItem({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID });
+					toolsMenu.addItem({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID });
+					log('Menu items added to Tools menu via uitool');
+				}
+			}
+		} catch (e) {
+			log('Error adding menu items: ' + e.toString());
+		}
+
+		try {
+			// Add toolbar buttons
+			const toolbarMode = Number(getSetting('Toolbar', defaults.Toolbar));
+			if (app.toolbar?.addButton) {
+				if (toolbarMode === 1 || toolbarMode === 3) {
+					app.toolbar.addButton({ id: TOOLBAR_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID, icon: 'script', visible: true });
+				}
+				if (toolbarMode === 2 || toolbarMode === 3) {
+					app.toolbar.addButton({ id: TOOLBAR_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID, icon: 'script', visible: true });
+				}
+				log('Toolbar buttons added via app.toolbar.addButton');
+			} else if (typeof uitool !== 'undefined' && uitool.toolbar && uitool.toolbar.addButton) {
+				const toolbarMode = Number(getSetting('Toolbar', defaults.Toolbar));
+				if (toolbarMode === 1 || toolbarMode === 3) {
+					uitool.toolbar.addButton({
+						id: TOOLBAR_RUN_ID,
+						title: _('Similar Artists'),
+						action: ACTION_RUN_ID,
+						icon: 'script',
+						visible: true
+					});
+				}
+				if (toolbarMode === 2 || toolbarMode === 3) {
+					uitool.toolbar.addButton({
+						id: TOOLBAR_AUTO_ID,
+						title: _('Similar Artists (Auto On/Off)'),
+						action: ACTION_AUTO_ID,
+						icon: 'script',
+						visible: true
+					});
+				}
+				log('Toolbar buttons added');
+			}
+		} catch (e) {
+			log('Error adding toolbar buttons: ' + e.toString());
+		}
+		*/
 	}
 
-	function tracklistToArray(list, limit) {
-		if (!list) return [];
-		if (list.toArray) {
-			const arr = list.toArray();
-			return typeof limit === 'number' ? arr.slice(0, limit) : arr;
+	function refreshToggleUI() {
+		try {
+			const iconNum = getSetting('OnPlay', false) ? 32 : 33;
+			if (app.toolbar?.setButtonIcon) {
+				app.toolbar.setButtonIcon(TOOLBAR_AUTO_ID, iconNum);
+			}
+			// app.actions is not available in some MM5 builds; ignore if missing.
+			if (app.actions?.updateActionIcon) {
+				app.actions.updateActionIcon(ACTION_AUTO_ID, iconNum);
+			}
+		} catch (e) {
+			log(e.toString());
 		}
-		return [];
 	}
 
-	async function enqueueTracks(tracks, ignoreDupes, clearFirst) {
+	function toggleAuto() {
+		const next = !getSetting('OnPlay', false);
+		setSetting('OnPlay', next);
+		refreshToggleUI();
+		if (next) attachAuto();
+		else detachAuto();
+	}
+
+	function attachAuto() {
+		detachAuto();
+		if (typeof app === 'undefined') return;
 		const player = app.player;
 		if (!player) return;
-		const playlist = player.playlist || player.nowPlayingQueue || player.getPlaylist?.();
-		if (!playlist) return;
-		if (clearFirst && playlist.clear) playlist.clear();
-		const existing = new Set();
-		if (ignoreDupes && playlist.toArray) {
-			playlist.toArray().forEach((t) => existing.add(t.id || t.ID));
+		if (app.listen) {
+			state.autoListen = app.listen(player, 'playbackState', (newState) => {
+				if (newState === 'trackChanged') handleAuto();
+			});
+		} else if (player.on) {
+			state.autoListen = player.on('playbackState', (newState) => {
+				if (newState === 'trackChanged') handleAuto();
+			});
 		}
-		tracks.forEach((t) => {
-			const id = t?.id || t?.ID;
-			if (ignoreDupes && id && existing.has(id)) return;
-			if (playlist.addTrack) playlist.addTrack(t);
-			else if (playlist.addTracks) playlist.addTracks([t]);
-			else if (player.appendTracks) player.appendTracks([t]);
+	}
+
+	function detachAuto() {
+		if (!state.autoListen) return;
+		try {
+			if (app.unlisten) app.unlisten(state.autoListen);
+			else if (state.autoListen.off) state.autoListen.off();
+		} catch (e) {
+			log(e.toString());
+		}
+		state.autoListen = null;
+	}
+
+	async function handleAuto() {
+		try {
+			if (!getSetting('OnPlay', false)) return;
+			const player = app.player;
+			if (!player || !player.playlist) return;
+			const list = player.playlist;
+			if (typeof list.getCursor === 'function' && typeof list.count === 'function') {
+				if (list.getCursor() + 2 > list.count()) {
+					await runSimilarArtists(true);
+				}
+			}
+		} catch (e) {
+			log(e.toString());
+		}
+	}
+
+	function parseListSetting(key) {
+		return stringSetting(key)
+			.split(',')
+			.map((s) => s.trim())
+			.filter((s) => s.length > 0);
+	}
+
+	function normalizeName(name) {
+		return (name || '').trim();
+	}
+
+	function collectSeedTracks() {
+		if (typeof app === 'undefined') return [];
+		let list = null;
+		if (uitools?.getSelectedTracklist) {
+			list = uitools.getSelectedTracklist();
+		}
+		const count = typeof list?.count === 'function' ? list.count() : (list?.count || 0);
+		if (!list || count === 0) {
+			list = app.player?.getCurrentTrack?.();// || app.player?.playlist;
+		}
+		if (!list) return [];
+		const tracks = list.toArray ? list.toArray() : [list];
+		const seeds = [];
+		(tracks || []).forEach((t) => {
+			if (t && t.artist) {
+				seeds.push({ name: normalizeName(t.artist), track: getTrackInfo(t) });
+			}
 		});
+		return seeds;
 	}
 
-	async function createPlaylist(tracks, seedName, overwriteMode) {
-		const titleTemplate = stringSetting('Name');
-		const baseName = titleTemplate.replace('%', seedName || '');
-		let name = baseName;
-		let playlist = findPlaylist(name);
-		if (overwriteMode === 0) {
-			let idx = 1;
-			while (playlist) {
-				idx += 1;
-				name = `${baseName}_${idx}`;
-				playlist = findPlaylist(name);
+	var getTrackInfo = function (track) {
+		var trackInfo = {
+			id: track.id,
+			title: track.title,
+			album: track.album,
+			trackNumber: track.trackNumber,
+			duration: Math.floor(track.songLength / 1000), // in seconds
+			timestamp: 0, // will be set later on playback start
+			nowplayingsent: false
+		};
+		var artists = track.artist.split(';', 1);
+		trackInfo.artist = artists[0];
+		artists = track.albumArtist.split(';', 1);
+		trackInfo.albumArtist = artists[0];
+		log('Similar Artists: prepared trackInfo: ' + JSON.stringify(trackInfo));
+		return trackInfo;
+	};
+
+	function uniqueArtists(seeds) {
+		const blacklist = new Set(parseListSetting('Black').map((s) => s.toUpperCase()));
+		const set = new Set();
+		const res = [];
+		seeds.forEach((s) => {
+			const key = s.name.toUpperCase();
+			if (!set.has(key) && !blacklist.has(key)) {
+				set.add(key);
+				res.push(s);
 			}
+		});
+		if (boolSetting('Sort')) {
+			res.sort((a, b) => a.name.localeCompare(b.name));
 		}
-		if (!playlist && app.playlists?.createPlaylist) {
-			playlist = app.playlists.createPlaylist(name, stringSetting('Parent'));
-		}
-		if (!playlist) return;
-		if (overwriteMode === 1 && playlist.clear) playlist.clear();
-		if (playlist.addTracks) playlist.addTracks(tracks);
-		else if (playlist.addTrack) tracks.forEach((t) => playlist.addTrack(t));
+		return res;
+	}
 
-		// navigation: 1 navigate to playlist, 2 navigate to now playing
-		const nav = intSetting('Navigate');
+	async function runSimilarArtists(autoRun) {
+		state.cancelled = false;
+		var prog = uitools.showProgressWindow();
 		try {
-			if (nav === 1 && app.ui?.navigateToPlaylist && playlist.id) {
-				app.ui.navigateToPlaylist(playlist.id);
-			} else if (nav === 2 && app.ui?.navigateNowPlaying) {
-				app.ui.navigateNowPlaying();
+			const seedsRaw = collectSeedTracks();
+			const seeds = uniqueArtists(seedsRaw);
+			if (!seeds.length) {
+				showToast('SimilarArtists: Select at least one track to seed the playlist.');
+				return;
+			}
+
+			var config = app.getValue(SCRIPT_ID, defaults);
+
+			const progress = app.ui?.createProgress?.('SimilarArtists', seeds.length) || null;
+			const artistLimit = config.Limit;// intSetting('Limit');
+			const tracksPerArtist = config.TPA;// intSetting('TPA');
+			const totalLimit = config.TPL;// intSetting('TPL');
+			const includeSeedArtist = config.Seed;// boolSetting('Seed');
+			const includeSeedTrack = config.Seed2;// boolSetting('Seed2');
+			const randomise = config.Random;// boolSetting('Random');
+			const enqueue = config.Enqueue;// boolSetting('Enqueue');
+			const ignoreDupes = config.Ignore;// boolSetting('Ignore');
+			const clearNP = config.ClearNP;// boolSetting('ClearNP');
+			const overwriteMode = config.Overwrite;// intSetting('Overwrite');
+			const confirm = config.Confirm;// boolSetting('Confirm');
+			const rankEnabled = config.Rank;// boolSetting('Rank');
+			const bestEnabled = config.Best;// boolSetting('Best');
+
+			if (rankEnabled) {
+				await ensureRankTable();
+				await resetRankTable();
+			}
+
+			const allTracks = [];
+			if (includeSeedTrack && seeds.length === 1 && seeds[0].track) {
+				allTracks.push(seeds[0].track);
+			}
+
+			const seedSlice = seeds.slice(0, artistLimit || seeds.length);
+			for (let i = 0; i < seedSlice.length; i++) {
+				// Check for cancellation
+				if (progress?.terminate || state.cancelled) {
+					if (progress?.close) progress.close();
+					if (confirm) {
+						showToast('SimilarArtists: Process cancelled by user.');
+					}
+					return;
+				}
+
+				const seed = seedSlice[i];
+				if (progress) {
+					progress.maxValue = seedSlice.length;
+					progress.value = i;
+					progress.text = `Processing ${seed.name} (${i + 1}/${seedSlice.length})`;
+				}
+
+				// Use fixPrefixes for the API call
+				const artistNameForApi = fixPrefixes(seed.name);
+				const similar = await fetchSimilarArtists(artistNameForApi);
+
+				const artistPool = [];
+				if (includeSeedArtist) artistPool.push(seed.name);
+				similar.slice(0, artistLimit).forEach((a) => {
+					if (a?.name) artistPool.push(a.name);
+				});
+
+				for (const artName of artistPool) {
+					// Check for cancellation
+					if (progress?.terminate || state.cancelled) {
+						break;
+					}
+
+					if (rankEnabled) {
+						await updateRankForArtist(artName);
+					}
+					const titles = await fetchTopTracks(fixPrefixes(artName), tracksPerArtist);
+					for (const title of titles) {
+						const matches = await findLibraryTracks(artName, title, 1, { rank: rankEnabled, best: bestEnabled });
+						matches.forEach((m) => allTracks.push(m));
+						if (allTracks.length >= totalLimit) break;
+					}
+					if (allTracks.length >= totalLimit) break;
+				}
+				if (allTracks.length >= totalLimit) break;
+			}
+
+			if (!allTracks.length) {
+				if (progress?.close) progress.close();
+				showToast('SimilarArtists: No matching tracks found in library.');
+				return;
+			}
+
+			if (randomise) shuffle(allTracks);
+			if (enqueue || overwriteMode === 2) {
+				await enqueueTracks(allTracks, ignoreDupes, clearNP);
+			} else {
+				const seedName = seeds[0]?.name || 'Similar Artists';
+				const proceed = !confirm || (await confirmPlaylist(seedName, overwriteMode));
+				if (proceed) {
+					await createPlaylist(allTracks, seedName, overwriteMode);
+				}
+			}
+
+			if (progress?.close) progress.close();
+
+			// Show completion message if confirm is enabled
+			if (confirm && !autoRun) {
+				const count = seedSlice.length;
+				if (count === 1) {
+					showToast('SimilarArtists: Artist has been processed.');
+				} else {
+					showToast(`SimilarArtists: All ${count} artists have been processed.`);
+				}
 			}
 		} catch (e) {
-			log(e.toString());
+			log(e.msg);
+			showToast('SimilarArtists: An error occurred - see log for details.');
+		} finally {
+			prog.close();
+			//uitools.hideProgressWindow();
 		}
 	}
 
-	function findPlaylist(name) {
-		if (app.playlists?.findByTitle) return app.playlists.findByTitle(name);
-		if (app.playlists?.getByTitle) return app.playlists.getByTitle(name);
-		return null;
+	async function confirmPlaylist(seedName, overwriteMode) {
+		const baseName = stringSetting('Name').replace('%', seedName || '');
+		const action = overwriteMode === 1 ? 'overwrite' : 'create';
+		const res = await showToast(`SimilarArtists: Do you wish to ${action} playlist '${baseName}'?`, ['yes', 'no']);
+		return res === 'yes';
 	}
 
-	function shuffle(arr) {
-		for (let i = arr.length - 1; i > 0; i -= 1) {
-			const j = Math.floor(Math.random() * (i + 1));
-			[arr[i], arr[j]] = [arr[j], arr[i]];
-		}
-	}
-
-	async function ensureRankTable() {
-		if (!app.db?.executeAsync) return;
+	async function fetchSimilarArtists(artistName) {
 		try {
-			await app.db.executeAsync('CREATE TABLE IF NOT EXISTS SimArtSongRank (ID INTEGER PRIMARY KEY, Rank INTEGER)');
-		} catch (e) {
-			log(e.toString());
-		}
-	}
-
-	async function resetRankTable() {
-		if (!app.db?.executeAsync) return;
-		try {
-			await app.db.executeAsync('DELETE FROM SimArtSongRank');
-		} catch (e) {
-			log(e.toString());
-		}
-	}
-
-	async function updateRankForArtist(artistName) {
-		if (!artistName || !app.db?.executeAsync) return;
-		const titles = await fetchTopTracksForRank(fixPrefixes(artistName));
-		for (let i = 0; i < titles.length; i++) {
-			const title = titles[i];
-			const matches = await findLibraryTracks(artistName, title, 5, { rank: false, best: false });
-			const rank = 101 - (i + 1);
-			for (const m of matches) {
-				await upsertRank(m.id || m.ID, rank);
+			if (!artistName) return [];
+			const apiKey = getApiKey();
+			const limitVal = parseInt(getSetting('Limit', defaults?.Limit || 0), 10) || undefined;
+			const params = new URLSearchParams({ method: 'artist.getSimilar', api_key: apiKey, format: 'json', artist: artistName });
+			if (limitVal) params.set('limit', String(limitVal));
+			const url = API_BASE + '?' + params.toString();
+			const res = await fetch(url);
+			if (!res || !res.ok) {
+				log(`fetchSimilarArtists: HTTP ${res?.status} ${res?.statusText} for ${artistName}`);
+				return [];
 			}
+			let data;
+			try {
+				data = await res.json();
+			} catch (e) {
+				log('fetchSimilarArtists: invalid JSON response: ' + e.toString());
+				return [];
+			}
+			if (data?.error) {
+				log('fetchSimilarArtists: API error: ' + (data.message || data.error));
+				return [];
+			}
+			const artists = data?.similarartists?.artist || [];
+			if (!Array.isArray(artists) && artists) return [artists];
+			return artists;
+		} catch (e) {
+			log(e.toString());
+			return [];
 		}
 	}
 
-	async function upsertRank(id, rank) {
-		if (!app.db?.executeAsync) return;
+	async function fetchTopTracks(artistName, limit) {
 		try {
-			await app.db.executeAsync('REPLACE INTO SimArtSongRank (ID, Rank) VALUES (?, ?)', [id, rank]);
+			if (!artistName) return [];
+			const apiKey = getApiKey();
+			const lim = Number(limit) || undefined;
+			const params = new URLSearchParams({ method: 'artist.getTopTracks', api_key: apiKey, format: 'json', artist: artistName });
+			if (lim) params.set('limit', String(lim));
+			const url = API_BASE + '?' + params.toString();
+			const res = await fetch(url);
+			if (!res || !res.ok) {
+				log(`fetchTopTracks: HTTP ${res?.status} ${res?.statusText} for ${artistName}`);
+				return [];
+			}
+			let data;
+			try {
+				data = await res.json();
+			} catch (e) {
+				log('fetchTopTracks: invalid JSON response: ' + e.toString());
+				return [];
+			}
+			if (data?.error) {
+				log('fetchTopTracks: API error: ' + (data.message || data.error));
+				return [];
+			}
+			let tracks = data?.toptracks?.track || [];
+			if (tracks && !Array.isArray(tracks)) tracks = [tracks];
+			const titles = [];
+			tracks.forEach((t) => {
+				if (t && (t.name || t.title)) titles.push(t.name || t.title);
+			});
+			return typeof lim === 'number' ? titles.slice(0, lim) : titles;
 		} catch (e) {
 			log(e.toString());
+			return [];
 		}
+	}
+
+	async function fetchTopTracksForRank(artistName) {
+		return fetchTopTracks(artistName, 100);
 	}
 
 	function start() {
@@ -862,7 +1548,7 @@
 
 		ensureDefaults();
 		//registerActions();
-		registerSettingsSheet();
+		//registerSettingsSheet();
 		if (getSetting('OnPlay', false))
 			attachAuto();
 
@@ -1147,55 +1833,55 @@
 	 * @param {object} panel - The panel/sheet object from MM5
 	 */
 	function saveSettingsPanel(panel) {
-		try {
-			const getControl = (id) => panel.getChildControl?.(id) || panel[id];
+		//try {
+		//	const getControl = (id) => panel.getChildControl?.(id) || panel[id];
 
-			const apiKeyCtrl = getControl('SAApiKey');
-			if (apiKeyCtrl) {
-				app.settings.setValue('SimilarArtists.ApiKey', apiKeyCtrl.text || '');
-			}
+		//	const apiKeyCtrl = getControl('SAApiKey');
+		//	if (apiKeyCtrl) {
+		//		app.settings.setValue('SimilarArtists.ApiKey', apiKeyCtrl.text || '');
+		//	}
 
-			setSetting('Name', getControl('SAName')?.text || defaults.Name);
-			setSetting('Limit', getControl('SALimit')?.value ?? defaults.Limit);
-			setSetting('TPA', getControl('SATPA')?.value ?? defaults.TPA);
-			setSetting('TPL', getControl('SATPL')?.value ?? defaults.TPL);
-			setSetting('Confirm', getControl('SAConfirm')?.checked ?? defaults.Confirm);
-			setSetting('Toolbar', getControl('SAToolbar')?.selectedIndex ?? defaults.Toolbar);
-			setSetting('Sort', getControl('SASort')?.checked ?? defaults.Sort);
+		//	setSetting('Name', getControl('SAName')?.text || defaults.Name);
+		//	setSetting('Limit', getControl('SALimit')?.value ?? defaults.Limit);
+		//	setSetting('TPA', getControl('SATPA')?.value ?? defaults.TPA);
+		//	setSetting('TPL', getControl('SATPL')?.value ?? defaults.TPL);
+		//	setSetting('Confirm', getControl('SAConfirm')?.checked ?? defaults.Confirm);
+		//	setSetting('Toolbar', getControl('SAToolbar')?.selectedIndex ?? defaults.Toolbar);
+		//	setSetting('Sort', getControl('SASort')?.checked ?? defaults.Sort);
 
-			const parentCtrl = getControl('SAParent');
-			const parentText = parentCtrl?.text || parentCtrl?.items?.[parentCtrl?.selectedIndex] || '';
-			setSetting('Parent', parentText === '[Playlists]' ? '' : parentText);
+		//	const parentCtrl = getControl('SAParent');
+		//	const parentText = parentCtrl?.text || parentCtrl?.items?.[parentCtrl?.selectedIndex] || '';
+		//	setSetting('Parent', parentText === '[Playlists]' ? '' : parentText);
 
-			setSetting('Black', getControl('SABlack')?.text || '');
-			setSetting('Random', getControl('SARandom')?.checked ?? defaults.Random);
-			setSetting('Seed', getControl('SASeed')?.checked ?? defaults.Seed);
-			setSetting('Seed2', getControl('SASeed2')?.checked ?? defaults.Seed2);
-			setSetting('Best', getControl('SABest')?.checked ?? defaults.Best);
-			setSetting('Rank', getControl('SARank')?.checked ?? defaults.Rank);
-			setSetting('Rating', (getControl('SARating')?.selectedIndex ?? 0) * 10);
-			setSetting('Unknown', getControl('SAUnknown')?.checked ?? defaults.Unknown);
-			setSetting('Genre', getControl('SAGenre')?.text || '');
-			setSetting('Overwrite', getControl('SAOverwrite')?.selectedIndex ?? defaults.Overwrite);
-			setSetting('Enqueue', getControl('SAEnqueue')?.checked ?? defaults.Enqueue);
-			setSetting('Navigate', getControl('SANavigate')?.selectedIndex ?? defaults.Navigate);
-			setSetting('OnPlay', getControl('SAOnPlay')?.checked ?? defaults.OnPlay);
-			setSetting('ClearNP', getControl('SAClearNP')?.checked ?? defaults.ClearNP);
-			setSetting('Exclude', getControl('SAExclude')?.text || '');
-			setSetting('Ignore', getControl('SAIgnore')?.checked ?? defaults.Ignore);
+		//	setSetting('Black', getControl('SABlack')?.text || '');
+		//	setSetting('Random', getControl('SARandom')?.checked ?? defaults.Random);
+		//	setSetting('Seed', getControl('SASeed')?.checked ?? defaults.Seed);
+		//	setSetting('Seed2', getControl('SASeed2')?.checked ?? defaults.Seed2);
+		//	setSetting('Best', getControl('SABest')?.checked ?? defaults.Best);
+		//	setSetting('Rank', getControl('SARank')?.checked ?? defaults.Rank);
+		//	setSetting('Rating', (getControl('SARating')?.selectedIndex ?? 0) * 10);
+		//	setSetting('Unknown', getControl('SAUnknown')?.checked ?? defaults.Unknown);
+		//	setSetting('Genre', getControl('SAGenre')?.text || '');
+		//	setSetting('Overwrite', getControl('SAOverwrite')?.selectedIndex ?? defaults.Overwrite);
+		//	setSetting('Enqueue', getControl('SAEnqueue')?.checked ?? defaults.Enqueue);
+		//	setSetting('Navigate', getControl('SANavigate')?.selectedIndex ?? defaults.Navigate);
+		//	setSetting('OnPlay', getControl('SAOnPlay')?.checked ?? defaults.OnPlay);
+		//	setSetting('ClearNP', getControl('SAClearNP')?.checked ?? defaults.ClearNP);
+		//	setSetting('Exclude', getControl('SAExclude')?.text || '');
+		//	setSetting('Ignore', getControl('SAIgnore')?.checked ?? defaults.Ignore);
 
-			// Update auto mode based on OnPlay setting
-			if (getSetting('OnPlay', false)) {
-				attachAuto();
-			} else {
-				detachAuto();
-			}
+		//	// Update auto mode based on OnPlay setting
+		//	if (getSetting('OnPlay', false)) {
+		//		attachAuto();
+		//	} else {
+		//		detachAuto();
+		//	}
 
-			// Update toolbar visibility
-			refreshToolbarVisibility();
-		} catch (e) {
-			log('saveSettingsPanel error: ' + e.toString());
-		}
+		//	// Update toolbar visibility
+		//	refreshToolbarVisibility();
+		//} catch (e) {
+		//	log('saveSettingsPanel error: ' + e.toString());
+		//}
 	}
 
 	/**
@@ -1236,23 +1922,23 @@
 	}
 
 	function registerSettingsSheet() {
-		try {
-			//if (typeof app === 'undefined') return;
-			if (!app.ui?.addOptionSheet) return;
-			app.ui.addOptionSheet({
-				id: SETTINGS_SHEET_ID,
-				title: _('Similar Artists'),
-				create: function (panel) {
-					initSettingsPanel(panel);
-				},
-				apply: function (panel) {
-					saveSettingsPanel(panel);
-				}
-			});
-			log('Settings sheet registered');
-		} catch (e) {
-			log('Error registering settings sheet: ' + e.toString());
-		}
+		//try {
+		//	//if (typeof app === 'undefined') return;
+		//	if (!app.ui?.addOptionSheet) return;
+		//	app.ui.addOptionSheet({
+		//		id: SETTINGS_SHEET_ID,
+		//		title: _('Similar Artists'),
+		//		create: function (panel) {
+		//			initSettingsPanel(panel);
+		//		},
+		//		apply: function (panel) {
+		//			saveSettingsPanel(panel);
+		//		}
+		//	});
+		//	log('Settings sheet registered');
+		//} catch (e) {
+		//	log('Error registering settings sheet: ' + e.toString());
+		//}
 	}
 
 	// Export functions to the global scope
