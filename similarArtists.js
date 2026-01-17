@@ -676,8 +676,11 @@
 
 		// Try find existing
 		let playlist = null;
-		if (app.playlists?.findByTitle) playlist = app.playlists.findByTitle(title);
-		else if (app.playlists?.getByTitle) playlist = app.playlists.getByTitle(title);
+		if (app.playlists?.findByTitle) {
+			playlist = app.playlists.findByTitle(title);
+		} else if (app.playlists?.getByTitle) {
+			playlist = app.playlists.getByTitle(title);
+		}
 
 		// Create if missing
 		if (!playlist) {
@@ -685,20 +688,34 @@
 				playlist = app.playlists.createPlaylist(title, parent || '');
 			} else if (app.playlists?.root?.newPlaylist) {
 				playlist = app.playlists.root.newPlaylist();
-				if (playlist) playlist.title = title;
+				if (playlist) {
+					playlist.name = title;
+					if (parent && playlist.parent) {
+						playlist.parent = parent;
+					}
+					if (playlist.commitAsync) {
+						await playlist.commitAsync();
+					}
+				}
 			}
-		} else if (overwrite && playlist.clear) {
+		} else if (overwrite) {
 			// Overwrite existing
-			playlist.clear();
+			if (playlist.clearTracksAsync) {
+				await playlist.clearTracksAsync();
+			} else if (playlist.clear) {
+				playlist.clear();
+			}
 		}
 
 		if (!playlist) return null;
 
 		// Add tracks (prefer bulk add)
-		if (playlist.addTracks) {
+		if (playlist.addTracksAsync) {
+			await playlist.addTracksAsync(tracks);
+		} else if (playlist.addTracks) {
 			playlist.addTracks(tracks);
 		} else if (playlist.addTrack) {
-			tracks.forEach(t => playlist.addTrack(t));
+			tracks.forEach((t) => playlist.addTrack(t));
 		} else if (app.player?.appendTracks) {
 			app.player.appendTracks(tracks);
 		}
@@ -720,8 +737,11 @@
 		const baseName = titleTemplate.replace('%', seedName || '');
 		let name = baseName;
 		let playlist = findPlaylist(name);
+
+		const overwriteText = String(overwriteMode || '');
+
 		//-- create new
-		if (overwriteMode.toLowerCase().indexOf("create") > -1) {
+		if (overwriteText.toLowerCase().indexOf('create') > -1) {
 			let idx = 1;
 			while (playlist) {
 				idx += 1;
@@ -729,19 +749,40 @@
 				playlist = findPlaylist(name);
 			}
 		}
-		if (!playlist && app.playlists?.createPlaylist) {
-			playlist = app.playlists.createPlaylist(name, stringSetting('Parent'));
+
+		if (!playlist) {
+			if (app.playlists?.createPlaylist) {
+				playlist = app.playlists.createPlaylist(name, stringSetting('Parent'));
+			} else if (app.playlists?.root?.newPlaylist) {
+				playlist = app.playlists.root.newPlaylist();
+				if (playlist) {
+					playlist.name = name;
+					if (playlist.commitAsync) {
+						await playlist.commitAsync();
+					}
+				}
+			}
 		}
-		if (!playlist)
+
+		if (!playlist) {
 			return;
+		}
 
-		if (overwriteMode.toLowerCase().indexOf("overwrite") > -1 && playlist.clear)
-			playlist.clear();
+		if (overwriteText.toLowerCase().indexOf('overwrite') > -1) {
+			if (playlist.clearTracksAsync) {
+				await playlist.clearTracksAsync();
+			} else if (playlist.clear) {
+				playlist.clear();
+			}
+		}
 
-		if (playlist.addTracks)
+		if (playlist.addTracksAsync) {
+			await playlist.addTracksAsync(tracks);
+		} else if (playlist.addTracks) {
 			playlist.addTracks(tracks);
-		else if (playlist.addTrack)
+		} else if (playlist.addTrack) {
 			tracks.forEach((t) => playlist.addTrack(t));
+		}
 
 		// navigation: 1 navigate to playlist, 2 navigate to now playing
 		const nav = intSetting('Navigate');
