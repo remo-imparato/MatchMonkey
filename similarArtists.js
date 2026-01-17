@@ -539,7 +539,7 @@
 
 				// Artist condition - handle prefixes
 				const prefixes = getIgnorePrefixes();
-				const artistConditions = [`Artists.Artist = ${artistName}`];
+				const artistConditions = [`Artists.Artist = '${artistName}'`];
 				params.push(artistName);
 
 				// Add alternate artist name forms for prefix handling
@@ -549,7 +549,7 @@
 					if (nameLower.startsWith(prefixLower + ' ')) {
 						// "The Beatles" -> also search "Beatles, The"
 						const withoutPrefix = artistName.slice(prefix.length + 1);
-						artistConditions.push(`Artists.Artist = ${withoutPrefix}, ${prefix}`);
+						artistConditions.push(`Artists.Artist = '${withoutPrefix}, ${prefix}'`);
 						params.push(`${withoutPrefix}, ${prefix}`);
 					}
 				}
@@ -560,23 +560,23 @@
 					const strippedTitle = stripName(title);
 					if (strippedTitle) {
 						// Use SQL function-based strip matching like VBS version
-						conds.push(`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(Songs.SongTitle),'&','AND'),'+','AND'),' N ','AND'),'''N''','AND'),' ',''),'.',''),',',''),':',''),';',''),'-',''),'_',''),'!',''),'''',''),'"','') = ${strippedTitle}`);
+						conds.push(`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(Songs.SongTitle),'&','AND'),'+','AND'),' N ','AND'),'''N''','AND'),' ',''),'.',''),',',''),':',''),';',''),'-',''),'_',''),'!',''),'''',''),'"','') = '${strippedTitle}'`);
 						params.push(strippedTitle);
 					} else {
-						conds.push(`Songs.SongTitle LIKE ${title}`);
+						conds.push(`Songs.SongTitle LIKE '${title}'`);
 						params.push(title);
 					}
 				}
 
 				// Exclude titles
 				excludeTitles.forEach((t) => {
-					conds.push(`Songs.SongTitle NOT LIKE %${t}%`);
+					conds.push(`Songs.SongTitle NOT LIKE '%${t}%'`);
 					params.push(`%${t}%`);
 				});
 
 				// Exclude genres
 				if (excludeGenres.length > 0) {
-					const genreConditions = excludeGenres.map(() => `Genres.GenreName LIKE GenresSongs.IDGenre NOT IN (SELECT IDGenre FROM Genres WHERE ${genreConditions})`);
+					const genreConditions = excludeGenres.map(() => `Genres.GenreName LIKE GenresSongs.IDGenre NOT IN (SELECT IDGenre FROM Genres WHERE '${excludeGenres})'`);
 					conds.push(`GenresSongs.IDGenre NOT IN (SELECT IDGenre FROM Genres WHERE ${genreConditions.join(' OR ')})`);
 					excludeGenres.forEach((g) => params.push(g));
 				}
