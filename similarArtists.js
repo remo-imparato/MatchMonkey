@@ -972,14 +972,34 @@
 				sql += ` LIMIT ${limit}`;
 			}
 
-			//console.debug('SQL: ' + sql);
-
-			// Execute
+			// Execute query
 			const tl = app?.db?.getTracklist(sql, -1);
+			
+			// CRITICAL: Disable auto-update and notifications to prevent UI flooding during iteration
+			let updateWasDisabled = false;
+			let notifyWasDisabled = false;
+			if (tl) {
+				updateWasDisabled = tl.autoUpdateDisabled;
+				notifyWasDisabled = tl.dontNotify;
+				tl.autoUpdateDisabled = true;
+				tl.dontNotify = true;
+			}
+			
 			await tl?.whenLoaded();
 
+			// Collect tracks into array (non-destructive iteration)
 			const arr = [];
-			tl.forEach((t) => arr.push(t));
+			if (tl) {
+				tl.forEach((t) => {
+					if (t) arr.push(t);
+				});
+			}
+
+			// IMPORTANT: Restore original state to allow UI updates for subsequent operations
+			if (tl) {
+				tl.autoUpdateDisabled = updateWasDisabled;
+				tl.dontNotify = notifyWasDisabled;
+			}
 
 			return typeof limit === 'number' ? arr.slice(0, limit) : arr;
 
@@ -1002,27 +1022,47 @@
 		const playlist = player.playlist || player.nowPlayingQueue || player.getPlaylist?.();
 		if (!playlist) return;
 
-		if (clearFirst && playlist.clear)
+		if (clearFirst && playlist.clear) {
 			playlist.clear();
-
-		const existing = new Set();
-		if (ignoreDupes && playlist.toArray) {
-			playlist.toArray().forEach((t) => existing.add(t.id || t.ID));
 		}
 
-		// Add tracks one at a time to prevent deadlock
-		for (let i = 0; i < tracks.length; i++) {
-			const t = tracks[i];
-			const id = t?.id || t?.ID;
-			if (ignoreDupes && id && existing.has(id)) continue;
+		// Build set of existing track IDs (without triggering UI updates)
+		const existing = new Set();
+		if (ignoreDupes && playlist.toArray) {
+			const existingTracks = playlist.toArray();
+			if (existingTracks) {
+				existingTracks.forEach((t) => {
+					if (t) existing.add(t.id || t.ID);
+				});
+			}
+		}
 
-			// Use synchronous methods - MM5 handles queueing internally
-			if (playlist.addTrack) {
-				playlist.addTrack(t);
-			} else if (playlist.addTracks) {
-				playlist.addTracks([t]);
-			} else if (player.appendTracks) {
-				player.appendTracks([t]);
+		// Add tracks in batches to avoid overwhelming the UI
+		// Process in chunks of 50 to allow UI thread to breathe
+		const BATCH_SIZE = 50;
+		for (let batchStart = 0; batchStart < tracks.length; batchStart += BATCH_SIZE) {
+			const batchEnd = Math.min(batchStart + BATCH_SIZE, tracks.length);
+			
+			for (let i = batchStart; i < batchEnd; i++) {
+				const t = tracks[i];
+				if (!t) continue;
+				
+				const id = t?.id || t?.ID;
+				if (ignoreDupes && id && existing.has(id)) continue;
+
+				// Use synchronous methods - MM5 handles queueing internally
+				if (playlist.addTrack) {
+					playlist.addTrack(t);
+				} else if (playlist.addTracks) {
+					playlist.addTracks([t]);
+				} else if (player.appendTracks) {
+					player.appendTracks([t]);
+				}
+			}
+			
+			// Yield to UI thread between batches
+			if (batchEnd < tracks.length) {
+				await new Promise(resolve => setTimeout(resolve, 10));
 			}
 		}
 	}
