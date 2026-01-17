@@ -310,7 +310,7 @@
 
 	async function runSimilarArtists(autoRun) {
 		state.cancelled = false;
-		var prog = uitools.showProgressWindow();
+		//var prog = uitools.showProgressWindow();
 		try {
 			const seedsRaw = collectSeedTracks();
 			const seeds = uniqueArtists(seedsRaw);
@@ -321,7 +321,7 @@
 
 			var config = app.getValue(SCRIPT_ID, defaults);
 
-			const progress = app.ui?.createProgress?.('SimilarArtists', seeds.length) || null;
+			//const progress = app.ui?.createProgress?.('SimilarArtists', seeds.length) || null;
 			const artistLimit = config.Limit;// intSetting('Limit');
 			const tracksPerArtist = config.TPA;// intSetting('TPA');
 			const totalLimit = config.TPL;// intSetting('TPL');
@@ -349,20 +349,20 @@
 			const seedSlice = seeds.slice(0, artistLimit || seeds.length);
 			for (let i = 0; i < seedSlice.length; i++) {
 				// Check for cancellation
-				if (progress?.terminate || state.cancelled) {
-					if (progress?.close) progress.close();
-					if (confirm) {
-						showToast('SimilarArtists: Process cancelled by user.');
-					}
-					return;
-				}
+				//if (progress?.terminate || state.cancelled) {
+				//	if (progress?.close) progress.close();
+				//	if (confirm) {
+				//		showToast('SimilarArtists: Process cancelled by user.');
+				//	}
+				//	return;
+				//}
 
 				const seed = seedSlice[i];
-				if (progress) {
-					progress.maxValue = seedSlice.length;
-					progress.value = i;
-					progress.text = `Processing ${seed.name} (${i + 1}/${seedSlice.length})`;
-				}
+				//if (progress) {
+				//	progress.maxValue = seedSlice.length;
+				//	progress.value = i;
+				//	progress.text = `Processing ${seed.name} (${i + 1}/${seedSlice.length})`;
+				//}
 
 				// Use fixPrefixes for the API call
 				const artistNameForApi = fixPrefixes(seed.name);
@@ -376,9 +376,9 @@
 
 				for (const artName of artistPool) {
 					// Check for cancellation
-					if (progress?.terminate || state.cancelled) {
-						break;
-					}
+					//if (progress?.terminate || state.cancelled) {
+					//	break;
+					//}
 
 					if (rankEnabled) {
 						await updateRankForArtist(artName);
@@ -395,7 +395,7 @@
 			}
 
 			if (!allTracks.length) {
-				if (progress?.close) progress.close();
+				//if (progress?.close) progress.close();
 				showToast('SimilarArtists: No matching tracks found in library.');
 				return;
 			}
@@ -411,7 +411,7 @@
 				}
 			}
 
-			if (progress?.close) progress.close();
+			//if (progress?.close) progress.close();
 
 			// Show completion message if confirm is enabled
 			if (confirm && !autoRun) {
@@ -426,7 +426,7 @@
 			log(e.msg);
 			showToast('SimilarArtists: An error occurred - see log for details.');
 		} finally {
-			prog.close();
+		//	prog.close();
 			//uitools.hideProgressWindow();
 		}
 	}
@@ -773,7 +773,7 @@
 
 	async function runSimilarArtists(autoRun) {
 		state.cancelled = false;
-		var prog = uitools.showProgressWindow();
+		//var prog = uitools.showProgressWindow();
 		try {
 			const seedsRaw = collectSeedTracks();
 			const seeds = uniqueArtists(seedsRaw);
@@ -812,20 +812,20 @@
 			const seedSlice = seeds.slice(0, artistLimit || seeds.length);
 			for (let i = 0; i < seedSlice.length; i++) {
 				// Check for cancellation
-				if (progress?.terminate || state.cancelled) {
-					if (progress?.close) progress.close();
-					if (confirm) {
-						showToast('SimilarArtists: Process cancelled by user.');
-					}
-					return;
-				}
+				//if (progress?.terminate || state.cancelled) {
+				//	if (progress?.close) progress.close();
+				//	if (confirm) {
+				//		showToast('SimilarArtists: Process cancelled by user.');
+				//	}
+				//	return;
+				//}
 
 				const seed = seedSlice[i];
-				if (progress) {
-					progress.maxValue = seedSlice.length;
-					progress.value = i;
-					progress.text = `Processing ${seed.name} (${i + 1}/${seedSlice.length})`;
-				}
+				//if (progress) {
+				//	progress.maxValue = seedSlice.length;
+				//	progress.value = i;
+				//	progress.text = `Processing ${seed.name} (${i + 1}/${seedSlice.length})`;
+				//}
 
 				// Use fixPrefixes for the API call
 				const artistNameForApi = fixPrefixes(seed.name);
@@ -839,9 +839,9 @@
 
 				for (const artName of artistPool) {
 					// Check for cancellation
-					if (progress?.terminate || state.cancelled) {
-						break;
-					}
+					//if (progress?.terminate || state.cancelled) {
+					//	break;
+					//}
 
 					if (rankEnabled) {
 						await updateRankForArtist(artName);
@@ -858,7 +858,7 @@
 			}
 
 			if (!allTracks.length) {
-				if (progress?.close) progress.close();
+				//if (progress?.close) progress.close();
 				showToast('SimilarArtists: No matching tracks found in library.');
 				return;
 			}
@@ -874,7 +874,7 @@
 				}
 			}
 
-			if (progress?.close) progress.close();
+			//if (progress?.close) progress.close();
 
 			// Show completion message if confirm is enabled
 			if (confirm && !autoRun) {
@@ -889,7 +889,7 @@
 			log(e.msg);
 			showToast('SimilarArtists: An error occurred - see log for details.');
 		} finally {
-			prog.close();
+			//prog.close();
 			//uitools.hideProgressWindow();
 		}
 	}
@@ -1109,7 +1109,7 @@
 
 	async function runSimilarArtists(autoRun) {
 		state.cancelled = false;
-		var prog = uitools.showProgressWindow();
+		//var prog = uitools.showProgressWindow();
 		try {
 			const seedsRaw = collectSeedTracks();
 			const seeds = uniqueArtists(seedsRaw);
@@ -1120,7 +1120,7 @@
 
 			var config = app.getValue(SCRIPT_ID, defaults);
 
-			const progress = app.ui?.createProgress?.('SimilarArtists', seeds.length) || null;
+			//const progress = app.ui?.createProgress?.('SimilarArtists', seeds.length) || null;
 			const artistLimit = config.Limit;// intSetting('Limit');
 			const tracksPerArtist = config.TPA;// intSetting('TPA');
 			const totalLimit = config.TPL;// intSetting('TPL');
@@ -1148,20 +1148,20 @@
 			const seedSlice = seeds.slice(0, artistLimit || seeds.length);
 			for (let i = 0; i < seedSlice.length; i++) {
 				// Check for cancellation
-				if (progress?.terminate || state.cancelled) {
-					if (progress?.close) progress.close();
-					if (confirm) {
-						showToast('SimilarArtists: Process cancelled by user.');
-					}
-					return;
-				}
+				//if (progress?.terminate || state.cancelled) {
+				//	if (progress?.close) progress.close();
+				//	if (confirm) {
+				//		showToast('SimilarArtists: Process cancelled by user.');
+				//	}
+				//	return;
+				//}
 
 				const seed = seedSlice[i];
-				if (progress) {
-					progress.maxValue = seedSlice.length;
-					progress.value = i;
-					progress.text = `Processing ${seed.name} (${i + 1}/${seedSlice.length})`;
-				}
+				//if (progress) {
+				//	progress.maxValue = seedSlice.length;
+				//	progress.value = i;
+				//	progress.text = `Processing ${seed.name} (${i + 1}/${seedSlice.length})`;
+				//}
 
 				// Use fixPrefixes for the API call
 				const artistNameForApi = fixPrefixes(seed.name);
@@ -1175,9 +1175,9 @@
 
 				for (const artName of artistPool) {
 					// Check for cancellation
-					if (progress?.terminate || state.cancelled) {
-						break;
-					}
+					//if (progress?.terminate || state.cancelled) {
+					//	break;
+					//}
 
 					if (rankEnabled) {
 						await updateRankForArtist(artName);
@@ -1194,7 +1194,7 @@
 			}
 
 			if (!allTracks.length) {
-				if (progress?.close) progress.close();
+				//if (progress?.close) progress.close();
 				showToast('SimilarArtists: No matching tracks found in library.');
 				return;
 			}
@@ -1210,7 +1210,7 @@
 				}
 			}
 
-			if (progress?.close) progress.close();
+			//if (progress?.close) progress.close();
 
 			// Show completion message if confirm is enabled
 			if (confirm && !autoRun) {
@@ -1225,7 +1225,7 @@
 			log(e.msg);
 			showToast('SimilarArtists: An error occurred - see log for details.');
 		} finally {
-			prog.close();
+			//prog.close();
 			//uitools.hideProgressWindow();
 		}
 	}
