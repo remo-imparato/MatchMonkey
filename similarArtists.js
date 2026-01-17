@@ -647,12 +647,22 @@
 			} else {
 				const seedName = seeds[0]?.name || 'Similar Artists';
 				const selectedPlaylist = !confirm ? null : (await confirmPlaylist(seedName, overwriteMode));
-				if (selectedPlaylist || !confirm) {
-					updateProgress(`Creating playlist "${selectedPlaylist?.name || seedName}" with ${allTracks.length} tracks...`, 0.85);
+				
+				// Only proceed with playlist creation if we have a valid playlist or user confirmed
+				if (selectedPlaylist) {
+					// User selected/created a playlist in the dialog
+					updateProgress(`Creating playlist "${selectedPlaylist.name || seedName}" with ${allTracks.length} tracks...`, 0.85);
 					await createPlaylist(allTracks, seedName, overwriteMode, selectedPlaylist);
 					updateProgress(`Playlist created successfully with ${allTracks.length} tracks!`, 1.0);
+				} else if (!confirm) {
+					// confirm is disabled, so skip playlist dialog and create automatically
+					updateProgress(`Creating new playlist "${seedName}" with ${allTracks.length} tracks...`, 0.85);
+					await createPlaylist(allTracks, seedName, overwriteMode, null);
+					updateProgress(`Playlist created successfully with ${allTracks.length} tracks!`, 1.0);
 				} else {
+					// confirm is enabled and user cancelled the dialog
 					log('SimilarArtists: User cancelled playlist creation.');
+					updateProgress(`Playlist creation cancelled by user.`, 1.0);
 				}
 			}
 
@@ -1114,7 +1124,7 @@
 		// This is ~100x faster than adding tracks one-by-one with batching
 		if (playlist.addTracksAsync && app.utils?.createTracklist) {
 			try {
-				let tracklist = app.utils.createTracklist(false);
+			 let tracklist = app.utils.createTracklist(false);
 				tracklist.dontNotify = true;
 				tracklist.autoUpdateDisabled = true;
 				
