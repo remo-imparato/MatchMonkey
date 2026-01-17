@@ -491,11 +491,12 @@
 			// Load config block stored under this script id.
 			var config = app.getValue(SCRIPT_ID, defaults);
 
-			// Register progress task with MM5 task system for UI display
+			// Create progress task using MM5's backgroundTasks system
 			let progressTask = null;
-			if (app.db?.registerProgressTask) {
-				progressTask = app.db.registerProgressTask('SimilarArtists', 0, 'Initializing...');
-				log('SimilarArtists: Progress task registered');
+			if (app.backgroundTasks?.createNew) {
+				progressTask = app.backgroundTasks.createNew();
+				progressTask.leadingText = 'SimilarArtists: Initializing...';
+				log('SimilarArtists: Progress task created');
 			}
 
 			const artistLimit = intSetting('Limit');
@@ -535,7 +536,7 @@
 			for (let i = 0; i < seedSlice.length; i++) {
 				const seed = seedSlice[i];
 
-				// Update progress task
+				// Update progress task with current status
 				if (progressTask) {
 					progressTask.text = `Processing ${seed.name} (${i + 1}/${seedSlice.length})`;
 					progressTask.value = (i + 1) / seedSlice.length;
@@ -589,7 +590,7 @@
 
 			if (!allTracks.length) {
 				showToast('SimilarArtists: No matching tracks found in library.');
-				if (progressTask) progressTask.remove();
+				if (progressTask) progressTask.terminate();
 				return;
 			}
 
@@ -637,7 +638,7 @@
 		} finally {
 			// Cleanup progress task
 			if (progressTask) {
-				progressTask.remove();
+				progressTask.terminate();
 			}
 		}
 	}
