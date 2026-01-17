@@ -470,7 +470,7 @@
 		const overwriteMode = config.Overwrite;// intSetting('Overwrite');
 		const confirm = config.Confirm;// boolSetting('Confirm');
 		const rankEnabled = config.Rank;// boolSetting('Rank');
-		const bestEnabled = Config.Best;// boolSetting('Best');
+		const bestEnabled = config.Best;// boolSetting('Best');
 
 		if (rankEnabled) {
 			await ensureRankTable();
