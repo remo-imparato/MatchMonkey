@@ -175,145 +175,6 @@
 		return result;
 	}
 
-	/**
-	 * Strip and normalize a song title for fuzzy matching
-	 * @param {string} name - Title to normalize
-	 * @returns {string} Normalized uppercase title
-	 */
-	function stripName(name) {
-		if (!name) return '';
-		let result = name.toUpperCase();
-		result = result.replace(/&/g, 'AND');
-		result = result.replace(/\+/g, 'AND');
-		result = result.replace(/ N /g, 'AND');
-		result = result.replace(/'N'/g, 'AND');
-		result = result.replace(/ /g, '');
-		result = result.replace(/\./g, '');
-		result = result.replace(/,/g, '');
-		result = result.replace(/:/g, '');
-		result = result.replace(/;/g, '');
-		result = result.replace(/-/g, '');
-		result = result.replace(/_/g, '');
-		result = result.replace(/!/g, '');
-		result = result.replace(/'/g, '');
-		result = result.replace(/"/g, '');
-		return result;
-	}
-
-	/**
-	 * Escape single quotes for SQL queries
-	 * @param {string} str - String to escape
-	 * @returns {string} Escaped string
-	 */
-	function escapeSql(str) {
-		return (str || '').replace(/'/g, "''");
-	}
-
-	function getToggleIcon() {
-		return getSetting('OnPlay', false) ? 'checkbox-checked' : 'checkbox-unchecked';
-	}
-
-	function registerActions() {
-		// Actions/menus are registered via `actions_add.js` + `init.js` (window.actions + window._menuItems)
-		// `app.actions` / `app.menu.*` are not stable/available across MM5 builds.
-		return;
-		/*
-		// MM5 uses actions.add() to register actions
-		try {
-			// Register the main run action
-			const actionsApi = app.actions || (typeof actions !== 'undefined' ? actions : null);
-			if (actionsApi && actionsApi.add) {
-				actionsApi.add({
-					id: ACTION_RUN_ID,
-					title: _('Similar Artists'),
-					icon: 'script',
-					disabled: false,
-					visible: true,
-					execute: function () {
-						runSimilarArtists(false);
-					}
-				});
-
-				actionsApi.add({
-					id: ACTION_AUTO_ID,
-					title: _('Similar Artists (Auto On/Off)'),
-					icon: 'script',
-					disabled: false,
-					visible: true,
-					execute: function () {
-						toggleAuto();
-					}
-				});
-
-				log('Actions registered successfully');
-			} else {
-				log('actions.add not available');
-			}
-		} catch (e) {
-			log('Error registering actions: ' + e.toString());
-		}
-
-		try {
-			// Prefer app.menu/tools if available, fall back to menuItems/uitool
-			if (app.menu?.tools?.addItem) {
-				app.menu.tools.addItem({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID });
-				app.menu.tools.addItem({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID });
-				log('Menu items added via app.menu.tools.addItem');
-			} else if (typeof menuItems !== 'undefined' && menuItems.add) {
-				menuItems.add({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID, menuId: 'tools' });
-				menuItems.add({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID, menuId: 'tools' });
-				log('Menu items added via menuItems.add');
-			} else if (typeof uitool !== 'undefined' && uitool.menu) {
-				var toolsMenu = uitool.menu.tools || uitool.menu.getItem('tools');
-				if (toolsMenu && toolsMenu.addItem) {
-					toolsMenu.addItem({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID });
-					toolsMenu.addItem({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID });
-					log('Menu items added to Tools menu via uitool');
-				}
-			}
-		} catch (e) {
-			log('Error adding menu items: ' + e.toString());
-		}
-
-		try {
-			// Add toolbar buttons
-			const toolbarMode = Number(getSetting('Toolbar', defaults.Toolbar));
-			if (app.toolbar?.addButton) {
-				if (toolbarMode === 1 || toolbarMode === 3) {
-					app.toolbar.addButton({ id: TOOLBAR_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID, icon: 'script', visible: true });
-				}
-				if (toolbarMode === 2 || toolbarMode === 3) {
-					app.toolbar.addButton({ id: TOOLBAR_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID, icon: 'script', visible: true });
-				}
-				log('Toolbar buttons added via app.toolbar.addButton');
-			} else if (typeof uitool !== 'undefined' && uitool.toolbar && uitool.toolbar.addButton) {
-				const toolbarMode = Number(getSetting('Toolbar', defaults.Toolbar));
-				if (toolbarMode === 1 || toolbarMode === 3) {
-					uitool.toolbar.addButton({
-						id: TOOLBAR_RUN_ID,
-						title: _('Similar Artists'),
-						action: ACTION_RUN_ID,
-						icon: 'script',
-						visible: true
-					});
-				}
-				if (toolbarMode === 2 || toolbarMode === 3) {
-					uitool.toolbar.addButton({
-						id: TOOLBAR_AUTO_ID,
-						title: _('Similar Artists (Auto On/Off)'),
-						action: ACTION_AUTO_ID,
-						icon: 'script',
-						visible: true
-					});
-				}
-				log('Toolbar buttons added');
-			}
-		} catch (e) {
-			log('Error adding toolbar buttons: ' + e.toString());
-		}
-		*/
-	}
-
 	function refreshToggleUI() {
 		try {
 			const iconNum = getSetting('OnPlay', false) ? 32 : 33;
@@ -651,111 +512,132 @@
 		return fetchTopTracks(artistName, 100);
 	}
 
-	function getToggleIcon() {
-		return getSetting('OnPlay', false) ? 'checkbox-checked' : 'checkbox-unchecked';
-	}
+	async function findLibraryTracks(artistName, title, limit, opts = {}) {
+		const excludeTitles = parseListSetting('Exclude');
+		const excludeGenres = parseListSetting('Genre');
+		const ratingMin = intSetting('Rating');
+		const allowUnknown = boolSetting('Unknown');
 
-	function registerActions() {
-		// Actions/menus are registered via `actions_add.js` + `init.js` (window.actions + window._menuItems)
-		// `app.actions` / `app.menu.*` are not stable/available across MM5 builds.
-		return;
-		/*
-		// MM5 uses actions.add() to register actions
 		try {
-			// Register the main run action
-			const actionsApi = app.actions || (typeof actions !== 'undefined' ? actions : null);
-			if (actionsApi && actionsApi.add) {
-				actionsApi.add({
-					id: ACTION_RUN_ID,
-					title: _('Similar Artists'),
-					icon: 'script',
-					disabled: false,
-					visible: true,
-					execute: function () {
-						runSimilarArtists(false);
+			// Try to use SQL-based search first (more accurate like the VBS version)
+			if (app.db?.getTracklist) {
+				const conds = [];
+				const params = [];
+
+				// Build the base query joining through ArtistsSongs for proper artist matching
+				let sql = 'SELECT DISTINCT Songs.* FROM Songs';
+				sql += ' INNER JOIN ArtistsSongs ON Songs.ID = ArtistsSongs.IDSong AND ArtistsSongs.PersonType = 1';
+				sql += ' INNER JOIN Artists ON ArtistsSongs.IDArtist = Artists.ID';
+
+				if (opts.rank) {
+					sql += ' LEFT OUTER JOIN SimArtSongRank ON Songs.ID = SimArtSongRank.ID';
+				}
+
+				if (excludeGenres.length > 0) {
+					sql += ' LEFT JOIN GenresSongs ON Songs.ID = GenresSongs.IDSong';
+				}
+
+				// Artist condition - handle prefixes
+				const prefixes = getIgnorePrefixes();
+				const artistConditions = [`Artists.Artist = ${artistName}`];
+				params.push(artistName);
+
+				// Add alternate artist name forms for prefix handling
+				for (const prefix of prefixes) {
+					const prefixLower = prefix.toLowerCase();
+					const nameLower = artistName.toLowerCase();
+					if (nameLower.startsWith(prefixLower + ' ')) {
+						// "The Beatles" -> also search "Beatles, The"
+						const withoutPrefix = artistName.slice(prefix.length + 1);
+						artistConditions.push(`Artists.Artist = ${withoutPrefix}, ${prefix}`);
+						params.push(`${withoutPrefix}, ${prefix}`);
 					}
+				}
+				conds.push(`(${artistConditions.join(' OR ')})`);
+
+				// Title condition with fuzzy matching
+				if (title) {
+					const strippedTitle = stripName(title);
+					if (strippedTitle) {
+						// Use SQL function-based strip matching like VBS version
+						conds.push(`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(Songs.SongTitle),'&','AND'),'+','AND'),' N ','AND'),'''N''','AND'),' ',''),'.',''),',',''),':',''),';',''),'-',''),'_',''),'!',''),'''',''),'"','') = ${strippedTitle}`);
+						params.push(strippedTitle);
+					} else {
+						conds.push(`Songs.SongTitle LIKE ${title}`);
+						params.push(title);
+					}
+				}
+
+				// Exclude titles
+				excludeTitles.forEach((t) => {
+					conds.push(`Songs.SongTitle NOT LIKE %${t}%`);
+					params.push(`%${t}%`);
 				});
 
-				actionsApi.add({
-					id: ACTION_AUTO_ID,
-					title: _('Similar Artists (Auto On/Off)'),
-					icon: 'script',
-					disabled: false,
-					visible: true,
-					execute: function () {
-						toggleAuto();
+				// Exclude genres
+				if (excludeGenres.length > 0) {
+					const genreConditions = excludeGenres.map(() => `Genres.GenreName LIKE GenresSongs.IDGenre NOT IN (SELECT IDGenre FROM Genres WHERE ${genreConditions})`);
+					conds.push(`GenresSongs.IDGenre NOT IN (SELECT IDGenre FROM Genres WHERE ${genreConditions.join(' OR ')})`);
+					excludeGenres.forEach((g) => params.push(g));
+				}
+
+				// Rating conditions
+				if (ratingMin > 0) {
+					if (allowUnknown) {
+						conds.push(`(Songs.Rating < 0 OR Songs.Rating > ${ratingMin - 5})`);
+						params.push(ratingMin - 5);
+					} else {
+						conds.push(`(Songs.Rating > ${ratingMin - 5} AND Songs.Rating < 101)`);
+						params.push(ratingMin - 5);
 					}
-				});
+				} else if (!allowUnknown) {
+					conds.push('(Songs.Rating > -1 AND Songs.Rating < 101)');
+				}
 
-				log('Actions registered successfully');
-			} else {
-				log('actions.add not available');
-			}
-		} catch (e) {
-			log('Error registering actions: ' + e.toString());
-		}
+				const where = conds.length ? ` WHERE ${conds.join(' AND ')}` : '';
 
-		try {
-			// Prefer app.menu/tools if available, fall back to menuItems/uitool
-			if (app.menu?.tools?.addItem) {
-				app.menu.tools.addItem({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID });
-				app.menu.tools.addItem({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID });
-				log('Menu items added via app.menu.tools.addItem');
-			} else if (typeof menuItems !== 'undefined' && menuItems.add) {
-				menuItems.add({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID, menuId: 'tools' });
-				menuItems.add({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID, menuId: 'tools' });
-				log('Menu items added via menuItems.add');
-			} else if (typeof uitool !== 'undefined' && uitool.menu) {
-				var toolsMenu = uitool.menu.tools || uitool.menu.getItem('tools');
-				if (toolsMenu && toolsMenu.addItem) {
-					toolsMenu.addItem({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID });
-					toolsMenu.addItem({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID });
-					log('Menu items added to Tools menu via uitool');
-				}
-			}
-		} catch (e) {
-			log('Error adding menu items: ' + e.toString());
-		}
+				// Order by
+				const order = [];
+				if (opts.rank)
+					order.push('SimArtSongRank.Rank DESC');
+				if (opts.best)
+					order.push('Songs.Rating DESC');
+				order.push('Random()');
+				const orderBy = ` ORDER BY ${order.join(',')}`;
 
-		try {
-			// Add toolbar buttons
-			const toolbarMode = Number(getSetting('Toolbar', defaults.Toolbar));
-			if (app.toolbar?.addButton) {
-				if (toolbarMode === 1 || toolbarMode === 3) {
-					app.toolbar.addButton({ id: TOOLBAR_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID, icon: 'script', visible: true });
-				}
-				if (toolbarMode === 2 || toolbarMode === 3) {
-					app.toolbar.addButton({ id: TOOLBAR_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID, icon: 'script', visible: true });
-				}
-				log('Toolbar buttons added via app.toolbar.addButton');
-			} else if (typeof uitool !== 'undefined' && uitool.toolbar && uitool.toolbar.addButton) {
-				const toolbarMode = Number(getSetting('Toolbar', defaults.Toolbar));
-				if (toolbarMode === 1 || toolbarMode === 3) {
-					uitool.toolbar.addButton({
-						id: TOOLBAR_RUN_ID,
-						title: _('Similar Artists'),
-						action: ACTION_RUN_ID,
-						icon: 'script',
-						visible: true
-					});
-				}
-				if (toolbarMode === 2 || toolbarMode === 3) {
-					uitool.toolbar.addButton({
-						id: TOOLBAR_AUTO_ID,
-						title: _('Similar Artists (Auto On/Off)'),
-						action: ACTION_AUTO_ID,
-						icon: 'script',
-						visible: true
-					});
-				}
-				log('Toolbar buttons added');
+				sql += where + ' GROUP BY Songs.SongTitle' + orderBy + ` LIMIT ${limit}`;
+
+				log('SQL: ' + sql);
+				const list = app.db.getTracklist(sql, -1);
+				const tl = await list.whenLoaded();
+
+				const lstAry = [];
+				tl.forEach((t) => lstAry.push(t));
+
+				if (tl.length > 0)
+					return typeof limit === 'number' ? lstAry.slice(0, limit) : lstAry;
+				else
+					return [];
 			}
+
+			// Fallback to query-based search
+			//if (app.db?.getTracklistByQueryAsync) {
+			//	const queryParts = [];
+			//	if (artistName) queryParts.push(`artist:"${artistName}"`);
+			//	if (title) queryParts.push(`title:"${title}"`);
+			//	excludeTitles.forEach((t) => queryParts.push(`NOT title:${t}`));
+			//	const query = queryParts.join(' AND ');
+			//	const tl = await app.db.getTracklistByQueryAsync(query, { limit });
+			//	return tracklistToArray(tl, limit);
+			//}
 		} catch (e) {
-			log('Error adding toolbar buttons: ' + e.toString());
+			log('findLibraryTracks error: ' + e.toString());
 		}
-		*/
+		return [];
 	}
 
+
+	
 	function refreshToggleUI() {
 		try {
 			const iconNum = getSetting('OnPlay', false) ? 32 : 33;
@@ -1092,112 +974,6 @@
 	async function fetchTopTracksForRank(artistName) {
 		return fetchTopTracks(artistName, 100);
 	}
-
-	function getToggleIcon() {
-		return getSetting('OnPlay', false) ? 'checkbox-checked' : 'checkbox-unchecked';
-	}
-
-	function registerActions() {
-		// Actions/menus are registered via `actions_add.js` + `init.js` (window.actions + window._menuItems)
-		// `app.actions` / `app.menu.*` are not stable/available across MM5 builds.
-		return;
-		/*
-		// MM5 uses actions.add() to register actions
-		try {
-			// Register the main run action
-			const actionsApi = app.actions || (typeof actions !== 'undefined' ? actions : null);
-			if (actionsApi && actionsApi.add) {
-				actionsApi.add({
-					id: ACTION_RUN_ID,
-					title: _('Similar Artists'),
-					icon: 'script',
-					disabled: false,
-					visible: true,
-					execute: function () {
-						runSimilarArtists(false);
-					}
-				});
-
-				actionsApi.add({
-					id: ACTION_AUTO_ID,
-					title: _('Similar Artists (Auto On/Off)'),
-					icon: 'script',
-					disabled: false,
-					visible: true,
-					execute: function () {
-						toggleAuto();
-					}
-				});
-
-				log('Actions registered successfully');
-			} else {
-				log('actions.add not available');
-			}
-		} catch (e) {
-			log('Error registering actions: ' + e.toString());
-		}
-
-		try {
-			// Prefer app.menu/tools if available, fall back to menuItems/uitool
-			if (app.menu?.tools?.addItem) {
-				app.menu.tools.addItem({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID });
-				app.menu.tools.addItem({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID });
-				log('Menu items added via app.menu.tools.addItem');
-			} else if (typeof menuItems !== 'undefined' && menuItems.add) {
-				menuItems.add({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID, menuId: 'tools' });
-				menuItems.add({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID, menuId: 'tools' });
-				log('Menu items added via menuItems.add');
-			} else if (typeof uitool !== 'undefined' && uitool.menu) {
-				var toolsMenu = uitool.menu.tools || uitool.menu.getItem('tools');
-				if (toolsMenu && toolsMenu.addItem) {
-					toolsMenu.addItem({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID });
-					toolsMenu.addItem({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID });
-					log('Menu items added to Tools menu via uitool');
-				}
-			}
-		} catch (e) {
-			log('Error adding menu items: ' + e.toString());
-		}
-
-		try {
-			// Add toolbar buttons
-			const toolbarMode = Number(getSetting('Toolbar', defaults.Toolbar));
-			if (app.toolbar?.addButton) {
-				if (toolbarMode === 1 || toolbarMode === 3) {
-					app.toolbar.addButton({ id: TOOLBAR_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID, icon: 'script', visible: true });
-				}
-				if (toolbarMode === 2 || toolbarMode === 3) {
-					app.toolbar.addButton({ id: TOOLBAR_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID, icon: 'script', visible: true });
-				}
-				log('Toolbar buttons added via app.toolbar.addButton');
-			} else if (typeof uitool !== 'undefined' && uitool.toolbar && uitool.toolbar.addButton) {
-				const toolbarMode = Number(getSetting('Toolbar', defaults.Toolbar));
-				if (toolbarMode === 1 || toolbarMode === 3) {
-					uitool.toolbar.addButton({
-						id: TOOLBAR_RUN_ID,
-						title: _('Similar Artists'),
-						action: ACTION_RUN_ID,
-						icon: 'script',
-						visible: true
-					});
-				}
-				if (toolbarMode === 2 || toolbarMode === 3) {
-					uitool.toolbar.addButton({
-						id: TOOLBAR_AUTO_ID,
-						title: _('Similar Artists (Auto On/Off)'),
-						action: ACTION_AUTO_ID,
-						icon: 'script',
-						visible: true
-					});
-				}
-				log('Toolbar buttons added');
-			}
-		} catch (e) {
-			log('Error adding toolbar buttons: ' + e.toString());
-		}
-		*/
-	}
-
 	function refreshToggleUI() {
 		try {
 			const iconNum = getSetting('OnPlay', false) ? 32 : 33;
@@ -1940,6 +1716,348 @@
 		//	log('Error registering settings sheet: ' + e.toString());
 		//}
 	}
+	function stripName(name) {
+		if (!name) return '';
+		let result = name.toUpperCase();
+		result = result.replace(/&/g, 'AND');
+		result = result.replace(/\+/g, 'AND');
+		result = result.replace(/ N /g, 'AND');
+		result = result.replace(/'N'/g, 'AND');
+		result = result.replace(/ /g, '');
+		result = result.replace(/\./g, '');
+		result = result.replace(/,/g, '');
+		result = result.replace(/:/g, '');
+		result = result.replace(/;/g, '');
+		result = result.replace(/-/g, '');
+		result = result.replace(/_/g, '');
+		result = result.replace(/!/g, '');
+		result = result.replace(/'/g, '');
+		result = result.replace(/"/g, '');
+		return result;
+	}
+
+	/**
+	 * Escape single quotes for SQL queries
+	 * @param {string} str - String to escape
+	 * @returns {string} Escaped string
+	 */
+	function escapeSql(str) {
+		return (str || '').replace(/'/g, "''");
+	}
+
+	function getToggleIcon() {
+	//	return getSetting('OnPlay', false) ? 'checkbox-checked' : 'checkbox-unchecked';
+	}
+
+	function registerActions() {
+		// Actions/menus are registered via `actions_add.js` + `init.js` (window.actions + window._menuItems)
+		// `app.actions` / `app.menu.*` are not stable/available across MM5 builds.
+		return;
+		/*
+		// MM5 uses actions.add() to register actions
+		try {
+			// Register the main run action
+			const actionsApi = app.actions || (typeof actions !== 'undefined' ? actions : null);
+			if (actionsApi && actionsApi.add) {
+				actionsApi.add({
+					id: ACTION_RUN_ID,
+					title: _('Similar Artists'),
+					icon: 'script',
+					disabled: false,
+					visible: true,
+					execute: function () {
+						runSimilarArtists(false);
+					}
+				});
+
+				actionsApi.add({
+					id: ACTION_AUTO_ID,
+					title: _('Similar Artists (Auto On/Off)'),
+					icon: 'script',
+					disabled: false,
+					visible: true,
+					execute: function () {
+						toggleAuto();
+					}
+				});
+
+				log('Actions registered successfully');
+			} else {
+				log('actions.add not available');
+			}
+		} catch (e) {
+			log('Error registering actions: ' + e.toString());
+		}
+
+		try {
+			// Prefer app.menu/tools if available, fall back to menuItems/uitool
+			if (app.menu?.tools?.addItem) {
+				app.menu.tools.addItem({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID });
+				app.menu.tools.addItem({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID });
+				log('Menu items added via app.menu.tools.addItem');
+			} else if (typeof menuItems !== 'undefined' && menuItems.add) {
+				menuItems.add({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID, menuId: 'tools' });
+				menuItems.add({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID, menuId: 'tools' });
+				log('Menu items added via menuItems.add');
+			} else if (typeof uitool !== 'undefined' && uitool.menu) {
+				var toolsMenu = uitool.menu.tools || uitool.menu.getItem('tools');
+				if (toolsMenu && toolsMenu.addItem) {
+					toolsMenu.addItem({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID });
+					toolsMenu.addItem({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID });
+					log('Menu items added to Tools menu via uitool');
+				}
+			}
+		} catch (e) {
+			log('Error adding menu items: ' + e.toString());
+		}
+
+		try {
+			// Add toolbar buttons
+			const toolbarMode = Number(getSetting('Toolbar', defaults.Toolbar));
+			if (app.toolbar?.addButton) {
+				if (toolbarMode === 1 || toolbarMode === 3) {
+					app.toolbar.addButton({ id: TOOLBAR_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID, icon: 'script', visible: true });
+				}
+				if (toolbarMode === 2 || toolbarMode === 3) {
+					app.toolbar.addButton({ id: TOOLBAR_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID, icon: 'script', visible: true });
+				}
+				log('Toolbar buttons added via app.toolbar.addButton');
+			} else if (typeof uitool !== 'undefined' && uitool.toolbar && uitool.toolbar.addButton) {
+				const toolbarMode = Number(getSetting('Toolbar', defaults.Toolbar));
+				if (toolbarMode === 1 || toolbarMode === 3) {
+					uitool.toolbar.addButton({
+						id: TOOLBAR_RUN_ID,
+						title: _('Similar Artists'),
+						action: ACTION_RUN_ID,
+						icon: 'script',
+						visible: true
+					});
+				}
+				if (toolbarMode === 2 || toolbarMode === 3) {
+					uitool.toolbar.addButton({
+						id: TOOLBAR_AUTO_ID,
+						title: _('Similar Artists (Auto On/Off)'),
+						action: ACTION_AUTO_ID,
+						icon: 'script',
+						visible: true
+					});
+				}
+				log('Toolbar buttons added');
+			}
+		} catch (e) {
+			log('Error adding toolbar buttons: ' + e.toString());
+		}
+		*/
+	}
+	function getToggleIcon() {
+		//return getSetting('OnPlay', false) ? 'checkbox-checked' : 'checkbox-unchecked';
+	}
+
+	function registerActions() {
+		// Actions/menus are registered via `actions_add.js` + `init.js` (window.actions + window._menuItems)
+		// `app.actions` / `app.menu.*` are not stable/available across MM5 builds.
+		return;
+		/*
+		// MM5 uses actions.add() to register actions
+		try {
+			// Register the main run action
+			const actionsApi = app.actions || (typeof actions !== 'undefined' ? actions : null);
+			if (actionsApi && actionsApi.add) {
+				actionsApi.add({
+					id: ACTION_RUN_ID,
+					title: _('Similar Artists'),
+					icon: 'script',
+					disabled: false,
+					visible: true,
+					execute: function () {
+						runSimilarArtists(false);
+					}
+				});
+
+				actionsApi.add({
+					id: ACTION_AUTO_ID,
+					title: _('Similar Artists (Auto On/Off)'),
+					icon: 'script',
+					disabled: false,
+					visible: true,
+					execute: function () {
+						toggleAuto();
+					}
+				});
+
+				log('Actions registered successfully');
+			} else {
+				log('actions.add not available');
+			}
+		} catch (e) {
+			log('Error registering actions: ' + e.toString());
+		}
+
+		try {
+			// Prefer app.menu/tools if available, fall back to menuItems/uitool
+			if (app.menu?.tools?.addItem) {
+				app.menu.tools.addItem({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID });
+				app.menu.tools.addItem({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID });
+				log('Menu items added via app.menu.tools.addItem');
+			} else if (typeof menuItems !== 'undefined' && menuItems.add) {
+				menuItems.add({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID, menuId: 'tools' });
+				menuItems.add({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID, menuId: 'tools' });
+				log('Menu items added via menuItems.add');
+			} else if (typeof uitool !== 'undefined' && uitool.menu) {
+				var toolsMenu = uitool.menu.tools || uitool.menu.getItem('tools');
+				if (toolsMenu && toolsMenu.addItem) {
+					toolsMenu.addItem({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID });
+					toolsMenu.addItem({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID });
+					log('Menu items added to Tools menu via uitool');
+				}
+			}
+		} catch (e) {
+			log('Error adding menu items: ' + e.toString());
+		}
+
+		try {
+			// Add toolbar buttons
+			const toolbarMode = Number(getSetting('Toolbar', defaults.Toolbar));
+			if (app.toolbar?.addButton) {
+				if (toolbarMode === 1 || toolbarMode === 3) {
+					app.toolbar.addButton({ id: TOOLBAR_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID, icon: 'script', visible: true });
+				}
+				if (toolbarMode === 2 || toolbarMode === 3) {
+					app.toolbar.addButton({ id: TOOLBAR_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID, icon: 'script', visible: true });
+				}
+				log('Toolbar buttons added via app.toolbar.addButton');
+			} else if (typeof uitool !== 'undefined' && uitool.toolbar && uitool.toolbar.addButton) {
+				const toolbarMode = Number(getSetting('Toolbar', defaults.Toolbar));
+				if (toolbarMode === 1 || toolbarMode === 3) {
+					uitool.toolbar.addButton({
+						id: TOOLBAR_RUN_ID,
+						title: _('Similar Artists'),
+						action: ACTION_RUN_ID,
+						icon: 'script',
+						visible: true
+					});
+				}
+				if (toolbarMode === 2 || toolbarMode === 3) {
+					uitool.toolbar.addButton({
+						id: TOOLBAR_AUTO_ID,
+						title: _('Similar Artists (Auto On/Off)'),
+						action: ACTION_AUTO_ID,
+						icon: 'script',
+						visible: true
+					});
+				}
+				log('Toolbar buttons added');
+			}
+		} catch (e) {
+			log('Error adding toolbar buttons: ' + e.toString());
+		}
+		*/
+	}
+	function getToggleIcon() {
+		//return getSetting('OnPlay', false) ? 'checkbox-checked' : 'checkbox-unchecked';
+	}
+
+	function registerActions() {
+		// Actions/menus are registered via `actions_add.js` + `init.js` (window.actions + window._menuItems)
+		// `app.actions` / `app.menu.*` are not stable/available across MM5 builds.
+		return;
+		/*
+		// MM5 uses actions.add() to register actions
+		try {
+			// Register the main run action
+			const actionsApi = app.actions || (typeof actions !== 'undefined' ? actions : null);
+			if (actionsApi && actionsApi.add) {
+				actionsApi.add({
+					id: ACTION_RUN_ID,
+					title: _('Similar Artists'),
+					icon: 'script',
+					disabled: false,
+					visible: true,
+					execute: function () {
+						runSimilarArtists(false);
+					}
+				});
+
+				actionsApi.add({
+					id: ACTION_AUTO_ID,
+					title: _('Similar Artists (Auto On/Off)'),
+					icon: 'script',
+					disabled: false,
+					visible: true,
+					execute: function () {
+						toggleAuto();
+					}
+				});
+
+				log('Actions registered successfully');
+			} else {
+				log('actions.add not available');
+			}
+		} catch (e) {
+			log('Error registering actions: ' + e.toString());
+		}
+
+		try {
+			// Prefer app.menu/tools if available, fall back to menuItems/uitool
+			if (app.menu?.tools?.addItem) {
+				app.menu.tools.addItem({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID });
+				app.menu.tools.addItem({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID });
+				log('Menu items added via app.menu.tools.addItem');
+			} else if (typeof menuItems !== 'undefined' && menuItems.add) {
+				menuItems.add({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID, menuId: 'tools' });
+				menuItems.add({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID, menuId: 'tools' });
+				log('Menu items added via menuItems.add');
+			} else if (typeof uitool !== 'undefined' && uitool.menu) {
+				var toolsMenu = uitool.menu.tools || uitool.menu.getItem('tools');
+				if (toolsMenu && toolsMenu.addItem) {
+					toolsMenu.addItem({ id: MENU_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID });
+					toolsMenu.addItem({ id: MENU_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID });
+					log('Menu items added to Tools menu via uitool');
+				}
+			}
+		} catch (e) {
+			log('Error adding menu items: ' + e.toString());
+		}
+
+		try {
+			// Add toolbar buttons
+			const toolbarMode = Number(getSetting('Toolbar', defaults.Toolbar));
+			if (app.toolbar?.addButton) {
+				if (toolbarMode === 1 || toolbarMode === 3) {
+					app.toolbar.addButton({ id: TOOLBAR_RUN_ID, title: _('Similar Artists'), action: ACTION_RUN_ID, icon: 'script', visible: true });
+				}
+				if (toolbarMode === 2 || toolbarMode === 3) {
+					app.toolbar.addButton({ id: TOOLBAR_AUTO_ID, title: _('Similar Artists (Auto On/Off)'), action: ACTION_AUTO_ID, icon: 'script', visible: true });
+				}
+				log('Toolbar buttons added via app.toolbar.addButton');
+			} else if (typeof uitool !== 'undefined' && uitool.toolbar && uitool.toolbar.addButton) {
+				const toolbarMode = Number(getSetting('Toolbar', defaults.Toolbar));
+				if (toolbarMode === 1 || toolbarMode === 3) {
+					uitool.toolbar.addButton({
+						id: TOOLBAR_RUN_ID,
+						title: _('Similar Artists'),
+						action: ACTION_RUN_ID,
+						icon: 'script',
+						visible: true
+					});
+				}
+				if (toolbarMode === 2 || toolbarMode === 3) {
+					uitool.toolbar.addButton({
+						id: TOOLBAR_AUTO_ID,
+						title: _('Similar Artists (Auto On/Off)'),
+						action: ACTION_AUTO_ID,
+						icon: 'script',
+						visible: true
+					});
+				}
+				log('Toolbar buttons added');
+			}
+		} catch (e) {
+			log('Error adding toolbar buttons: ' + e.toString());
+		}
+		*/
+	}
+
 
 	// Export functions to the global scope
 	globalArg.SimilarArtists = {
