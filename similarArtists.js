@@ -674,8 +674,8 @@
 
 				// Exclude genres
 				if (excludeGenres.length > 0) {
-					const genreConditions = excludeGenres.map(() => `Genres.GenreName LIKE GenresSongs.IDGenre NOT IN (SELECT IDGenre FROM Genres WHERE ${genreConditions})`).join(' OR ');
-					conds.push(`GenresSongs.IDGenre NOT IN (SELECT IDGenre FROM Genres WHERE ${genreConditions})`);
+					const genreConditions = excludeGenres.map(() => `Genres.GenreName LIKE GenresSongs.IDGenre NOT IN (SELECT IDGenre FROM Genres WHERE ${genreConditions})`);
+					conds.push(`GenresSongs.IDGenre NOT IN (SELECT IDGenre FROM Genres WHERE ${genreConditions.join(' OR ') })`);
 					excludeGenres.forEach((g) => params.push(g));
 				}
 
@@ -706,7 +706,8 @@
 				sql += where + ' GROUP BY Songs.SongTitle' + orderBy + ` LIMIT ${limit}`;
 
 				log('SQL: ' + sql);
-				const tl = await app.db.getTracklist(sql, -1);
+				const list = app.db.getTracklist(sql, -1);
+				const tl = await list.whenLoaded();
 				return tracklistToArray(tl, limit);
 			}
 
