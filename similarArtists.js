@@ -390,7 +390,7 @@
 					} else if (typeof selectedList.get === 'function') {
 						t = selectedList.get(idx);
 					}
-					
+
 					if (t) {
 						log(`collectSeedTracks: index ${idx} got track with artist = ${t?.artist || 'N/A'}`);
 						if (t.artist) {
@@ -491,8 +491,12 @@
 			// Load config block stored under this script id.
 			var config = app.getValue(SCRIPT_ID, defaults);
 
-			// Get progress token for UI updates
-			const progressToken = app.db?.getProgressToken?.();
+			// Register progress task with MM5 task system for UI display
+			let progressTask = null;
+			if (app.db?.registerProgressTask) {
+				progressTask = app.db.registerProgressTask('SimilarArtists', 0, 'Initializing...');
+				log('SimilarArtists: Progress task registered');
+			}
 
 			const artistLimit = intSetting('Limit');
 			const tracksPerArtist = intSetting('TPA');
@@ -531,10 +535,10 @@
 			for (let i = 0; i < seedSlice.length; i++) {
 				const seed = seedSlice[i];
 
-				// Update progress bar
-				if (progressToken) {
-					progressToken.text = `Processing ${seed.name} (${i + 1}/${seedSlice.length})`;
-					progressToken.value = (i + 1) / seedSlice.length;
+				// Update progress task
+				if (progressTask) {
+					progressTask.text = `Processing ${seed.name} (${i + 1}/${seedSlice.length})`;
+					progressTask.value = (i + 1) / seedSlice.length;
 				}
 
 				// Use fixPrefixes for the API call
@@ -585,6 +589,7 @@
 
 			if (!allTracks.length) {
 				showToast('SimilarArtists: No matching tracks found in library.');
+				if (progressTask) progressTask.remove();
 				return;
 			}
 
@@ -625,9 +630,15 @@
 					showToast(`SimilarArtists: All ${count} artists have been processed.`);
 				}
 			}
+
 		} catch (e) {
 			log(e.msg || e.toString());
 			showToast('SimilarArtists: An error occurred - see log for details.');
+		} finally {
+			// Cleanup progress task
+			if (progressTask) {
+				progressTask.remove();
+			}
 		}
 	}
 
@@ -1004,7 +1015,7 @@
 			const t = tracks[i];
 			const id = t?.id || t?.ID;
 			if (ignoreDupes && id && existing.has(id)) continue;
-			
+
 			// Use synchronous methods - MM5 handles queueing internally
 			if (playlist.addTrack) {
 				playlist.addTrack(t);
@@ -1084,7 +1095,7 @@
 						tracklist.add(t);
 					}
 				});
-				
+
 				// Use addTracksAsync with the tracklist
 				if (tracklist && tracklist.count > 0) {
 					await playlist.addTracksAsync(tracklist);
