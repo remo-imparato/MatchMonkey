@@ -521,33 +521,48 @@
 			const ratingMin = intSetting('Rating');
 			const allowUnknown = boolSetting('Unknown');
 
-			// Start building SQL
-			let sql = 'SELECT DISTINCT Songs.* FROM Songs';
-			sql += ' INNER JOIN ArtistsSongs ON Songs.ID = ArtistsSongs.IDSong AND ArtistsSongs.PersonType = 1';
-			sql += ' INNER JOIN Artists ON ArtistsSongs.IDArtist = Artists.ID';
+			// Base SELECT — DISTINCT is fine without GROUP BY
+			let sql = `
+			SELECT DISTINCT Songs.*
+			FROM Songs
+			INNER JOIN ArtistsSongs 
+				ON Songs.ID = ArtistsSongs.IDSong 
+				AND ArtistsSongs.PersonType = 1
+			INNER JOIN Artists 
+				ON ArtistsSongs.IDArtist = Artists.ID
+		`;
 
 			if (opts.rank) {
-				sql += ' LEFT OUTER JOIN SimArtSongRank ON Songs.ID = SimArtSongRank.ID';
+				sql += `
+				LEFT OUTER JOIN SimArtSongRank 
+					ON Songs.ID = SimArtSongRank.ID
+			`;
 			}
 
 			if (excludeGenres.length > 0) {
-				sql += ' LEFT JOIN GenresSongs ON Songs.ID = GenresSongs.IDSong';
+				sql += `
+				LEFT JOIN GenresSongs 
+					ON Songs.ID = GenresSongs.IDSong
+			`;
 			}
 
 			const whereParts = [];
 
-			// Artist matching (handle prefixes)
+			// Artist matching (prefix handling)
 			if (artistName) {
 				const artistConds = [];
 				artistConds.push(`Artists.Artist = '${escapeSql(artistName)}'`);
 
 				const prefixes = getIgnorePrefixes();
+				const nameLower = artistName.toLowerCase();
+
 				for (const prefix of prefixes) {
 					const prefixLower = prefix.toLowerCase();
-					const nameLower = (artistName || '').toLowerCase();
 					if (nameLower.startsWith(prefixLower + ' ')) {
 						const withoutPrefix = artistName.slice(prefix.length + 1);
-						artistConds.push(`Artists.Artist = '${escapeSql(`${withoutPrefix}, ${prefix}`)}'`);
+						artistConds.push(
+							`Artists.Artist = '${escapeSql(`${withoutPrefix}, ${prefix}`)}'`
+						);
 					}
 				}
 
@@ -557,9 +572,16 @@
 			// Title matching (fuzzy strip)
 			if (title) {
 				const strippedTitle = stripName(title);
+
+				const stripExpr = `
+				REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+				REPLACE(REPLACE(REPLACE(REPLACE(
+					UPPER(Songs.SongTitle),
+				'&','AND'),'+','AND'),' N ','AND'),'''N''','AND'),' ',''),'.',''),
+				',',''),':',''),';',''),'-',''),'_',''),'!',''),'''',''),'\"','')
+			`;
+
 				if (strippedTitle) {
-					// Mirror the VBS/SQL strip routine used elsewhere
-					const stripExpr = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(Songs.SongTitle),'&','AND'),'+','AND'),' N ','AND'),'''N''','AND'),' ',''),'.',''),',',''),':',''),';',''),'-',''),'_',''),'!',''),'''',''),'\"','')";
 					whereParts.push(`${stripExpr} = '${escapeSql(strippedTitle)}'`);
 				} else {
 					whereParts.push(`Songs.SongTitle LIKE '%${escapeSql(title)}%'`);
@@ -571,52 +593,63 @@
 				whereParts.push(`Songs.SongTitle NOT LIKE '%${escapeSql(t)}%'`);
 			});
 
-			// Exclude genres via subquery
+			// Exclude genres
 			if (excludeGenres.length > 0) {
-				const genreConditions = excludeGenres.map((g) => `GenreName LIKE '%${escapeSql(g)}%'`).join(' OR ');
-				whereParts.push(`GenresSongs.IDGenre NOT IN (SELECT IDGenre FROM Genres WHERE ${genreConditions})`);
+				const genreConditions = excludeGenres
+					.map((g) => `GenreName LIKE '%${escapeSql(g)}%'`)
+					.join(' OR ');
+				whereParts.push(`
+				GenresSongs.IDGenre NOT IN (
+					SELECT IDGenre FROM Genres WHERE ${genreConditions}
+				)
+			`);
 			}
 
-			// Rating conditions
+			// Rating logic
 			if (ratingMin > 0) {
 				if (allowUnknown) {
-					whereParts.push(`(Songs.Rating < 0 OR Songs.Rating > ${ratingMin - 5})`);
+					whereParts.push(`(Songs.Rating < 0 OR Songs.Rating >= ${ratingMin})`);
 				} else {
-					whereParts.push(`(Songs.Rating > ${ratingMin - 5} AND Songs.Rating < 101)`);
+					whereParts.push(`(Songs.Rating >= ${ratingMin} AND Songs.Rating <= 100)`);
 				}
 			} else if (!allowUnknown) {
-				whereParts.push('(Songs.Rating > -1 AND Songs.Rating < 101)');
+				whereParts.push(`(Songs.Rating >= 0 AND Songs.Rating <= 100)`);
 			}
 
-			const whereClause = whereParts.length ? ` WHERE ${whereParts.join(' AND ')}` : '';
+			// WHERE clause
+			if (whereParts.length > 0) {
+				sql += ` WHERE ${whereParts.join(' AND ')}`;
+			}
 
-			// Order by
+			// ORDER BY
 			const order = [];
 			if (opts.rank) order.push('SimArtSongRank.Rank DESC');
 			if (opts.best) order.push('Songs.Rating DESC');
 			order.push('Random()');
-			const orderBy = ` ORDER BY ${order.join(',')}`;
 
-			const limitClause = typeof limit === 'number' && limit > 0 ? ` LIMIT ${limit}` : '';
+			sql += ` ORDER BY ${order.join(', ')}`;
 
-			sql += whereClause + ' GROUP BY Songs.SongTitle' + orderBy + limitClause;
+			// LIMIT
+			if (typeof limit === 'number' && limit > 0) {
+				sql += ` LIMIT ${limit}`;
+			}
 
 			log('SQL: ' + sql);
 
-			// Execute and wait for tracklist to load
+			// Execute
 			const tl = app.db.getTracklist(sql, -1);
 			await tl.whenLoaded();
 
-			// Convert to array and return up to requested limit
 			const arr = [];
 			tl.forEach((t) => arr.push(t));
+
 			return typeof limit === 'number' ? arr.slice(0, limit) : arr;
+
 		} catch (e) {
 			log('findLibraryTracks error: ' + e.toString());
 			return [];
 		}
 	}
-
 	async function enqueueTracks(tracks, ignoreDupes, clearFirst) {
 		const player = app.player;
 		if (!player) return;
