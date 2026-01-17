@@ -385,7 +385,7 @@
 	 */
 	async function runSimilarArtists(autoRun) {
 		state.cancelled = false;
-		//var prog = uitools.showProgressWindow();
+		
 		try {
 			const seedsRaw = collectSeedTracks();
 			const seeds = uniqueArtists(seedsRaw);
@@ -400,7 +400,9 @@
 			// Load config block stored under this script id.
 			var config = app.getValue(SCRIPT_ID, defaults);
 
-			//const progress = app.ui?.createProgress?.('SimilarArtists', seeds.length) || null;
+			// Get progress token for UI updates
+			const progressToken = app.db?.getProgressToken?.();
+
 			const artistLimit = intSetting('Limit');
 			const tracksPerArtist = intSetting('TPA');
 			const totalLimit = intSetting('TPL');
@@ -408,12 +410,12 @@
 			const includeSeedTrack = boolSetting('Seed2');
 			const randomise = boolSetting('Random');
 			const enqueue = boolSetting('Enqueue');
-			const ignoreDupes =boolSetting('Ignore');
+			const ignoreDupes = boolSetting('Ignore');
 			const clearNP = boolSetting('ClearNP');
-			const overwriteMode = config.Overwrite;// intSetting('Overwrite');
-			const confirm =  boolSetting('Confirm');
+			const overwriteMode = config.Overwrite;
+			const confirm = boolSetting('Confirm');
 			const rankEnabled = boolSetting('Rank');
-			const bestEnabled =  boolSetting('Best');
+			const bestEnabled = boolSetting('Best');
 
 			// Log settings for debugging
 			log(`Settings loaded: includeSeedArtist=${includeSeedArtist}, includeSeedTrack=${includeSeedTrack}, randomise=${randomise}, rankEnabled=${rankEnabled}`);
@@ -430,21 +432,13 @@
 			// Process each seed artist up to configured limit.
 			const seedSlice = seeds.slice(0, artistLimit || seeds.length);
 			for (let i = 0; i < seedSlice.length; i++) {
-				// Check for cancellation
-				//if (progress?.terminate || state.cancelled) {
-				//	if (progress?.close) progress.close();
-				//	if (confirm) {
-				//		showToast('SimilarArtists: Process cancelled by user.');
-				//	}
-				//	return;
-				//}
-
 				const seed = seedSlice[i];
-				//if (progress) {
-				//	progress.maxValue = seedSlice.length;
-				//	progress.value = i;
-				//	progress.text = `Processing ${seed.name} (${i + 1}/${seedSlice.length})`;
-				//}
+
+				// Update progress bar
+				if (progressToken) {
+					progressToken.text = `Processing ${seed.name} (${i + 1}/${seedSlice.length})`;
+					progressToken.value = (i + 1) / seedSlice.length;
+				}
 
 				// Use fixPrefixes for the API call
 				const artistNameForApi = fixPrefixes(seed.name);
@@ -461,11 +455,6 @@
 				});
 
 				for (const artName of artistPool) {
-					// Check for cancellation
-					//if (progress?.terminate || state.cancelled) {
-					//	break;
-					//}
-
 					// Populate rank map: fetch top tracks for this artist and score them
 					if (rankEnabled) {
 						const titles = await fetchTopTracksForRank(fixPrefixes(artName));
@@ -498,7 +487,6 @@
 			}
 
 			if (!allTracks.length) {
-				//if (progress?.close) progress.close();
 				showToast('SimilarArtists: No matching tracks found in library.');
 				return;
 			}
@@ -529,8 +517,6 @@
 				}
 			}
 
-			//if (progress?.close) progress.close();
-
 			// Show completion message if confirm is enabled
 			if (confirm && !autoRun) {
 				const count = seedSlice.length;
@@ -541,13 +527,8 @@
 				}
 			}
 		} catch (e) {
-			log(e.msg);
+			log(e.msg || e.toString());
 			showToast('SimilarArtists: An error occurred - see log for details.');
-		} finally {
-			//	prog.close();
-			//uitools.hideProgressWindow();
-			//showToast('SimilarArtists: Finished');
-
 		}
 	}
 
