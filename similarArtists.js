@@ -374,15 +374,15 @@
 				let processedCount = 0;
 				selectedList.forEach((t) => {
 					processedCount++;
-					log(`collectSeedTracks: forEach iteration ${processedCount}, track artist = ${t?.artist || 'N/A'}`);
+					//log(`collectSeedTracks: forEach iteration ${processedCount}, track artist = ${t?.artist || 'N/A'}`);
 					if (t && t.artist) {
 						seeds.push({ name: normalizeName(t.artist), track: t });
 					}
 				});
-				log(`collectSeedTracks: forEach completed, processed ${processedCount} tracks, collected ${seeds.length} seeds`);
+				//log(`collectSeedTracks: forEach completed, processed ${processedCount} tracks, collected ${seeds.length} seeds`);
 			} else {
 				// Fallback: try using index-based access if forEach not available
-				log('collectSeedTracks: forEach not available, trying index-based access');
+				//log('collectSeedTracks: forEach not available, trying index-based access');
 				for (let idx = 0; idx < selectedCount; idx++) {
 					let t = null;
 					if (typeof selectedList.getFastObject === 'function') {
@@ -392,17 +392,17 @@
 					}
 
 					if (t) {
-						log(`collectSeedTracks: index ${idx} got track with artist = ${t?.artist || 'N/A'}`);
+						//log(`collectSeedTracks: index ${idx} got track with artist = ${t?.artist || 'N/A'}`);
 						if (t.artist) {
 							seeds.push({ name: normalizeName(t.artist), track: t });
 						}
 					}
 				}
-				log(`collectSeedTracks: index-based access completed, collected ${seeds.length} seeds`);
+				//log(`collectSeedTracks: index-based access completed, collected ${seeds.length} seeds`);
 			}
 
 			if (seeds.length > 0) {
-				log(`collectSeedTracks: Returning ${seeds.length} seed(s): ${seeds.map(s => s.name).join(', ')}`);
+				//log(`collectSeedTracks: Returning ${seeds.length} seed(s): ${seeds.map(s => s.name).join(', ')}`);
 				return seeds;
 			}
 		}
@@ -975,8 +975,8 @@
 			//console.debug('SQL: ' + sql);
 
 			// Execute
-			const tl = app.db.getTracklist(sql, -1);
-			await tl.whenLoaded();
+			const tl = app?.db?.getTracklist(sql, -1);
+			await tl?.whenLoaded();
 
 			const arr = [];
 			tl.forEach((t) => arr.push(t));
