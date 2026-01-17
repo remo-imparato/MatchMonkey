@@ -777,7 +777,7 @@
 				sql += ` LIMIT ${limit}`;
 			}
 
-			log('SQL: ' + sql);
+			console.debug('SQL: ' + sql);
 
 			// Execute
 			const tl = app.db.getTracklist(sql, -1);
@@ -824,91 +824,9 @@
 	 * Create or locate a playlist, optionally overwrite its content, then add tracks.
 	 * @param {object[]} tracks Tracks to add.
 	 * @param {string} title Playlist title.
-	 * @param {string} parent Parent playlist path/title.
 	 * @param {boolean} overwrite Whether to clear existing playlist content.
 	 * @returns {Promise<object|null>} Playlist object.
 	 */
-	async function createPlaylistAndPopulate(tracks, title, parent, overwrite = false) {
-		if (!tracks || tracks.length === 0) return null;
-
-		// Try find existing
-		let playlist = null;
-		if (app.playlists?.findByTitle) {
-			playlist = app.playlists.findByTitle(title);
-		} else if (app.playlists?.getByTitle) {
-			playlist = app.playlists.getByTitle(title);
-		}
-
-		// Create if missing
-		if (!playlist) {
-			if (app.playlists?.createPlaylist) {
-				playlist = app.playlists.createPlaylist(title, parent || '');
-			} else if (app.playlists?.root?.newPlaylist) {
-				// Old API path: newPlaylist() + set name + commitAsync() to persist.
-				playlist = app.playlists.root.newPlaylist();
-				if (playlist) {
-					playlist.name = title;
-					if (parent && playlist.parent) {
-						playlist.parent = parent;
-					}
-					if (playlist.commitAsync) {
-						await playlist.commitAsync();
-					}
-				}
-			}
-		} else if (overwrite) {
-			// Overwrite existing
-			if (playlist.clearTracksAsync) {
-				await playlist.clearTracksAsync();
-			} else if (playlist.clear) {
-				playlist.clear();
-			}
-		}
-
-		if (!playlist) return null;
-
-		// Add tracks (prefer bulk add) - some MM5/Cef builds don't allow passing JS arrays into native methods.
-		if (playlist.addTracksAsync) {
-			await playlist.addTracksAsync(tracks);
-			/*
-			let tracklist = null;
-			if (app.utils?.createTracklist) {
-				tracklist = app.utils.createTracklist(true);
-				(tracks || []).forEach((t) => {
-					if (t) {
-						tracklist.add(t);
-					}
-				});
-			}
-			if (tracklist) {
-				await playlist.addTracksAsync(tracklist);
-			} else if (playlist.addTrack) {
-				(tracks || []).forEach((t) => {
-					if (t) {
-						playlist.addTrack(t);
-					}
-				});
-			}*/
-		} else if (playlist.addTracks) {
-			playlist.addTracks(tracks);
-		} else if (playlist.addTrack) {
-			tracks.forEach((t) => playlist.addTrack(t));
-		} else if (app.player?.appendTracks) {
-			app.player.appendTracks(tracks);
-		}
-
-		// Optional: navigate to playlist
-		try {
-			if (app.ui?.navigateToPlaylist && playlist.id) {
-				app.ui.navigateToPlaylist(playlist.id);
-			}
-		} catch (e) {
-			console.log('navigateToPlaylist failed: ' + e);
-		}
-
-		return playlist;
-	}
-
 	async function createPlaylist(tracks, seedName, overwriteMode) {
 		const titleTemplate = stringSetting('Name');
 		const baseName = titleTemplate.replace('%', seedName || '');
@@ -957,7 +875,7 @@
 
 		// Add tracks to playlist. Some builds don't allow JS arrays to be passed into native methods.
 		if (playlist.addTracksAsync) {
-			var createTracklist = false;
+			var createTracklist = true;
 			if (createTracklist) {
 				let tracklist = null;
 				if (app.utils?.createTracklist) {
