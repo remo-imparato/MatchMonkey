@@ -401,19 +401,22 @@
 			var config = app.getValue(SCRIPT_ID, defaults);
 
 			//const progress = app.ui?.createProgress?.('SimilarArtists', seeds.length) || null;
-			const artistLimit = config.Limit;// intSetting('Limit');
-			const tracksPerArtist = config.TPA;// intSetting('TPA');
-			const totalLimit = config.TPL;// intSetting('TPL');
-			const includeSeedArtist = config.Seed;// boolSetting('Seed');
-			const includeSeedTrack = config.Seed2;// boolSetting('Seed2');
-			const randomise = config.Random;// boolSetting('Random');
-			const enqueue = config.Enqueue;// boolSetting('Enqueue');
-			const ignoreDupes = config.Ignore;// boolSetting('Ignore');
-			const clearNP = config.ClearNP;// boolSetting('ClearNP');
+			const artistLimit = intSetting('Limit');
+			const tracksPerArtist = intSetting('TPA');
+			const totalLimit = intSetting('TPL');
+			const includeSeedArtist = boolSetting('Seed');
+			const includeSeedTrack = boolSetting('Seed2');
+			const randomise = boolSetting('Random');
+			const enqueue = boolSetting('Enqueue');
+			const ignoreDupes =boolSetting('Ignore');
+			const clearNP = boolSetting('ClearNP');
 			const overwriteMode = config.Overwrite;// intSetting('Overwrite');
-			const confirm = config.Confirm;// boolSetting('Confirm');
-			const rankEnabled = config.Rank;// boolSetting('Rank');
-			const bestEnabled = config.Best;// boolSetting('Best');
+			const confirm =  boolSetting('Confirm');
+			const rankEnabled = boolSetting('Rank');
+			const bestEnabled =  boolSetting('Best');
+
+			// Log settings for debugging
+			log(`Settings loaded: includeSeedArtist=${includeSeedArtist}, includeSeedTrack=${includeSeedTrack}, randomise=${randomise}, rankEnabled=${rankEnabled}`);
 
 			// In-memory rank map: track ID -> rank score (used if rankEnabled)
 			const trackRankMap = rankEnabled ? new Map() : null;
