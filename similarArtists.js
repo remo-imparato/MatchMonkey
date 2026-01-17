@@ -363,28 +363,46 @@
 			? selectedList.count()
 			: (selectedList?.count || 0);
 
+		log(`collectSeedTracks: selectedList count = ${selectedCount}`);
+
 		if (selectedList && selectedCount > 0) {
 			// Process all selected tracks using forEach (not toArray)
-			log(`collectSeedTracks: Found ${selectedCount} selected track(s)`);
+			log(`collectSeedTracks: Found ${selectedCount} selected track(s), iterating...`);
 
 			if (typeof selectedList.forEach === 'function') {
 				// Use forEach for iteration (MM5 standard pattern)
+				let processedCount = 0;
 				selectedList.forEach((t) => {
+					processedCount++;
+					log(`collectSeedTracks: forEach iteration ${processedCount}, track artist = ${t?.artist || 'N/A'}`);
 					if (t && t.artist) {
 						seeds.push({ name: normalizeName(t.artist), track: t });
 					}
 				});
-			} else if (typeof selectedList.toArray === 'function') {
-				// Fallback to toArray if available
-				const selectedTracks = selectedList.toArray();
-				(selectedTracks || []).forEach((t) => {
-					if (t && t.artist) {
-						seeds.push({ name: normalizeName(t.artist), track: t });
+				log(`collectSeedTracks: forEach completed, processed ${processedCount} tracks, collected ${seeds.length} seeds`);
+			} else {
+				// Fallback: try using index-based access if forEach not available
+				log('collectSeedTracks: forEach not available, trying index-based access');
+				for (let idx = 0; idx < selectedCount; idx++) {
+					let t = null;
+					if (typeof selectedList.getFastObject === 'function') {
+						t = selectedList.getFastObject(idx);
+					} else if (typeof selectedList.get === 'function') {
+						t = selectedList.get(idx);
 					}
-				});
+					
+					if (t) {
+						log(`collectSeedTracks: index ${idx} got track with artist = ${t?.artist || 'N/A'}`);
+						if (t.artist) {
+							seeds.push({ name: normalizeName(t.artist), track: t });
+						}
+					}
+				}
+				log(`collectSeedTracks: index-based access completed, collected ${seeds.length} seeds`);
 			}
 
 			if (seeds.length > 0) {
+				log(`collectSeedTracks: Returning ${seeds.length} seed(s): ${seeds.map(s => s.name).join(', ')}`);
 				return seeds;
 			}
 		}
@@ -393,6 +411,7 @@
 		log('collectSeedTracks: No selection found, falling back to currently playing track');
 		const currentTrack = app.player?.getCurrentTrack?.();
 		if (currentTrack && currentTrack.artist) {
+			log(`collectSeedTracks: Current playing track artist = ${currentTrack.artist}`);
 			seeds.push({ name: normalizeName(currentTrack.artist), track: currentTrack });
 			return seeds;
 		}
