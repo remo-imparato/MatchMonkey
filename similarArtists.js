@@ -19,30 +19,6 @@
 
 	// Default settings (kept commented-out here because this add-on reads defaults from the Options page).
 	const defaults = {
-		//	Toolbar: 1, // 0=none 1=run 2=auto 3=both
-		//	Confirm: true,
-		//	Sort: false,
-		//	Limit: 5,
-		//	Name: 'Artists similar to %',
-		//	TPA: 9999,
-		//	TPL: 9999,
-		//	Random: false,
-		//	Seed: false,
-		//	Seed2: false,
-		//	Best: false,
-		//	Rank: false,
-		//	Rating: 0,
-		//	Unknown: true,
-		//	Overwrite: 0, // 0=create, 1=overwrite, 2=do not create playlist (enqueue only)
-		//	Enqueue: false,
-		//	Navigate: 0,
-		//	OnPlay: false,
-		//	ClearNP: false,
-		//	Ignore: false,
-		//	Parent: '',
-		//	Black: '',
-		//	Exclude: '',
-		//	Genre: '',
 	};
 
 	// Runtime state for the add-on (not persisted).
@@ -101,13 +77,13 @@
 		}
 	}
 
-	// At top of js/similarArtists.js (or in your existing file)
 	/**
 	 * Get the Last.fm API key from MediaMonkey settings with a built-in fallback.
 	 * @returns {string} API key.
 	 */
 	function getApiKey() {
-		return app?.settings?.getValue?.('SimilarArtists.ApiKey', '') || '6cfe51c9bf7e77d6449e63ac0db2ac24';
+		return getSetting('ApiKey', '6cfe51c9bf7e77d6449e63ac0db2ac24');
+		//return app?.settings?.getValue?.('SimilarArtists.ApiKey', '') || '6cfe51c9bf7e77d6449e63ac0db2ac24';
 	}
 
 	/**
@@ -117,7 +93,9 @@
 	 * @returns {*} Stored value or fallback.
 	 */
 	function getSetting(key, fallback) {
-		if (typeof app === 'undefined' || !app.getValue) return fallback;
+		if (typeof app === 'undefined' || !app.getValue)
+			return fallback;
+
 		let val = app.getValue(SCRIPT_ID, {});
 		val = val[key];
 		switch (val) {
@@ -125,6 +103,7 @@
 			case null:
 				return fallback;
 		}
+
 		return val;
 	}
 
@@ -155,30 +134,6 @@
 	function boolSetting(key) {
 		const val = getSetting(key, defaults[key]);
 		return Boolean(val);
-	}
-
-	/**
-	 * Get a setting coerced to integer.
-	 * @param {string} key Setting key.
-	 * @returns {number}
-	 */
-	function intSetting(key) {
-		const val = getSetting(key, defaults[key]);
-		return parseInt(val, 10) || 0;
-	}
-
-	/**
-	 * Initialize missing settings to defaults.
-	 * Note: currently returns early because defaults are defined in Options UI.
-	 */
-	function ensureDefaults() {
-		return;
-		Object.keys(defaults).forEach((k) => {
-			const val = getSetting(k, null);
-			if (val === null) {
-				setSetting(k, defaults[k]);
-			}
-		});
 	}
 
 	/**
@@ -252,9 +207,11 @@
 	function toggleAuto() {
 		const next = !getSetting('OnPlay', false);
 		setSetting('OnPlay', next);
-		refreshToggleUI();
-		if (next) attachAuto();
-		else detachAuto();
+		//refreshToggleUI();
+		if (next)
+			attachAuto();
+		else
+			detachAuto();
 	}
 
 	/**
@@ -262,9 +219,11 @@
 	 */
 	function attachAuto() {
 		detachAuto();
-		if (typeof app === 'undefined') return;
+		if (typeof app === 'undefined')
+			return;
 		const player = app.player;
-		if (!player) return;
+		if (!player)
+			return;
 		if (app.listen) {
 			state.autoListen = app.listen(player, 'playbackState', (newState) => {
 				if (newState === 'trackChanged') handleAuto();
@@ -280,7 +239,8 @@
 	 * Detach playback listener for auto-mode.
 	 */
 	function detachAuto() {
-		if (!state.autoListen) return;
+		if (!state.autoListen)
+			return;
 		try {
 			if (app.unlisten) app.unlisten(state.autoListen);
 			else if (state.autoListen.off) state.autoListen.off();
@@ -295,9 +255,11 @@
 	 */
 	async function handleAuto() {
 		try {
-			if (!getSetting('OnPlay', false)) return;
+			if (!getSetting('OnPlay', false))
+				return;
 			const player = app.player;
-			if (!player || !player.playlist) return;
+			if (!player || !player.playlist)
+				return;
 			const list = player.playlist;
 			if (typeof list.getCursor === 'function' && typeof list.count === 'function') {
 				// When only 1 track remains (cursor + 2 > count), pre-fill with more similar tracks.
@@ -337,7 +299,8 @@
 	 * @returns {{name: string, track?: object}[]}
 	 */
 	function collectSeedTracks() {
-		if (typeof app === 'undefined') return [];
+		if (typeof app === 'undefined')
+			return [];
 		let list = null;
 		if (uitools?.getSelectedTracklist) {
 			list = uitools.getSelectedTracklist();
@@ -346,7 +309,8 @@
 		if (!list || count === 0) {
 			list = app.player?.getCurrentTrack?.();// || app.player?.playlist;
 		}
-		if (!list) return [];
+		if (!list)
+			return [];
 		const tracks = list.toArray ? list.toArray() : [list];
 		const seeds = [];
 		(tracks || []).forEach((t) => {
@@ -421,6 +385,7 @@
 				showToast('SimilarArtists: Select at least one track to seed the playlist.');
 				return;
 			}
+			showToast('SimilarArtists: Started');
 
 			// Load config block stored under this script id.
 			var config = app.getValue(SCRIPT_ID, defaults);
@@ -541,6 +506,8 @@
 		} finally {
 			//	prog.close();
 			//uitools.hideProgressWindow();
+			showToast('SimilarArtists: Finished');
+
 		}
 	}
 
@@ -564,13 +531,20 @@
 	 */
 	async function fetchSimilarArtists(artistName) {
 		try {
-			if (!artistName) return [];
+			if (!artistName)
+				return [];
+
 			const apiKey = getApiKey();
 			const limitVal = parseInt(getSetting('Limit', defaults?.Limit || 0), 10) || undefined;
 			const params = new URLSearchParams({ method: 'artist.getSimilar', api_key: apiKey, format: 'json', artist: artistName });
-			if (limitVal) params.set('limit', String(limitVal));
+			if (limitVal)
+				params.set('limit', String(limitVal));
+
 			const url = API_BASE + '?' + params.toString();
+			log('fetchSimilarArtists: querying ' + url);
+			//call to last fm api
 			const res = await fetch(url);
+
 			if (!res || !res.ok) {
 				log(`fetchSimilarArtists: HTTP ${res?.status} ${res?.statusText} for ${artistName}`);
 				return [];
@@ -579,15 +553,16 @@
 			try {
 				data = await res.json();
 			} catch (e) {
-				log('fetchSimilarArtists: invalid JSON response: ' + e.toString());
+				console.warn('fetchSimilarArtists: invalid JSON response: ' + e.toString());
 				return [];
 			}
 			if (data?.error) {
-				log('fetchSimilarArtists: API error: ' + (data.message || data.error));
+				console.warn('fetchSimilarArtists: API error: ' + (data.message || data.error));
 				return [];
 			}
 			const artists = data?.similarartists?.artist || [];
-			if (!Array.isArray(artists) && artists) return [artists];
+			if (!Array.isArray(artists) && artists)
+				return [artists];
 			return artists;
 		} catch (e) {
 			log(e.toString());
@@ -603,12 +578,17 @@
 	 */
 	async function fetchTopTracks(artistName, limit) {
 		try {
-			if (!artistName) return [];
+			if (!artistName)
+				return [];
 			const apiKey = getApiKey();
 			const lim = Number(limit) || undefined;
 			const params = new URLSearchParams({ method: 'artist.getTopTracks', api_key: apiKey, format: 'json', artist: artistName });
-			if (lim) params.set('limit', String(lim));
+			if (lim)
+				params.set('limit', String(lim));
+
 			const url = API_BASE + '?' + params.toString();
+			log('fetchTopTracks: querying ' + url);
+
 			const res = await fetch(url);
 			if (!res || !res.ok) {
 				log(`fetchTopTracks: HTTP ${res?.status} ${res?.statusText} for ${artistName}`);
@@ -618,18 +598,19 @@
 			try {
 				data = await res.json();
 			} catch (e) {
-				log('fetchTopTracks: invalid JSON response: ' + e.toString());
+				console.warn('fetchTopTracks: invalid JSON response: ' + e.toString());
 				return [];
 			}
 			if (data?.error) {
-				log('fetchTopTracks: API error: ' + (data.message || data.error));
+				console.warn('fetchTopTracks: API error: ' + (data.message || data.error));
 				return [];
 			}
 			let tracks = data?.toptracks?.track || [];
 			if (tracks && !Array.isArray(tracks)) tracks = [tracks];
 			const titles = [];
 			tracks.forEach((t) => {
-				if (t && (t.name || t.title)) titles.push(t.name || t.title);
+				if (t && (t.name || t.title))
+					titles.push(t.name || t.title);
 			});
 			return typeof lim === 'number' ? titles.slice(0, lim) : titles;
 		} catch (e) {
@@ -658,7 +639,8 @@
 	 */
 	async function findLibraryTracks(artistName, title, limit, opts = {}) {
 		try {
-			if (!app?.db?.getTracklist) return [];
+			if (!app?.db?.getTracklist)
+				return [];
 
 			const excludeTitles = parseListSetting('Exclude');
 			const excludeGenres = parseListSetting('Genre');
@@ -766,8 +748,10 @@
 
 			// ORDER BY
 			const order = [];
-			if (opts.rank) order.push('RankValue DESC');
-			if (opts.best) order.push('Songs.Rating DESC');
+			if (opts.rank)
+				order.push('RankValue DESC');
+			if (opts.best)
+				order.push('Songs.Rating DESC');
 			order.push('Random()');
 
 			sql += ` ORDER BY ${order.join(', ')}`;
@@ -802,10 +786,14 @@
 	 */
 	async function enqueueTracks(tracks, ignoreDupes, clearFirst) {
 		const player = app.player;
-		if (!player) return;
+		if (!player)
+			return;
 		const playlist = player.playlist || player.nowPlayingQueue || player.getPlaylist?.();
-		if (!playlist) return;
-		if (clearFirst && playlist.clear) playlist.clear();
+		if (!playlist)
+			return;
+		if (clearFirst && playlist.clear)
+			playlist.clear();
+
 		const existing = new Set();
 		if (ignoreDupes && playlist.toArray) {
 			playlist.toArray().forEach((t) => existing.add(t.id || t.ID));
@@ -862,6 +850,8 @@
 
 		if (!playlist) {
 			return;
+		} else {
+			log(`SimilarArtists: Using playlist '${name}' (ID: ${playlist.id || playlist.ID})`);
 		}
 
 		// If overwrite is selected, clear existing playlist content.
@@ -875,6 +865,7 @@
 
 		// Add tracks to playlist. Some builds don't allow JS arrays to be passed into native methods.
 		if (playlist.addTracksAsync) {
+
 			var createTracklist = true;
 			if (createTracklist) {
 				let tracklist = null;
@@ -886,6 +877,7 @@
 						}
 					});
 				}
+
 				var addTracks = false;
 				if (tracklist && addTracks) {
 					await playlist.addTracksAsync(tracklist);
@@ -906,11 +898,11 @@
 		}
 
 		// navigation: 1 navigate to playlist, 2 navigate to now playing
-		const nav = intSetting('Navigate');
+		const nav = getSetting('SANavigate');
 		try {
-			if (nav === 1 && app.ui?.navigateToPlaylist && playlist.id) {
+			if (nav.indexOf('new') > -1 && app.ui?.navigateToPlaylist && playlist.id) {
 				app.ui.navigateToPlaylist(playlist.id);
-			} else if (nav === 2 && app.ui?.navigateNowPlaying) {
+			} else if (nav.indexOf('now') > -1 && app.ui?.navigateNowPlaying) {
 				app.ui.navigateNowPlaying();
 			}
 		} catch (e) {
@@ -924,8 +916,12 @@
 	 * @returns {object|null}
 	 */
 	function findPlaylist(name) {
-		if (app.playlists?.findByTitle) return app.playlists.findByTitle(name);
-		if (app.playlists?.getByTitle) return app.playlists.getByTitle(name);
+		if (app.playlists?.findByTitle)
+			return app.playlists.findByTitle(name);
+
+		if (app.playlists?.getByTitle)
+			return app.playlists.getByTitle(name);
+
 		return null;
 	}
 
@@ -944,9 +940,10 @@
 	 * Ensure the ranking table exists (used when Rank mode is enabled).
 	 */
 	async function ensureRankTable() {
-		if (!app.db?.executeAsync) return;
+		if (!app.db?.executeQueryAsync)
+			return;
 		try {
-			await app.db.executeAsync('CREATE TABLE IF NOT EXISTS SimArtSongRank (ID INTEGER PRIMARY KEY, Rank INTEGER)');
+			await app.db.executeQueryAsync('CREATE TABLE IF NOT EXISTS SimArtSongRank (ID INTEGER PRIMARY KEY, Rank INTEGER)');
 		} catch (e) {
 			log(e.toString());
 		}
@@ -956,9 +953,10 @@
 	 * Clear existing rank weights for a new run.
 	 */
 	async function resetRankTable() {
-		if (!app.db?.executeAsync) return;
+		if (!app.db?.executeQueryAsync)
+			return;
 		try {
-			await app.db.executeAsync('DELETE FROM SimArtSongRank');
+			await app.db.executeQueryAsync('DELETE FROM SimArtSongRank');
 		} catch (e) {
 			log(e.toString());
 		}
@@ -970,7 +968,9 @@
 	 * @param {string} artistName Artist name.
 	 */
 	async function updateRankForArtist(artistName) {
-		if (!artistName || !app.db?.executeAsync) return;
+		if (!artistName || !app.db?.executeQueryAsync)
+			return;
+
 		const titles = await fetchTopTracksForRank(fixPrefixes(artistName));
 		for (let i = 0; i < titles.length; i++) {
 			const title = titles[i];
@@ -988,9 +988,9 @@
 	 * @param {number} rank Rank value.
 	 */
 	async function upsertRank(id, rank) {
-		if (!app.db?.executeAsync) return;
+		if (!app.db?.executeQueryAsync) return;
 		try {
-			await app.db.executeAsync('REPLACE INTO SimArtSongRank (ID, Rank) VALUES (?, ?)', [id, rank]);
+			await app.db.executeQueryAsync('REPLACE INTO SimArtSongRank (ID, Rank) VALUES (?, ?)', [id, rank]);
 		} catch (e) {
 			log(e.toString());
 		}
