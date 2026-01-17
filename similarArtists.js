@@ -449,7 +449,7 @@
 
 	async function runSimilarArtists(autoRun) {
 		state.cancelled = false;
-		uitools.showProgresWindow();
+		var prog = uitools.showProgressWindow();
 		try {
 			const seedsRaw = collectSeedTracks();
 			const seeds = uniqueArtists(seedsRaw);
@@ -565,7 +565,8 @@
 			log(e.msg);
 			showToast('SimilarArtists: An error occurred - see log for details.');
 		} finally {
-			uitools.hideProgresWindow();
+			prog.close();
+			//uitools.hideProgressWindow();
 		}
 	}
 
