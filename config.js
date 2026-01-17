@@ -61,51 +61,128 @@ window.configInfo = {
 		UI.SAGenre.controlClass.value = this.config.Genre;
 
 		// Populate parent playlist dropdown dynamically
+		this.populateParentPlaylistDropdown(UI);
+
+	},
+
+	/**
+	 * Populate the parent playlist dropdown with all available playlists.
+	 * Handles both immediate and deferred population depending on API availability.
+	 * @param {object} UI UI elements object from getAllUIElements
+	 */
+	populateParentPlaylistDropdown: function(UI) {
 		try {
 			const parentCtrl = UI.SAParent?.controlClass;
-			if (parentCtrl) {
+			if (!parentCtrl) {
+				console.warn('SimilarArtists Config: SAParent control not found');
+				return;
+			}
+
+			// Helper function to set dropdown items
+			const setDropdownItems = (items) => {
+				try {
+					// Try setItems method first (newer MM5 builds)
+					if (typeof parentCtrl.setItems === 'function') {
+						parentCtrl.setItems(items);
+						console.log('SimilarArtists Config: Playlist dropdown populated via setItems');
+					} 
+					// Fallback: direct items array assignment
+					else if (parentCtrl.items && Array.isArray(parentCtrl.items)) {
+						parentCtrl.items = items;
+						console.log('SimilarArtists Config: Playlist dropdown populated via items property');
+					} 
+					// Last resort: try value property
+					else if (parentCtrl.value !== undefined) {
+						// For HTML select elements
+						parentCtrl.innerHTML = items.map(item => `<option>${item}</option>`).join('');
+						console.log('SimilarArtists Config: Playlist dropdown populated via innerHTML');
+					}
+
+					// Set selected value (default to 'Similar Artists Playlists' if it exists)
+					const defaultParent = this.config?.Parent || 'Similar Artists Playlists';
+					let selectedIndex = 0;
+
+					if (items.indexOf(defaultParent) >= 0) {
+						selectedIndex = items.indexOf(defaultParent);
+					}
+
+					if (typeof parentCtrl.selectedIndex !== 'undefined') {
+						parentCtrl.selectedIndex = selectedIndex;
+						console.log(`SimilarArtists Config: Selected index set to ${selectedIndex} (${items[selectedIndex]})`);
+					}
+				} catch (e) {
+					console.error('SimilarArtists Config: Error setting dropdown items:', e.toString());
+				}
+			};
+
+			// Helper function to get playlists
+			const getPlaylistsList = () => {
 				const allPlaylists = [];
 				
-				// Get all available playlists
-				if (app.playlists?.getAll) {
-					const pls = app.playlists.getAll();
-					if (Array.isArray(pls)) {
-						pls.forEach(p => { 
-							if (p && p.title) {
-								allPlaylists.push(p.title);
-							}
-						});
+				// Try multiple methods to get playlists
+				if (app.playlists?.getAll && typeof app.playlists.getAll === 'function') {
+					try {
+						const pls = app.playlists.getAll();
+						if (Array.isArray(pls)) {
+							pls.forEach(p => { 
+								if (p && (p.title || p.name)) {
+									allPlaylists.push(p.title || p.name);
+								}
+							});
+							console.log(`SimilarArtists Config: Retrieved ${allPlaylists.length} playlists via getAll`);
+						}
+					} catch (e) {
+						console.warn('SimilarArtists Config: Error calling getAll():', e.toString());
+					}
+				} 
+				// Fallback: try root playlists
+				else if (app.playlists?.root?.playlists) {
+					try {
+						const rootPls = app.playlists.root.playlists;
+						if (Array.isArray(rootPls)) {
+							rootPls.forEach(p => {
+								if (p && (p.title || p.name)) {
+									allPlaylists.push(p.title || p.name);
+								}
+							});
+							console.log(`SimilarArtists Config: Retrieved ${allPlaylists.length} playlists via root.playlists`);
+						}
+					} catch (e) {
+						console.warn('SimilarArtists Config: Error accessing root.playlists:', e.toString());
 					}
 				}
 
-				allPlaylists.sort((a, b) => a.localeCompare(b));
+				return allPlaylists;
+			};
 
-				// Build items: [None] + playlists
-				const items = ['[None]'].concat(allPlaylists);
-
-				// Set items on control
-				if (typeof parentCtrl.setItems === 'function') {
-					parentCtrl.setItems(items);
-				} else if (parentCtrl.items && Array.isArray(parentCtrl.items)) {
-					parentCtrl.items = items;
-				}
-
-				// Set selected value (default to 'Similar Artists Playlists' if it exists)
-				const defaultParent = this.config.Parent || 'Similar Artists Playlists';
-				let selectedIndex = 0;
-
-				if (items.indexOf(defaultParent) >= 0) {
-					selectedIndex = items.indexOf(defaultParent);
-				}
-
-				if (typeof parentCtrl.selectedIndex !== 'undefined') {
-					parentCtrl.selectedIndex = selectedIndex;
-				}
+			// Attempt to populate immediately
+			let playlists = getPlaylistsList();
+			
+			if (playlists.length > 0) {
+				// Got playlists immediately
+				playlists.sort((a, b) => a.localeCompare(b));
+				const items = ['[None]'].concat(playlists);
+				setDropdownItems.call(this, items);
+			} else {
+				// No playlists yet, try again after a short delay
+				console.log('SimilarArtists Config: No playlists found immediately, retrying...');
+				setTimeout(() => {
+					playlists = getPlaylistsList();
+					if (playlists.length > 0) {
+						playlists.sort((a, b) => a.localeCompare(b));
+						const items = ['[None]'].concat(playlists);
+						setDropdownItems.call(this, items);
+					} else {
+						console.warn('SimilarArtists Config: Still no playlists found after delay');
+						// Set default items at minimum
+						setDropdownItems.call(this, ['[None]']);
+					}
+				}, 500);
 			}
-		} catch (e) {
-			// Silently fail if dropdown population doesn't work
-		}
 
+		} catch (e) {
+			console.error('SimilarArtists Config: Error populating parent playlist dropdown:', e.toString());
+		}
 	},
 
 	save: function (pnlDiv, addon) {
