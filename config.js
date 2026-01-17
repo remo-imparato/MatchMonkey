@@ -6,7 +6,6 @@ window.configInfo = {
 
 		// defaults matching similarArtists.js
 		const defaults = {
-			//Toolbar: 1,
 			ApiKey: app?.utils?.web?.getAPIKey('lastfmApiKey') || '6cfe51c9bf7e77d6449e63ac0db2ac24',
 			Confirm: true,
 			Sort: false,
@@ -23,7 +22,7 @@ window.configInfo = {
 			Unknown: true,
 			Overwrite: 'Create new playlist',
 			Enqueue: false,
-			Navigate: 0,
+			Navigate: 'None',
 			OnPlay: false,
 			ClearNP: false,
 			Ignore: false,
@@ -216,25 +215,25 @@ window.configInfo = {
 
 		//this.config.Toolbar = UI.SAToolbar.controlClass.value;
 		this.config.ApiKey = UI.SAApiKey.controlClass.value;
-		this.config.Confirm = UI.SAConfirm.controlClass.value;
-		this.config.Sort = UI.SASort.controlClass.value;
+		this.config.Confirm = UI.SAConfirm.controlClass.checked;
+		this.config.Sort = UI.SASort.controlClass.checked;
 		this.config.Limit = UI.SALimit.controlClass.value;
 		this.config.Name = UI.SAName.controlClass.value;
 		this.config.TPA = UI.SATPA.controlClass.value;
 		this.config.TPL = UI.SATPL.controlClass.value;
-		this.config.Random = UI.SARandom.controlClass.value;
-		this.config.Seed = UI.SASeed.controlClass.value;
-		this.config.Seed2 = UI.SASeed2.controlClass.value;
-		this.config.Best = UI.SABest.controlClass.value;
-		this.config.Rank = UI.SARank.controlClass.value;
+		this.config.Random = UI.SARandom.controlClass.checked;
+		this.config.Seed = UI.SASeed.controlClass.checked;
+		this.config.Seed2 = UI.SASeed2.controlClass.checked;
+		this.config.Best = UI.SABest.controlClass.checked;
+		this.config.Rank = UI.SARank.controlClass.checked;
 		this.config.Rating = UI.SARating.controlClass.value;
-		this.config.Unknown = UI.SAUnknown.controlClass.value;
+		this.config.Unknown = UI.SAUnknown.controlClass.checked;
 		this.config.Overwrite = UI.SAOverwrite.controlClass.value;
-		this.config.Enqueue = UI.SAEnqueue.controlClass.value;
+		this.config.Enqueue = UI.SAEnqueue.controlClass.checked;
 		this.config.Navigate = UI.SANavigate.controlClass.value;
-		this.config.OnPlay = UI.SAOnPlay.controlClass.value;
-		this.config.ClearNP = UI.SAClearNP.controlClass.value;
-		this.config.Ignore = UI.SAIgnore.controlClass.value;
+		this.config.OnPlay = UI.SAOnPlay.controlClass.checked;
+		this.config.ClearNP = UI.SAClearNP.controlClass.checked;
+		this.config.Ignore = UI.SAIgnore.controlClass.checked;
 		this.config.Parent = UI.SAParent.controlClass.value;
 		this.config.Black = UI.SABlack.controlClass.value;
 		this.config.Exclude = UI.SAExclude.controlClass.value;
