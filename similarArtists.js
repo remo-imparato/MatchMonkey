@@ -1087,20 +1087,26 @@
 	 */
 	async function enqueueTracks(tracks, ignoreDupes, clearFirst) {
 		const player = app.player;
-		if (!player) return;
+		if (!player) {
+			log('SimilarArtists: Player not available');
+			return;
+		}
 
 		const playlist = player.playlist || player.nowPlayingQueue || player.getPlaylist?.();
-		if (!playlist) return;
+		if (!playlist) {
+			log('SimilarArtists: Playlist not available');
+			return;
+		}
 
-		if (clearFirst && playlist.clear) {
+		if (clearFirst && playlist.clear && typeof playlist.clear === 'function') {
 			playlist.clear();
 		}
 
 		// Build set of existing track IDs to filter duplicates
 		const existing = new Set();
-		if (ignoreDupes && playlist.toArray) {
+		if (ignoreDupes && playlist.toArray && typeof playlist.toArray === 'function') {
 			const existingTracks = playlist.toArray();
-			if (existingTracks) {
+			if (existingTracks && typeof existingTracks.forEach === 'function') {
 				existingTracks.forEach((t) => {
 					if (t) existing.add(t.id || t.ID);
 				});
@@ -1115,44 +1121,76 @@
 			})
 			: tracks;
 
-		if (!tracksToAdd.length) {
+		if (!tracksToAdd || tracksToAdd.length === 0) {
 			log('SimilarArtists: No tracks to add after deduplication');
 			return;
 		}
 
-		// OPTIMIZED: Use MM5's batch pattern - single addTracksAsync call with disabled notifications
-		// This is ~100x faster than adding tracks one-by-one with batching
-		if (playlist.addTracksAsync && app.utils?.createTracklist) {
-			try {
-			 let tracklist = app.utils.createTracklist(false);
-				tracklist.dontNotify = true;
-				tracklist.autoUpdateDisabled = true;
-				
-				tracksToAdd.forEach((t) => {
-					if (t) tracklist.add(t);
-				});
-				
-				if (tracklist.count > 0) {
-					await playlist.addTracksAsync(tracklist);
-					log(`SimilarArtists: Enqueued ${tracklist.count} tracks to Now Playing (batch add)`);
-				}
-			} catch (e) {
-				log(`SimilarArtists: Error in addTracksAsync: ${e.toString()}, falling back to individual adds`);
-				// Fallback to individual addition on error
-				for (const t of tracksToAdd) {
-					if (playlist.addTrack) {
-						playlist.addTrack(t);
+		try {
+			// Primary: Try async batch add with tracklist (modern MM5 pattern)
+			if (playlist.addTracksAsync && typeof playlist.addTracksAsync === 'function' && app.utils?.createTracklist) {
+				try {
+					let tracklist = app.utils.createTracklist(false);
+					
+					if (!tracklist) {
+						log('SimilarArtists: Failed to create tracklist');
+						throw new Error('createTracklist returned null');
 					}
+					
+					// Disable notifications before adding
+					if (tracklist.dontNotify !== undefined) {
+						tracklist.dontNotify = true;
+					}
+					if (tracklist.autoUpdateDisabled !== undefined) {
+						tracklist.autoUpdateDisabled = true;
+					}
+
+					// Add all tracks to the temporary tracklist
+					for (const t of tracksToAdd) {
+						if (t && typeof tracklist.add === 'function') {
+							tracklist.add(t);
+						}
+					}
+
+					// Critical: Call notifyLoaded BEFORE addTracksAsync
+					if (typeof tracklist.notifyLoaded === 'function') {
+						tracklist.notifyLoaded();
+					}
+
+					// Now we can safely call addTracksAsync
+					if (tracklist.count > 0) {
+						await playlist.addTracksAsync(tracklist);
+						log(`SimilarArtists: Enqueued ${tracklist.count} tracks to Now Playing (async batch)`);
+						return;
+					}
+				} catch (e) {
+					log(`SimilarArtists: Error in addTracksAsync: ${e.toString()}, attempting fallback`);
 				}
 			}
-		} else if (playlist.addTracks) {
-			// Use synchronous batch method if available
-			playlist.addTracks(tracksToAdd);
-			log(`SimilarArtists: Enqueued ${tracksToAdd.length} tracks to Now Playing`);
-		} else if (playlist.addTrack) {
-			// Fallback: add synchronously one at a time (slower)
-			tracksToAdd.forEach((t) => playlist.addTrack(t));
-			log(`SimilarArtists: Enqueued ${tracksToAdd.length} tracks to Now Playing (individual adds)`);
+
+			// Secondary: Use synchronous batch method if available
+			if (playlist.addTracks && typeof playlist.addTracks === 'function') {
+				playlist.addTracks(tracksToAdd);
+				log(`SimilarArtists: Enqueued ${tracksToAdd.length} tracks to Now Playing (sync batch)`);
+				return;
+			}
+
+			// Tertiary: Add tracks individually (slowest, most compatible)
+			if (playlist.addTrack && typeof playlist.addTrack === 'function') {
+				let addedCount = 0;
+				for (const t of tracksToAdd) {
+					if (t) {
+						playlist.addTrack(t);
+						addedCount++;
+					}
+				}
+				log(`SimilarArtists: Enqueued ${addedCount} tracks to Now Playing (individual adds)`);
+				return;
+			}
+
+			log('SimilarArtists: No suitable method found to enqueue tracks');
+		} catch (e) {
+			log(`SimilarArtists: Fatal error in enqueueTracks: ${e.toString()}`);
 		}
 	}
 
@@ -1257,18 +1295,47 @@
 		} else {
 			try {
 				// Primary: Try async batch add with tracklist (modern MM5 pattern)
-				if (playlist.addTracksAsync && app.utils?.createTracklist) {
-					const tracklist = app.utils.createTracklist(false);
-					tracklist.dontNotify = true;
-					tracklist.autoUpdateDisabled = true;
+				if (playlist.addTracksAsync && typeof playlist.addTracksAsync === 'function' && app.utils?.createTracklist) {
+					try {
+						const tracklist = app.utils.createTracklist(false);
+						
+						if (!tracklist) {
+							log('SimilarArtists: Failed to create tracklist in createPlaylist');
+							throw new Error('createTracklist returned null');
+						}
 
-					(tracks || []).forEach((t) => {
-						if (t) tracklist.add(t);
-					});
+						// Disable notifications before adding
+						if (tracklist.dontNotify !== undefined) {
+							tracklist.dontNotify = true;
+						}
+						if (tracklist.autoUpdateDisabled !== undefined) {
+							tracklist.autoUpdateDisabled = true;
+						}
 
-					if (tracklist.count > 0) {
-						await playlist.addTracksAsync(tracklist);
-						log(`SimilarArtists: Added ${tracklist.count} tracks to playlist (async batch)`);
+						// Add all tracks to the temporary tracklist
+						for (const t of (tracks || [])) {
+							if (t && typeof tracklist.add === 'function') {
+								tracklist.add(t);
+							}
+						}
+
+						// Critical: Call notifyLoaded BEFORE addTracksAsync to signal tracklist is ready
+						if (typeof tracklist.notifyLoaded === 'function') {
+							tracklist.notifyLoaded();
+						}
+
+						// Now we can safely call addTracksAsync
+						if (tracklist.count > 0) {
+							await playlist.addTracksAsync(tracklist);
+							log(`SimilarArtists: Added ${tracklist.count} tracks to playlist (async batch)`);
+						}
+					} catch (e) {
+						log(`SimilarArtists: Error in addTracksAsync: ${e.toString()}, attempting fallback`);
+						// Fallback: try addTracks synchronously
+						if (playlist.addTracks && typeof playlist.addTracks === 'function') {
+							playlist.addTracks(tracks);
+							log(`SimilarArtists: Added ${tracks.length} tracks to playlist via addTracks (fallback)`);
+						}
 					}
 				} else if (playlist.addTracks && typeof playlist.addTracks === 'function') {
 					// Secondary: Try synchronous batch add
@@ -1276,6 +1343,7 @@
 					log(`SimilarArtists: Added ${tracks.length} tracks to playlist (sync batch)`);
 				} else if (playlist.addTrack && typeof playlist.addTrack === 'function') {
 					// Tertiary: Add tracks individually (slowest, most compatible)
+					log(`SimilarArtists: Adding ${tracks.length} tracks individually via addTrack`);
 					let addedCount = 0;
 					for (const t of (tracks || [])) {
 						if (t) {
@@ -1288,7 +1356,7 @@
 					log('SimilarArtists: No suitable method found to add tracks to playlist');
 				}
 			} catch (e) {
-				log(`SimilarArtists: Error adding tracks to playlist: ${e.toString()}`);
+				log(`SimilarArtists: Fatal error adding tracks to playlist: ${e.toString()}`);
 			}
 		}
 
