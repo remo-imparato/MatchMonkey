@@ -617,6 +617,113 @@
 		}
 	}
 
+	async function enqueueTracks(tracks, ignoreDupes, clearFirst) {
+		const player = app.player;
+		if (!player) return;
+		const playlist = player.playlist || player.nowPlayingQueue || player.getPlaylist?.();
+		if (!playlist) return;
+		if (clearFirst && playlist.clear) playlist.clear();
+		const existing = new Set();
+		if (ignoreDupes && playlist.toArray) {
+			playlist.toArray().forEach((t) => existing.add(t.id || t.ID));
+		}
+		tracks.forEach((t) => {
+			const id = t?.id || t?.ID;
+			if (ignoreDupes && id && existing.has(id)) return;
+			if (playlist.addTrack) playlist.addTrack(t);
+			else if (playlist.addTracks) playlist.addTracks([t]);
+			else if (player.appendTracks) player.appendTracks([t]);
+		});
+	}
+
+	async function createPlaylist(tracks, seedName, overwriteMode) {
+		const titleTemplate = stringSetting('Name');
+		const baseName = titleTemplate.replace('%', seedName || '');
+		let name = baseName;
+		let playlist = findPlaylist(name);
+		if (overwriteMode === 0) {
+			let idx = 1;
+			while (playlist) {
+				idx += 1;
+				name = `${baseName}_${idx}`;
+				playlist = findPlaylist(name);
+			}
+		}
+		if (!playlist && app.playlists?.createPlaylist) {
+			playlist = app.playlists.createPlaylist(name, stringSetting('Parent'));
+		}
+		if (!playlist) return;
+		if (overwriteMode === 1 && playlist.clear) playlist.clear();
+		if (playlist.addTracks) playlist.addTracks(tracks);
+		else if (playlist.addTrack) tracks.forEach((t) => playlist.addTrack(t));
+
+		// navigation: 1 navigate to playlist, 2 navigate to now playing
+		const nav = intSetting('Navigate');
+		try {
+			if (nav === 1 && app.ui?.navigateToPlaylist && playlist.id) {
+				app.ui.navigateToPlaylist(playlist.id);
+			} else if (nav === 2 && app.ui?.navigateNowPlaying) {
+				app.ui.navigateNowPlaying();
+			}
+		} catch (e) {
+			log(e.toString());
+		}
+	}
+
+	function findPlaylist(name) {
+		if (app.playlists?.findByTitle) return app.playlists.findByTitle(name);
+		if (app.playlists?.getByTitle) return app.playlists.getByTitle(name);
+		return null;
+	}
+
+	function shuffle(arr) {
+		for (let i = arr.length - 1; i > 0; i -= 1) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[arr[i], arr[j]] = [arr[j], arr[i]];
+		}
+	}
+
+	async function ensureRankTable() {
+		if (!app.db?.executeAsync) return;
+		try {
+			await app.db.executeAsync('CREATE TABLE IF NOT EXISTS SimArtSongRank (ID INTEGER PRIMARY KEY, Rank INTEGER)');
+		} catch (e) {
+			log(e.toString());
+		}
+	}
+
+	async function resetRankTable() {
+		if (!app.db?.executeAsync) return;
+		try {
+			await app.db.executeAsync('DELETE FROM SimArtSongRank');
+		} catch (e) {
+			log(e.toString());
+		}
+	}
+
+	async function updateRankForArtist(artistName) {
+		if (!artistName || !app.db?.executeAsync) return;
+		const titles = await fetchTopTracksForRank(fixPrefixes(artistName));
+		for (let i = 0; i < titles.length; i++) {
+			const title = titles[i];
+			const matches = await findLibraryTracks(artistName, title, 5, { rank: false, best: false });
+			const rank = 101 - (i + 1);
+			for (const m of matches) {
+				await upsertRank(m.id || m.ID, rank);
+			}
+		}
+	}
+
+	async function upsertRank(id, rank) {
+		if (!app.db?.executeAsync) return;
+		try {
+			await app.db.executeAsync('REPLACE INTO SimArtSongRank (ID, Rank) VALUES (?, ?)', [id, rank]);
+		} catch (e) {
+			log(e.toString());
+		}
+	}
+
+
 	function start() {
 		if (state.started) return;
 		state.started = true;
