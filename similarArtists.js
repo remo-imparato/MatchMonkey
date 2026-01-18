@@ -697,11 +697,12 @@
 	/**
 	 * Ask user for confirmation before creating/overwriting a playlist.
 	 * Opens dlgSelectPlaylist dialog to let user select or create a playlist.
-	 * If user clicks OK without selecting a playlist, automatically creates one with seedName.
+	 * If user clicks OK with a selected/created playlist, return it.
+	 * If user clicks OK without selecting a playlist, return null (createPlaylist will create one).
 	 * If user clicks Cancel, returns null to cancel the operation.
 	 * @param {string} seedName Seed artist name used in playlist naming.
 	 * @param {*} overwriteMode Mode label (Create/Overwrite/Do not create).
-	 * @returns {Promise<object|null>} Selected/created playlist object, or null if user cancelled.
+	 * @returns {Promise<object|null>} Selected/created playlist object, or null if not selected.
 	 */
 	async function confirmPlaylist(seedName, overwriteMode) {
 		return new Promise((resolve) => {
@@ -727,50 +728,17 @@
 						}
 
 						// User clicked OK
-						const selectedPlaylist = dlg.getValue('getPlaylist')?.();
+                        const selectedPlaylist = dlg.getValue('getPlaylist')?.();
 
 						if (selectedPlaylist) {
-							// User selected or created a playlist
+							// User selected or created a playlist in the dialog
 							log(`confirmPlaylist: User selected/created playlist: ${selectedPlaylist.name || selectedPlaylist.title}`);
 							resolve(selectedPlaylist);
 						} else {
-							// User clicked OK without selecting/creating a playlist
-							// Auto-create a new playlist with seedName
-							log(`confirmPlaylist: No playlist selected, auto-creating playlist with name: ${seedName}`);
-							const templateName = stringSetting('Name');
-							const playlistName = templateName.replace('%', seedName || 'Similar Artists');
-
-							// Create the playlist
-							let newPlaylist = null;
-							if (app.playlists?.createPlaylist) {
-								newPlaylist = app.playlists.createPlaylist(playlistName, stringSetting('Parent'));
-								log(`confirmPlaylist: Auto-created playlist: ${playlistName}`);
-								resolve(newPlaylist);
-							} else if (app.playlists?.root?.newPlaylist) {
-								// Old API path
-								newPlaylist = app.playlists.root.newPlaylist();
-								if (newPlaylist) {
-									newPlaylist.name = playlistName;
-									if (newPlaylist.commitAsync) {
-										newPlaylist.commitAsync().then(() => {
-											log(`confirmPlaylist: Auto-created playlist (legacy API): ${playlistName}`);
-											resolve(newPlaylist);
-										}).catch((err) => {
-											log(`confirmPlaylist: Error committing auto-created playlist: ${err.toString()}`);
-											resolve(newPlaylist);
-										});
-										return;
-									}
-									log(`confirmPlaylist: Auto-created playlist (legacy API): ${playlistName}`);
-									resolve(newPlaylist);
-								} else {
-									log('confirmPlaylist: Failed to create playlist (legacy API)');
-									resolve(null);
-								}
-							} else {
-								log('confirmPlaylist: No playlist API available for auto-creation');
-								resolve(null);
-							}
+							// User clicked OK without selecting a playlist
+							// Return null so createPlaylist() can create one with proper naming
+							log('confirmPlaylist: User did not select a playlist, returning null for createPlaylist to handle');
+							resolve(null);
 						}
 					} catch (e) {
 						log('confirmPlaylist: Error in dialog closure: ' + e.toString());
