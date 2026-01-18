@@ -461,6 +461,100 @@
 	}
 
 	/**
+	 * Process seed artists to find similar artists and their tracks from Last.fm and local library.
+	 * @param {Array<{name: string, track?: object}>} seeds Array of seed artist objects.
+	 * @param {object} settings Configuration settings for processing.
+	 * @param {number} settings.artistLimit Max similar artists per seed.
+	 * @param {number} settings.tracksPerArtist Tracks to fetch per artist.
+	 * @param {number} settings.totalLimit Total track limit.
+	 * @param {boolean} settings.includeSeedArtist Include seed artist in results.
+	 * @param {boolean} settings.includeSeedTrack Include seed track in results.
+	 * @param {boolean} settings.rankEnabled Enable ranking mode.
+	 * @param {Map<number, number>} [trackRankMap] Optional rank map to populate.
+	 * @returns {Promise<object[]>} Array of matched track objects.
+	 */
+	async function processSeedArtists(seeds, settings, trackRankMap = null) {
+		const {
+			artistLimit,
+			tracksPerArtist,
+			totalLimit,
+			includeSeedArtist,
+			includeSeedTrack,
+			rankEnabled
+		} = settings;
+
+		const allTracks = [];
+
+		// Optional: include currently selected/playing seed track (only for single seed).
+		if (includeSeedTrack && seeds.length === 1 && seeds[0].track) {
+			allTracks.push(seeds[0].track);
+		}
+
+		// Process each seed artist up to configured limit.
+		const seedSlice = seeds.slice(0, artistLimit || seeds.length);
+		for (let i = 0; i < seedSlice.length; i++) {
+			const seed = seedSlice[i];
+
+			// Update progress: Fetching similar artists
+			const seedProgress = (i + 1) / seedSlice.length;
+			updateProgress(`Fetching similar artists for "${seed.name}" (${i + 1}/${seedSlice.length})`, seedProgress * 0.3);
+
+			// Use fixPrefixes for the API call
+			const artistNameForApi = fixPrefixes(seed.name);
+			const similar = await fetchSimilarArtists(artistNameForApi);
+
+			// Build pool: seed artist (optional) + similar artists.
+			const artistPool = [];
+			if (includeSeedArtist)
+				artistPool.push(seed.name);
+
+			similar.slice(0, artistLimit).forEach((a) => {
+				if (a?.name)
+					artistPool.push(a.name);
+			});
+
+			updateProgress(`Found ${similar.length} similar artist(s) for "${seed.name}", querying tracks...`, seedProgress * 0.3);
+
+			for (const artName of artistPool) {
+				// Populate rank map: fetch top tracks for this artist and score them
+				if (rankEnabled && trackRankMap) {
+					updateProgress(`Ranking: Fetching top 100 tracks for "${artName}"...`, seedProgress * 0.3);
+					const titles = await fetchTopTracksForRank(fixPrefixes(artName));
+					updateProgress(`Ranking: Scoring ${titles.length} tracks from "${artName}"...`, seedProgress * 0.3);
+					for (let rankIdx = 0; rankIdx < titles.length; rankIdx++) {
+						const title = titles[rankIdx];
+						// Score: higher rank for earlier positions (101 = 1st, 1 = 100th)
+						const rankScore = 101 - (rankIdx + 1);
+						const matches = await findLibraryTracks(artName, title, 5, { rank: false, best: false });
+						for (const m of matches) {
+							const trackId = m.id || m.ID;
+							// Keep highest score if track appears in multiple artists' top tracks
+							const currentScore = trackRankMap.get(trackId) || 0;
+							if (rankScore > currentScore) {
+								trackRankMap.set(trackId, rankScore);
+							}
+						}
+					}
+				}
+
+				// Fetch top track titles from Last.fm, then try to find local matches.
+				updateProgress(`Fetching top ${tracksPerArtist} tracks for "${artName}" from Last.fm...`, seedProgress * 0.3);
+				const titles = await fetchTopTracks(fixPrefixes(artName), tracksPerArtist);
+				updateProgress(`Searching library for ${titles.length} tracks from "${artName}"...`, seedProgress * 0.3);
+				for (const title of titles) {
+					const matches = await findLibraryTracks(artName, title, 1, { rank: false, best: false });
+					matches.forEach((m) => allTracks.push(m));
+					if (allTracks.length >= totalLimit) break;
+				}
+				if (allTracks.length >= totalLimit) break;
+			}
+			if (allTracks.length >= totalLimit) break;
+		}
+
+		return allTracks;
+	}
+
+	/**
 	 * Main entry point for generating similar-artist tracks.
 	 * Steps:
 	 * - Collect seed artists from selection / playing track
@@ -521,72 +615,15 @@
 			// In-memory rank map: track ID -> rank score (used if rankEnabled)
 			const trackRankMap = rankEnabled ? new Map() : null;
 
-			const allTracks = [];
-			// Optional: include currently selected/playing seed track (only for single seed).
-			if (includeSeedTrack && seeds.length === 1 && seeds[0].track) {
-				allTracks.push(seeds[0].track);
-			}
-
-			// Process each seed artist up to configured limit.
-			const seedSlice = seeds.slice(0, artistLimit || seeds.length);
-			for (let i = 0; i < seedSlice.length; i++) {
-				const seed = seedSlice[i];
-
-				// Update progress: Fetching similar artists
-				const seedProgress = (i + 1) / seedSlice.length;
-				updateProgress(`Fetching similar artists for "${seed.name}" (${i + 1}/${seedSlice.length})`, seedProgress * 0.3);
-
-				// Use fixPrefixes for the API call
-				const artistNameForApi = fixPrefixes(seed.name);
-				const similar = await fetchSimilarArtists(artistNameForApi);
-
-				// Build pool: seed artist (optional) + similar artists.
-				const artistPool = [];
-				if (includeSeedArtist)
-					artistPool.push(seed.name);
-
-				similar.slice(0, artistLimit).forEach((a) => {
-					if (a?.name)
-						artistPool.push(a.name);
-				});
-
-				updateProgress(`Found ${similar.length} similar artist(s) for "${seed.name}", querying tracks...`, seedProgress * 0.3);
-
-				for (const artName of artistPool) {
-					// Populate rank map: fetch top tracks for this artist and score them
-					if (rankEnabled) {
-						updateProgress(`Ranking: Fetching top 100 tracks for "${artName}"...`, seedProgress * 0.3);
-						const titles = await fetchTopTracksForRank(fixPrefixes(artName));
-						updateProgress(`Ranking: Scoring ${titles.length} tracks from "${artName}"...`, seedProgress * 0.3);
-						for (let rankIdx = 0; rankIdx < titles.length; rankIdx++) {
-							const title = titles[rankIdx];
-							// Score: higher rank for earlier positions (101 = 1st, 1 = 100th)
-							const rankScore = 101 - (rankIdx + 1);
-							const matches = await findLibraryTracks(artName, title, 5, { rank: false, best: false });
-							for (const m of matches) {
-								const trackId = m.id || m.ID;
-								// Keep highest score if track appears in multiple artists' top tracks
-								const currentScore = trackRankMap.get(trackId) || 0;
-								if (rankScore > currentScore) {
-									trackRankMap.set(trackId, rankScore);
-								}
-							}
-						}
-					}
-
-					// Fetch top track titles from Last.fm, then try to find local matches.
-					updateProgress(`Fetching top ${tracksPerArtist} tracks for "${artName}" from Last.fm...`, seedProgress * 0.3);
-					const titles = await fetchTopTracks(fixPrefixes(artName), tracksPerArtist);
-					updateProgress(`Searching library for ${titles.length} tracks from "${artName}"...`, seedProgress * 0.3);
-					for (const title of titles) {
-						const matches = await findLibraryTracks(artName, title, 1, { rank: false, best: false });
-						matches.forEach((m) => allTracks.push(m));
-						if (allTracks.length >= totalLimit) break;
-					}
-					if (allTracks.length >= totalLimit) break;
-				}
-				if (allTracks.length >= totalLimit) break;
-			}
+			// Process seed artists to find similar artists and tracks
+			const allTracks = await processSeedArtists(seeds, {
+				artistLimit,
+				tracksPerArtist,
+				totalLimit,
+				includeSeedArtist,
+				includeSeedTrack,
+				rankEnabled
+			}, trackRankMap);
 
 			if (!allTracks.length) {
 				showToast('SimilarArtists: No matching tracks found in library.');
@@ -644,7 +681,7 @@
 
 			// Show completion message if confirm is enabled (suppress in auto-mode)
 			if (confirm && !autoRun) {
-				const count = seedSlice.length;
+				const count = seeds.length;
 				if (count === 1) {
 				showToast('SimilarArtists: Artist has been processed.');
 				} else {
