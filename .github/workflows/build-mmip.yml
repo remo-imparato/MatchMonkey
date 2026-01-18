@@ -1,0 +1,67 @@
+name: Build MMIP Package
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*.*.*'  # Trigger on version tags like v2.0.0
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Get version from info.json
+        id: get_version
+        run: |
+          VERSION=$(jq -r '.version' info.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+      
+      - name: Create MMIP package
+        run: |
+          # MMIP files are just ZIP archives with .mmip extension
+          # Include all necessary addon files (no icons folder - doesn't exist)
+          zip -r SimilarArtists-${{ steps.get_version.outputs.version }}.mmip \
+            similarArtists.js \
+            init.js \
+            actions_add.js \
+            config.html \
+            config.js \
+            info.json \
+            smiley_yellow_128.png \
+            README.md \
+            dialogs/ \
+            -x "*.git*" \
+            -x "node_modules/*" \
+            -x ".github/*" \
+            -x "ai_*" \
+            -x "lastfm.txt"
+          
+          echo "Package created: SimilarArtists-${{ steps.get_version.outputs.version }}.mmip"
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mmip-package
+          path: '*.mmip'
+          retention-days: 90
+      
+      # Only create release on tagged commits
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: '*.mmip'
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
