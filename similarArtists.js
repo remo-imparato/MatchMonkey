@@ -674,18 +674,18 @@
 	 * Ask user for confirmation before creating/overwriting a playlist.
 	 * Opens dlgSelectPlaylist dialog to let user select or create a playlist.
 	 * If user clicks OK with a selected/created playlist, return it.
-	 * If user clicks OK without selecting a playlist, return null (createPlaylist will create one).
+	 * If user clicks OK without selecting a playlist, return a special object indicating auto-create.
 	 * If user clicks Cancel, returns null to cancel the operation.
 	 * @param {string} seedName Seed artist name used in playlist naming.
 	 * @param {*} overwriteMode Mode label (Create/Overwrite/Do not create).
-	 * @returns {Promise<object|null>} Selected/created playlist object, or null if not selected.
+	 * @returns {Promise<object|null>} Selected/created playlist object, special auto-create indicator, or null if cancelled.
 	 */
 	async function confirmPlaylist(seedName, overwriteMode) {
-			return new Promise((resolve) => {
+		return new Promise((resolve) => {
 			try {
 				if (typeof uitools === 'undefined' || !uitools.openDialog) {
 					log('confirmPlaylist: uitools.openDialog not available');
-					resolve(null);
+					resolve({ autoCreate: true }); // Fallback to auto-create
 					return;
 				}
 
@@ -704,28 +704,27 @@
 						}
 
 						// User clicked OK
-                        const selectedPlaylist = dlg.getValue('getPlaylist')?.();
+						const selectedPlaylist = dlg.getValue('getPlaylist')?.();
 
 						if (selectedPlaylist) {
 							// User selected or created a playlist in the dialog
 							log(`confirmPlaylist: User selected/created playlist: ${selectedPlaylist.name || selectedPlaylist.title}`);
 							resolve(selectedPlaylist);
 						} else {
-							// User clicked OK without selecting a playlist
-							// Return null so createPlaylist() can create one with proper naming
-							log('confirmPlaylist: User did not select a playlist, returning null for createPlaylist to handle');
-							resolve(null);
+							// User clicked OK without selecting a playlist - auto-create one
+							log('confirmPlaylist: User clicked OK without selecting playlist - will auto-create');
+							resolve({ autoCreate: true });
 						}
 					} catch (e) {
 						log('confirmPlaylist: Error in dialog closure: ' + e.toString());
-						resolve(null);
+						resolve({ autoCreate: true }); // Fallback to auto-create on error
 					}
 				};
 
 				app.listen(dlg, 'closed', dlg.whenClosed);
 			} catch (e) {
 				log('confirmPlaylist: Error opening dialog: ' + e.toString());
-				resolve(null);
+				resolve({ autoCreate: true }); // Fallback to auto-create
 			}
 		});
 	}
@@ -1169,63 +1168,89 @@
 	 * @param {object[]} tracks Tracks to add.
 	 * @param {string} seedName Seed artist name used for playlist naming.
 	 * @param {*} overwriteMode Playlist creation mode (Create/Overwrite/Do not create).
-	 * @param {object|null} selectedPlaylist Pre-selected playlist from dialog (if provided).
+	 * @param {object|null} selectedPlaylist Pre-selected playlist from dialog (if provided), or { autoCreate: true } to create new.
 	 * @returns {Promise<object|null>} Playlist object.
 	 */
 	async function createPlaylist(tracks, seedName, overwriteMode, selectedPlaylist) {
 		const titleTemplate = stringSetting('Name');
 		const baseName = titleTemplate.replace('%', seedName || '');
-		let name = baseName;
-		let playlist = selectedPlaylist || findPlaylist(name);
-
 		const overwriteText = String(overwriteMode || '');
-		//-- create new if mode is "Create new playlist"
-		if (overwriteText.toLowerCase().indexOf('create') > -1) {
-			let idx = 1;
-			while (playlist) {
-				idx += 1;
-				name = `${baseName}_${idx}`;
-				playlist = findPlaylist(name);
-			}
-		}
+		
+		let playlist = null;
+		let shouldClear = false;
 
-		// Create new playlist if not found (using modern MM5 pattern)
-		if (!playlist) {
-			try {
-				const parentName = stringSetting('Parent');
-				let parentPlaylist = null;
-				
-				// Find parent playlist if specified
-				if (parentName) {
-					parentPlaylist = findPlaylist(parentName);
+		// Scenario 1: User selected an existing playlist from dialog
+		if (selectedPlaylist && !selectedPlaylist.autoCreate) {
+			// User explicitly selected a playlist - use it as-is
+			playlist = selectedPlaylist;
+			// Check if overwrite is enabled
+			shouldClear = overwriteText.toLowerCase().indexOf('overwrite') > -1;
+			log(`createPlaylist: Using user-selected playlist '${playlist.name}' (ID: ${playlist.id || playlist.ID}), shouldClear=${shouldClear}`);
+		}
+		// Scenario 2: Auto-create new playlist (OK clicked without selection, or confirm disabled)
+		else if (selectedPlaylist?.autoCreate || !selectedPlaylist) {
+			// Determine playlist name
+			let name = baseName;
+			
+			// Check if "Create new playlist" mode - always generate unique name
+			if (overwriteText.toLowerCase().indexOf('create') > -1) {
+				// Find unique name by appending index
+				let idx = 1;
+				let testPlaylist = findPlaylist(name);
+				while (testPlaylist) {
+					idx += 1;
+					name = `${baseName}_${idx}`;
+					testPlaylist = findPlaylist(name);
 				}
-				
-				// Use modern MM5 pattern: newPlaylist() on parent or root
-				if (parentPlaylist && parentPlaylist.newPlaylist) {
-					playlist = parentPlaylist.newPlaylist();
-				} else {
-					playlist = app.playlists.root.newPlaylist();
+				log(`createPlaylist: Create mode - using unique name: ${name}`);
+			} else {
+				// Overwrite or default mode - try to find existing playlist with base name
+				playlist = findPlaylist(name);
+				if (playlist) {
+					// Found existing playlist - check if we should overwrite
+					shouldClear = overwriteText.toLowerCase().indexOf('overwrite') > -1;
+					log(`createPlaylist: Found existing playlist '${name}', shouldClear=${shouldClear}`);
 				}
-				
-				if (!playlist) {
-					log('createPlaylist: Failed to create new playlist object');
+			}
+
+			// Create new playlist if not found
+			if (!playlist) {
+				try {
+					const parentName = stringSetting('Parent');
+					let parentPlaylist = null;
+					
+					// Find parent playlist if specified
+					if (parentName) {
+						parentPlaylist = findPlaylist(parentName);
+					}
+					
+					// Use modern MM5 pattern: newPlaylist() on parent or root
+					if (parentPlaylist && parentPlaylist.newPlaylist) {
+						playlist = parentPlaylist.newPlaylist();
+					} else {
+						playlist = app.playlists.root.newPlaylist();
+					}
+					
+					if (!playlist) {
+						log('createPlaylist: Failed to create new playlist object');
+						return null;
+					}
+					
+					// Set name (MM5 pattern from actions.js newPlaylist)
+					playlist.name = ' - ' + name + ' - '; // Temporary name to appear first in list
+					
+					// Persist the playlist
+					await playlist.commitAsync();
+					
+					// Mark as new for potential UI handling
+					playlist.isNew = true;
+					
+					log(`createPlaylist: Created new playlist: ${name}`);
+					
+				} catch (e) {
+					log(`createPlaylist: Error creating playlist: ${e.toString()}`);
 					return null;
 				}
-				
-				// Set name (MM5 pattern from actions.js newPlaylist)
-				playlist.name = ' - ' + name + ' - '; // Temporary name to appear first in list
-				
-				// Persist the playlist
-				await playlist.commitAsync();
-				
-				// Mark as new for potential UI handling
-				playlist.isNew = true;
-				
-				log(`createPlaylist: Created playlist: ${name}`);
-				
-			} catch (e) {
-				log(`createPlaylist: Error creating playlist: ${e.toString()}`);
-				return null;
 			}
 		}
 
@@ -1234,10 +1259,7 @@
 			return null;
 		}
 
-		log(`createPlaylist: Using playlist '${playlist.name}' (ID: ${playlist.id || playlist.ID})`);
-
-		// Determine if we should clear the playlist (overwrite mode)
-		const shouldClear = overwriteText.toLowerCase().indexOf('overwrite') > -1;
+		log(`createPlaylist: Using playlist '${playlist.name}' (ID: ${playlist.id || playlist.ID}), shouldClear=${shouldClear}`);
 
 		// Add tracks to playlist using unified helper
 		if (tracks && tracks.length > 0) {
@@ -1367,4 +1389,4 @@
 		toggleAuto,
 	};
 
-})(typeof window !== 'undefined' ? window : global);
+})(typeof window !== 'undefined' ? window : global);})(typeof window !== 'undefined' ? window : global);
