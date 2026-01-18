@@ -1,3 +1,28 @@
+/**
+ * SimilarArtists Add-on for MediaMonkey 5
+ * 
+ * @author Remo Imparato
+ * @version 2.0.0
+ * @description Generates playlists or queues tracks from similar artists using Last.fm API.
+ *              Supports automatic mode to queue similar tracks when approaching end of playlist.
+ * 
+ * @repository https://github.com/remo-imparato/SimilarArtistsMM5
+ * @license MIT
+ * 
+ * Features:
+ * - Query Last.fm for similar artists based on selected/playing track
+ * - Find matching tracks in local MediaMonkey library
+ * - Create playlists or add to Now Playing queue
+ * - Automatic mode: auto-queue similar tracks near end of playlist
+ * - Ranking mode: prioritize popular tracks from similar artists
+ * - Extensive filtering options (genre, rating, title exclusions)
+ * 
+ * Requirements:
+ * - MediaMonkey 5.0+ 
+ * - Last.fm API key (default provided, customizable in settings)
+ * - Internet connection for Last.fm API queries
+ */
+
 (function (globalArg) {
 	'use strict';
 
@@ -49,27 +74,12 @@
 	 */
 	function showToast(text, options = {}) {
 		try {
-			// Prefer uitools.toastMessage.show (newer API)
+			// Use uitools.toastMessage.show (MM5 API)
 			if (typeof uitools !== 'undefined' && uitools?.toastMessage?.show) {
 				uitools.toastMessage.show(text, options);
 				return;
 			}
-			// Some environments may expose uitool (older) implementation
-			if (typeof uitool !== 'undefined' && uitool?.toastMessage?.show) {
-				uitool.toastMessage.show(text, options);
-				return;
-			}
-			// Fallback to app.messageBox if available (synchronous/modal)
-			if (typeof app !== 'undefined') {
-				try {
-					showToast(text);
-				}
-				catch (e) {
-					log('showToast fallback failed: ' + e.toString());
-				}
-				return;
-			}
-			// Last resort: log to console
+			// Fallback to console log
 			log(text);
 		} catch (e) {
 			log('showToast error: ' + e.toString());
@@ -238,27 +248,19 @@
 		if (!player)
 			return;
 
-		// Use app.listen for proper MM5 event handling
-		if (app.listen) {
-			state.autoListen = app.listen(player, 'playbackState', (newState) => {
-				log(`SimilarArtists: playbackState changed to '${newState}'`);
-				if (newState === 'trackChanged') {
-					handleAuto();
-				}
-			});
-			log('SimilarArtists: Auto-mode listener attached (using app.listen)');
-		} else if (player.on) {
-			// Fallback for older API
-			state.autoListen = player.on('playbackState', (newState) => {
-				log(`SimilarArtists: playbackState changed to '${newState}'`);
-				if (newState === 'trackChanged') {
-					handleAuto();
-				}
-			});
-			log('SimilarArtists: Auto-mode listener attached (using player.on)');
-		} else {
-			log('SimilarArtists: No event listener API available');
+		// Use app.listen for MM5 event handling
+		if (!app.listen) {
+			log('SimilarArtists: app.listen not available');
+			return;
 		}
+
+		state.autoListen = app.listen(player, 'playbackState', (newState) => {
+			log(`SimilarArtists: playbackState changed to '${newState}'`);
+			if (newState === 'trackChanged') {
+				handleAuto();
+			}
+		});
+		log('SimilarArtists: Auto-mode listener attached');
 	}
 
 	/**
@@ -270,10 +272,7 @@
 		try {
 			if (app.unlisten) {
 				app.unlisten(state.autoListen);
-				log('SimilarArtists: Auto-mode listener detached (using app.unlisten)');
-			} else if (state.autoListen.off) {
-				state.autoListen.off();
-				log('SimilarArtists: Auto-mode listener detached (using listener.off)');
+				log('SimilarArtists: Auto-mode listener detached');
 			}
 		} catch (e) {
 			log('SimilarArtists: Error detaching auto-mode listener: ' + e.toString());
@@ -366,43 +365,20 @@
 		log(`collectSeedTracks: selectedList count = ${selectedCount}`);
 
 		if (selectedList && selectedCount > 0) {
-			// Process all selected tracks using forEach (not toArray)
+			// Process all selected tracks using forEach (MM5 standard pattern)
 			log(`collectSeedTracks: Found ${selectedCount} selected track(s), iterating...`);
 
 			if (typeof selectedList.forEach === 'function') {
-				// Use forEach for iteration (MM5 standard pattern)
-				let processedCount = 0;
 				selectedList.forEach((t) => {
-					processedCount++;
-					//log(`collectSeedTracks: forEach iteration ${processedCount}, track artist = ${t?.artist || 'N/A'}`);
 					if (t && t.artist) {
 						seeds.push({ name: normalizeName(t.artist), track: t });
 					}
 				});
-				//log(`collectSeedTracks: forEach completed, processed ${processedCount} tracks, collected ${seeds.length} seeds`);
 			} else {
-				// Fallback: try using index-based access if forEach not available
-				//log('collectSeedTracks: forEach not available, trying index-based access');
-				for (let idx = 0; idx < selectedCount; idx++) {
-					let t = null;
-					if (typeof selectedList.getFastObject === 'function') {
-						t = selectedList.getFastObject(idx);
-					} else if (typeof selectedList.get === 'function') {
-						t = selectedList.get(idx);
-					}
-
-					if (t) {
-						//log(`collectSeedTracks: index ${idx} got track with artist = ${t?.artist || 'N/A'}`);
-						if (t.artist) {
-							seeds.push({ name: normalizeName(t.artist), track: t });
-						}
-					}
-				}
-				//log(`collectSeedTracks: index-based access completed, collected ${seeds.length} seeds`);
+				log('collectSeedTracks: forEach not available on selectedList');
 			}
 
 			if (seeds.length > 0) {
-				//log(`collectSeedTracks: Returning ${seeds.length} seed(s): ${seeds.map(s => s.name).join(', ')}`);
 				return seeds;
 			}
 		}
@@ -705,7 +681,7 @@
 	 * @returns {Promise<object|null>} Selected/created playlist object, or null if not selected.
 	 */
 	async function confirmPlaylist(seedName, overwriteMode) {
-		return new Promise((resolve) => {
+			return new Promise((resolve) => {
 			try {
 				if (typeof uitools === 'undefined' || !uitools.openDialog) {
 					log('confirmPlaylist: uitools.openDialog not available');
@@ -1066,14 +1042,13 @@
 		}
 
 		// Clear target if requested
-		if (options.clearFirst) {
+		if (clearFirst) {
 			try {
 				if (target.clearTracksAsync && typeof target.clearTracksAsync === 'function') {
 					await target.clearTracksAsync();
-					log('addTracksToTarget: Cleared target (async)');
-				} else if (target.clear && typeof target.clear === 'function') {
-					target.clear();
-					log('addTracksToTarget: Cleared target (sync)');
+					log('addTracksToTarget: Cleared target');
+				} else {
+					log('addTracksToTarget: clearTracksAsync not available');
 				}
 			} catch (e) {
 				log(`addTracksToTarget: Error clearing target: ${e.toString()}`);
@@ -1082,7 +1057,7 @@
 
 		// Build set of existing track IDs for deduplication
 		const existing = new Set();
-		if (options.ignoreDupes) {
+		if (ignoreDupes) {
 			try {
 				// For Now Playing, try toArray() (synchronous snapshot)
 				if (target.toArray && typeof target.toArray === 'function') {
@@ -1119,66 +1094,48 @@
 			return 0;
 		}
 
-		// Add tracks using best available method (MM5 pattern from actions.js)
+		// Add tracks using modern MM5 pattern (from actions.js)
 		try {
-			// Primary: Use addTracksAsync with a temporary tracklist (modern MM5 pattern)
-			if (target.addTracksAsync && typeof target.addTracksAsync === 'function' && app.utils?.createTracklist) {
-				try {
-					// Create a mutable temporary tracklist
-					const tracklist = app.utils.createTracklist(true);
-					
-					if (!tracklist) {
-						log('addTracksToTarget: Failed to create tracklist');
-						throw new Error('createTracklist returned null');
-					}
+			if (!app.utils?.createTracklist) {
+				log('addTracksToTarget: app.utils.createTracklist not available');
+				return 0;
+			}
 
-					// Add all tracks to the temporary tracklist
-					for (const t of tracksToAdd) {
-						if (t && typeof tracklist.add === 'function') {
-							tracklist.add(t);
-						}
-					}
+			if (!target.addTracksAsync || typeof target.addTracksAsync !== 'function') {
+				log('addTracksToTarget: target.addTracksAsync not available');
+				return 0;
+			}
 
-					// Wait for tracklist to be ready (MM5 pattern from savePlaylistFromNowPlaying)
-					await tracklist.whenLoaded();
+			// Create a mutable temporary tracklist
+			const tracklist = app.utils.createTracklist(true);
+			
+			if (!tracklist) {
+				log('addTracksToTarget: Failed to create tracklist');
+				return 0;
+			}
 
-					// Now we can safely call addTracksAsync
-					if (tracklist.count > 0) {
-						await target.addTracksAsync(tracklist);
-						log(`addTracksToTarget: Added ${tracklist.count} tracks (async batch)`);
-						return tracklist.count;
-					}
-				} catch (e) {
-					log(`addTracksToTarget: Error in addTracksAsync: ${e.toString()}, trying fallback`);
-					// Fall through to next method
+			// Add all tracks to the temporary tracklist
+			for (const t of tracksToAdd) {
+				if (t && typeof tracklist.add === 'function') {
+					tracklist.add(t);
 				}
 			}
 
-			// Secondary: Use synchronous batch method if available
-			if (target.addTracks && typeof target.addTracks === 'function') {
-				target.addTracks(tracksToAdd);
-				log(`addTracksToTarget: Added ${tracksToAdd.length} tracks (sync batch)`);
-				return tracksToAdd.length;
+			// Wait for tracklist to be ready (MM5 pattern from savePlaylistFromNowPlaying)
+			await tracklist.whenLoaded();
+
+			// Now we can safely call addTracksAsync
+			if (tracklist.count > 0) {
+				await target.addTracksAsync(tracklist);
+				log(`addTracksToTarget: Added ${tracklist.count} tracks (async batch)`);
+				return tracklist.count;
 			}
 
-			// Tertiary: Add tracks individually (slowest, most compatible)
-			if (target.addTrack && typeof target.addTrack === 'function') {
-				let addedCount = 0;
-				for (const t of tracksToAdd) {
-					if (t) {
-						target.addTrack(t);
-						addedCount++;
-					}
-				}
-				log(`addTracksToTarget: Added ${addedCount} tracks (individual)`);
-				return addedCount;
-			}
-
-			log('addTracksToTarget: No suitable method found to add tracks');
+			log('addTracksToTarget: No tracks in tracklist to add');
 			return 0;
 
 		} catch (e) {
-			log(`addTracksToTarget: Fatal error: ${e.toString()}`);
+			log(`addTracksToTarget: Error: ${e.toString()}`);
 			return 0;
 		}
 	}
@@ -1222,7 +1179,6 @@
 		let playlist = selectedPlaylist || findPlaylist(name);
 
 		const overwriteText = String(overwriteMode || '');
-
 		//-- create new if mode is "Create new playlist"
 		if (overwriteText.toLowerCase().indexOf('create') > -1) {
 			let idx = 1;
@@ -1322,7 +1278,6 @@
 
 	/**
 	 * Find an existing playlist by title (case-insensitive).
-	 * Tries multiple methods to support different MediaMonkey API versions.
 	 * @param {string} name Playlist title to search for.
 	 * @returns {object|null} Playlist object if found, null otherwise.
 	 */
@@ -1332,56 +1287,16 @@
 		}
 
 		try {
-			// Method 1: Try findByTitle (newer API)
+			// Use findByTitle (MM5 API)
 			if (app.playlists?.findByTitle && typeof app.playlists.findByTitle === 'function') {
 				const playlist = app.playlists.findByTitle(name);
 				if (playlist) {
-					log(`findPlaylist: Found playlist by title (findByTitle): "${name}"`);
+					log(`findPlaylist: Found playlist by title: "${name}"`);
 					return playlist;
 				}
 			}
 		} catch (e) {
-			log(`findPlaylist: findByTitle error: ${e.toString()}`);
-		}
-
-		try {
-			// Method 2: Try getByTitle (alternative API)
-			if (app.playlists?.getByTitle && typeof app.playlists.getByTitle === 'function') {
-				const playlist = app.playlists.getByTitle(name);
-				if (playlist) {
-					log(`findPlaylist: Found playlist by title (getByTitle): "${name}"`);
-					return playlist;
-				}
-			}
-		} catch (e) {
-			log(`findPlaylist: getByTitle error: ${e.toString()}`);
-		}
-
-		try {
-			// Method 3: Manual iteration with case-insensitive match (fallback)
-			if (app.playlists?.getAll && typeof app.playlists.getAll === 'function') {
-				const playlists = app.playlists.getAll();
-				if (playlists && typeof playlists.forEach === 'function') {
-					const nameLower = String(name || '').toLowerCase();
-					let found = null;
-
-					playlists.forEach((p) => {
-						if (p && (p.title || p.name)) {
-							const pName = String(p.title || p.name).toLowerCase();
-							if (pName === nameLower) {
-								found = p;
-							}
-						}
-					});
-
-					if (found) {
-						log(`findPlaylist: Found playlist by manual search (case-insensitive): "${name}"`);
-						return found;
-					}
-				}
-			}
-		} catch (e) {
-			log(`findPlaylist: Manual iteration error: ${e.toString()}`);
+			log(`findPlaylist: Error: ${e.toString()}`);
 		}
 
 		log(`findPlaylist: Playlist not found: "${name}"`);
@@ -1452,4 +1367,4 @@
 		toggleAuto,
 	};
 
-})(typeof window !== 'undefined' ? window : global);
+})(typeof window !== 'undefined' ? window : global);})(typeof window !== 'undefined' ? window : global);
