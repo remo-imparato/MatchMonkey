@@ -738,7 +738,7 @@
 			if (confirm && !autoRun) {
 				const count = seeds.length;
 				if (count === 1) {
-				showToast('SimilarArtists: Artist has been processed.');
+					showToast('SimilarArtists: Artist has been processed.');
 				} else {
 					showToast(`SimilarArtists: All ${count} artists have been processed.`);
 				}
@@ -1831,11 +1831,20 @@
 		log('SimilarArtists addon started successfully.');
 	}
 
+	/**
+	 * Check if auto-mode is currently enabled.
+	 * @returns {boolean} True if auto-mode is enabled.
+	 */
+	function isAutoEnabled() {
+		return getSetting('OnPlay', false);
+	}
+
 	// Export functions to the global scope
 	globalArg.SimilarArtists = {
 		start,
 		runSimilarArtists,
 		toggleAuto,
+		isAutoEnabled,
 	};
 
 })(typeof window !== 'undefined' ? window : global);

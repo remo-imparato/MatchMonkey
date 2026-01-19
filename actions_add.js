@@ -13,17 +13,33 @@ window.actions.SimilarArtistsRun = {
 	hotkeyAble: true,
 	visible: true,
 	disabled: false,
-	execute: () => window.SimilarArtists?.runSimilarArtists(false)
+	execute: function() {
+		window.SimilarArtists?.runSimilarArtists(false);
+	}
 };
 
 window.actions.SimilarArtistsToggleAuto = {
 	title: () => _('Similar Artists: &Auto On/Off'),
 	icon: 'script',
 	hotkeyAble: true,
-	checkable: true,
 	visible: true,
 	disabled: false,
-	execute: () => window.SimilarArtists?.toggleAuto()
+	checked: function() {
+		// Use the exported helper function if available, otherwise read directly
+		if (window.SimilarArtists?.isAutoEnabled) {
+			return window.SimilarArtists.isAutoEnabled();
+		}
+		// Fallback: read the OnPlay setting directly
+		try {
+			const config = app.getValue('SimilarArtists', {});
+			return Boolean(config.OnPlay);
+		} catch (e) {
+			return false;
+		}
+	},
+	execute: function() {
+		window.SimilarArtists?.toggleAuto();
+	}
 };
 
 window._menuItems.tools.action.submenu.push({
