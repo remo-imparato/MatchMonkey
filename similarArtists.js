@@ -281,6 +281,14 @@ try {
 				app.actions.updateActionIcon(ACTION_AUTO_ID, enabled ? 32 : 33);
 			if (app.actions?.updateActionState)
 				app.actions.updateActionState(ACTION_AUTO_ID);
+			// Ensure window.actions menu checkbox reflects latest state
+			if (window.actions?.SimilarArtistsToggleAuto) {
+				window.actions.SimilarArtistsToggleAuto.checked = () => Boolean(isAutoEnabled());
+				if (app.actions?.updateActionState)
+					app.actions.updateActionState(window.actions.SimilarArtistsToggleAuto);
+			}
+			// Best-effort menu refresh
+			window._menuItems?.tools?.action?.invalidate?.();
 		} catch (e) {
 			log('applyAutoModeFromSettings UI refresh failed: ' + e.toString());
 		}

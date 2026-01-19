@@ -339,10 +339,15 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = function (sett, pnl
 			: parseInt(this.config.Rating, 10);
 		const ratingValue = Number.isFinite(ratingValueRaw) ? Math.max(0, Math.min(100, ratingValueRaw)) : 0;
 
-		if (UI.SARating?.controlClass) {
+		const applyRatingUI = () => {
+			if (!UI.SARating?.controlClass) return;
 			UI.SARating.controlClass.useUnknown = allowUnknown;
 			UI.SARating.controlClass.value = (allowUnknown && ratingValue === 0) ? -1 : ratingValue;
-		}
+		};
+
+		applyRatingUI();
+		// Some rating controls refresh on interaction; reapply after render to ensure correct display.
+		setTimeout(applyRatingUI, 0);
 
 		UI.SAUnknown.controlClass.checked = allowUnknown;
 
