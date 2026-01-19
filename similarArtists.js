@@ -23,7 +23,7 @@
  * - Internet connection for Last.fm API queries
  */
 requirejs('helpers/debugTools');
-registerDebuggerEntryPoint.call(globalArg.SimilarArtists, 'start');
+registerDebuggerEntryPoint.call(window.SimilarArtists, 'start');
 
 (function (globalArg) {
 	'use strict';
@@ -990,8 +990,10 @@ registerDebuggerEntryPoint.call(globalArg.SimilarArtists, 'start');
 				if (!artistName) return '';
 
 				const artistConds = [];
+				// Exact match
 				artistConds.push(`Artists.Artist = '${escapeSql(artistName)}'`);
 
+				// Handle prefix variations (e.g., "The Beatles" vs "Beatles, The")
 				const prefixes = getIgnorePrefixes();
 				const nameLower = artistName.toLowerCase();
 
@@ -1283,7 +1285,7 @@ registerDebuggerEntryPoint.call(globalArg.SimilarArtists, 'start');
 					} else {
 						// "Beatles" -> also match "Beatles, The" and "The Beatles"
 						artistConds.push(`Artists.Artist = '${escapeSql(`${artistName}, ${prefix}`)}'`);
-						artistConds.push(`Artists.Artist = '${escapeSql`${prefix} ${artistName}`}`);
+						artistConds.push(`Artists.Artist = '${escapeSql(`${prefix} ${artistName}`)}'`);
 					}
 				}
 

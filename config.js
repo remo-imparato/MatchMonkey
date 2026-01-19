@@ -56,7 +56,12 @@ window.configInfo = {
 		UI.SASeed2.controlClass.checked = this.config.Seed2;
 		UI.SABest.controlClass.checked = this.config.Best;
 		UI.SARank.controlClass.checked = this.config.Rank;
-		UI.SARating.controlClass.value = this.config.Rating;
+		
+		// Rating control uses 'rating' property (0-100 scale, or -1 for unset)
+		const ratingValue = parseInt(this.config.Rating, 10) || 0;
+		UI.SARating.controlClass.rating = ratingValue;
+		this.log(`load: Rating set to ${ratingValue}`);
+		
 		UI.SAUnknown.controlClass.checked = this.config.Unknown;
 		UI.SAOverwrite.controlClass.value = this.config.Overwrite;
 		UI.SAEnqueue.controlClass.checked = this.config.Enqueue;
@@ -74,6 +79,7 @@ window.configInfo = {
 
 	/**
 	 * Recursively collect all manual (non-auto) playlists from the playlist tree.
+	 * Uses forEach pattern to avoid "Read lock not acquired" errors.
 	 * @param {object} node Playlist node to process
 	 * @param {string[]} results Array to collect playlist names
 	 * @param {string} prefix Path prefix for nested playlists (optional)
@@ -100,7 +106,7 @@ window.configInfo = {
 			if (!count || count <= 0) return;
 
 			// Use forEach which is the safest pattern for iteration in MM5
-			// Avoid locked() as it can cause "Read lock not acquired" errors
+			// This avoids "Read lock not acquired" errors
 			if (typeof children.forEach === 'function') {
 				children.forEach((child) => {
 					if (child) {
@@ -108,7 +114,7 @@ window.configInfo = {
 					}
 				});
 			} else {
-				// Manual iteration fallback using getValue
+				// Manual iteration fallback using getValue (also safe)
 				for (let i = 0; i < count; i++) {
 					try {
 						const child = children.getValue ? children.getValue(i) : children[i];
@@ -261,7 +267,12 @@ window.configInfo = {
 		this.config.Seed2 = UI.SASeed2.controlClass.checked;
 		this.config.Best = UI.SABest.controlClass.checked;
 		this.config.Rank = UI.SARank.controlClass.checked;
-		this.config.Rating = UI.SARating.controlClass.value;
+		
+		// Rating control uses 'rating' property (0-100 scale, or -1 for unset)
+		const ratingValue = UI.SARating.controlClass.rating;
+		this.config.Rating = (ratingValue !== undefined && ratingValue >= 0) ? ratingValue : 0;
+		this.log(`save: Rating = ${this.config.Rating}`);
+		
 		this.config.Unknown = UI.SAUnknown.controlClass.checked;
 		this.config.Overwrite = UI.SAOverwrite.controlClass.value;
 		this.config.Enqueue = UI.SAEnqueue.controlClass.checked;
@@ -273,13 +284,13 @@ window.configInfo = {
 		this.config.Exclude = UI.SAExclude.controlClass.value;
 		this.config.Genre = UI.SAGenre.controlClass.value;
 
-		// Get selected parent playlist from dropdown
+		// Get selected parent playlist from dropdown using forEach (safest approach)
 		try {
 			const parentCtrl = UI.SAParent?.controlClass;
 			if (parentCtrl) {
-				// Try to get value directly first (simplest approach)
 				let selectedValue = '';
 				
+				// Try to get value directly first (simplest approach)
 				if (parentCtrl.value !== undefined && parentCtrl.value !== null) {
 					selectedValue = String(parentCtrl.value);
 				} else if (parentCtrl.dataSource && typeof parentCtrl.focusedIndex !== 'undefined') {
@@ -289,14 +300,12 @@ window.configInfo = {
 					const count = typeof ds.count === 'function' ? ds.count() : ds.count;
 					
 					if (idx >= 0 && idx < count) {
-						// Use forEach to safely get the item at index
-						let found = false;
+						// Use forEach to safely get the item at index (avoids read lock errors)
 						let currentIdx = 0;
 						if (typeof ds.forEach === 'function') {
 							ds.forEach((item) => {
-								if (currentIdx === idx && !found) {
+								if (currentIdx === idx && !selectedValue) {
 									selectedValue = item ? item.toString() : '';
-									found = true;
 								}
 								currentIdx++;
 							});

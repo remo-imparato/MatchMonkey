@@ -91,6 +91,7 @@ function log(txt) {
 
 /**
  * Recursively collect all manual (non-auto) playlists from the playlist tree.
+ * Uses forEach pattern to avoid "Read lock not acquired" errors.
  * @param {object} node Playlist node to process
  * @param {string[]} results Array to collect playlist names
  * @param {number} depth Current recursion depth (to prevent infinite loops)
@@ -113,16 +114,13 @@ function collectManualPlaylists(node, results, depth = 0) {
 
         log(`collectManualPlaylists: Found ${count} children at depth ${depth}`);
 
-        // Iterate using getValue() which is safer than getFastObject for our use case
-        for (let i = 0; i < count; i++) {
-            try {
-                // Use getValue to get a proper reference we can use outside iteration
-                const child = children.getValue(i);
-                
-                if (!child) continue;
+        // Use forEach which is safe and doesn't require locks
+        if (typeof children.forEach === 'function') {
+            children.forEach((child) => {
+                if (!child) return;
 
                 const name = child.title || child.name;
-                if (!name) continue;
+                if (!name) return;
 
                 // Check if this is a manual playlist (not auto-playlist)
                 const isAuto = child.isAutoPlaylist === true;
@@ -134,9 +132,31 @@ function collectManualPlaylists(node, results, depth = 0) {
 
                 // Recurse into child playlists
                 collectManualPlaylists(child, results, depth + 1);
+            });
+        } else {
+            // Fallback: use getValue which is safer than getFastObject
+            for (let i = 0; i < count; i++) {
+                try {
+                    const child = children.getValue(i);
+                    
+                    if (!child) continue;
 
-            } catch (itemErr) {
-                log(`Error processing item ${i}: ${itemErr.toString()}`);
+                    const name = child.title || child.name;
+                    if (!name) continue;
+
+                    const isAuto = child.isAutoPlaylist === true;
+
+                    if (!isAuto) {
+                        results.push(name);
+                        log(`Found manual playlist: "${name}"`);
+                    }
+
+                    // Recurse into child playlists
+                    collectManualPlaylists(child, results, depth + 1);
+
+                } catch (itemErr) {
+                    log(`Error processing item ${i}: ${itemErr.toString()}`);
+                }
             }
         }
 
@@ -218,7 +238,13 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = function (sett, pnl
 		UI.SASeed2.controlClass.checked = this.config.Seed2;
 		UI.SABest.controlClass.checked = this.config.Best;
 		UI.SARank.controlClass.checked = this.config.Rank;
-		UI.SARating.controlClass.value = this.config.Rating;
+		
+		// Rating control uses 'rating' property (0-100 scale, or -1 for unset)
+		// Convert stored value (0-100) to rating control value
+		const ratingValue = parseInt(this.config.Rating, 10) || 0;
+		UI.SARating.controlClass.rating = ratingValue;
+		log(`load: Rating set to ${ratingValue}`);
+		
 		UI.SAUnknown.controlClass.checked = this.config.Unknown;
 		UI.SAOverwrite.controlClass.value = this.config.Overwrite;
 		UI.SAEnqueue.controlClass.checked = this.config.Enqueue;
@@ -255,7 +281,12 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function (sett) {
 		this.config.Seed2 = UI.SASeed2.controlClass.checked;
 		this.config.Best = UI.SABest.controlClass.checked;
 		this.config.Rank = UI.SARank.controlClass.checked;
-		this.config.Rating = UI.SARating.controlClass.value;
+		
+		// Rating control uses 'rating' property (0-100 scale, or -1 for unset)
+		const ratingValue = UI.SARating.controlClass.rating;
+		this.config.Rating = (ratingValue !== undefined && ratingValue >= 0) ? ratingValue : 0;
+		log(`save: Rating = ${this.config.Rating}`);
+		
 		this.config.Unknown = UI.SAUnknown.controlClass.checked;
 		this.config.Overwrite = UI.SAOverwrite.controlClass.value;
 		this.config.Enqueue = UI.SAEnqueue.controlClass.checked;
@@ -273,11 +304,24 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function (sett) {
 			if (parentCtrl && parentCtrl.dataSource && typeof parentCtrl.focusedIndex !== 'undefined') {
 				const ds = parentCtrl.dataSource;
 				const idx = parentCtrl.focusedIndex;
+				const count = typeof ds.count === 'function' ? ds.count() : ds.count;
 				
-				// Get the selected item from dataSource
-				if (idx >= 0 && idx < ds.count) {
-					const selectedItem = ds.getValue(idx);
-					const selectedValue = selectedItem ? selectedItem.toString() : '';
+				// Get the selected item from dataSource using forEach (safer)
+				if (idx >= 0 && idx < count) {
+					let selectedValue = '';
+					let currentIdx = 0;
+					
+					if (typeof ds.forEach === 'function') {
+						ds.forEach((item) => {
+							if (currentIdx === idx) {
+								selectedValue = item ? item.toString() : '';
+							}
+							currentIdx++;
+						});
+					} else if (typeof ds.getValue === 'function') {
+						const item = ds.getValue(idx);
+						selectedValue = item ? item.toString() : '';
+					}
 					
 					// Store empty string if [None] is selected, otherwise store the playlist name
 					this.config.Parent = (selectedValue === '[None]') ? '' : selectedValue;
