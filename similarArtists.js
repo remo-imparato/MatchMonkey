@@ -157,7 +157,7 @@ try {
 	 */
 	function setSetting(key, value) {
 		if (typeof app === 'undefined' || !app.setValue || !app.getValue) return;
-		
+
 		// MM5 stores settings as complete objects, so we need to:
 		// 1. Get the current config object
 		// 2. Update the specific key
@@ -615,22 +615,22 @@ try {
 				if (rankEnabled && trackRankMap) {
 					updateProgress(`Ranking: Fetching top 100 tracks for "${artName}"...`, seedProgress * 0.3);
 					const rankTitles = await fetchTopTracksForRank(fixPrefixes(artName));
-					
+
 					if (rankTitles.length > 0) {
 						updateProgress(`Ranking: Batch lookup of ${rankTitles.length} tracks from "${artName}"...`, seedProgress * 0.3);
-						
+
 						// Use batch lookup for ranking (up to 5 matches per title for better scoring)
-						const rankMatches = await findLibraryTracksBatch(artName, rankTitles, 5, { 
-							rank: false, 
-							best: bestEnabled 
+						const rankMatches = await findLibraryTracksBatch(artName, rankTitles, 5, {
+							rank: false,
+							best: bestEnabled
 						});
-						
+
 						// Score all matched tracks
 						let scoredCount = 0;
 						rankTitles.forEach((title, rankIdx) => {
 							const matches = rankMatches.get(title) || [];
 							const rankScore = 101 - (rankIdx + 1); // Higher score for earlier positions
-							
+
 							matches.forEach(track => {
 								const trackId = track.id || track.ID;
 								const currentScore = trackRankMap.get(trackId) || 0;
@@ -640,7 +640,7 @@ try {
 								}
 							});
 						});
-						
+
 						log(`Ranking: Scored ${scoredCount} unique tracks from "${artName}"`);
 					}
 				}
@@ -648,16 +648,16 @@ try {
 				// COLLECTION MODE: Fetch top N tracks for playlist
 				updateProgress(`Collecting: Fetching top ${tracksPerArtist} tracks from "${artName}"...`, seedProgress * 0.3);
 				const titles = await fetchTopTracks(fixPrefixes(artName), tracksPerArtist);
-				
+
 				if (titles.length > 0) {
 					updateProgress(`Collecting: Batch lookup of ${titles.length} tracks from "${artName}"...`, seedProgress * 0.3);
-					
+
 					// Use batch lookup (1 match per title for collection)
-					const matches = await findLibraryTracksBatch(artName, titles, 1, { 
-						rank: false, 
-						best: bestEnabled 
+					const matches = await findLibraryTracksBatch(artName, titles, 1, {
+						rank: false,
+						best: bestEnabled
 					});
-					
+
 					// Add all matched tracks to results (in order of Last.fm ranking)
 					let addedFromArtist = 0;
 					titles.forEach(title => {
@@ -666,14 +666,14 @@ try {
 							allTracks.push(track);
 							addedFromArtist++;
 						});
-						
+
 						// Stop if we've hit the total limit
 						if (allTracks.length >= totalLimit) return;
 					});
-					
+
 					log(`Collecting: Added ${addedFromArtist} tracks from "${artName}" to playlist`);
 				}
-				
+
 				if (allTracks.length >= totalLimit) break;
 			}
 			if (allTracks.length >= totalLimit) break;
@@ -786,17 +786,27 @@ try {
 			// Either enqueue to Now Playing or create a playlist, depending on settings.
 			// In auto-mode, always enqueue to Now Playing
 			if (enqueue || autoRun || overwriteMode.toLowerCase().indexOf("do not") > -1) {
-				updateProgress(`Adding ${allTracks.length} tracks to Now Playing...`, 0.8);
+				if (autoRun) {
+					updateProgress(`Auto-enqueue: Adding ${allTracks.length} tracks to Now Playing...`, 0.8);
+					log(`SimilarArtists: Auto-enqueue triggered - adding ${allTracks.length} track(s) to Now Playing (ignoreDupes=${ignoreDupes}, clearNP=${clearNP})`);
+				} else {
+					updateProgress(`Adding ${allTracks.length} tracks to Now Playing...`, 0.8);
+				}
+
 				await enqueueTracks(allTracks, ignoreDupes, clearNP);
-				log(`Enqueued ${allTracks.length} track(s) to Now Playing`);
+				if (autoRun) {
+					log(`SimilarArtists: Auto-enqueue completed - added ${allTracks.length} track(s) to Now Playing`);
+				} else {
+					log(`Enqueued ${allTracks.length} track(s) to Now Playing`);
+				}
 				updateProgress(`Successfully added ${allTracks.length} tracks to Now Playing!`, 1.0);
 			} else {
 				const seedName = seeds[0]?.name || 'Similar Artists';
-				
+
 				// If confirm is enabled, show dialog to select/create playlist
 				if (confirm) {
 					const dialogResult = await confirmPlaylist(seedName, overwriteMode);
-					
+
 					if (dialogResult === null) {
 						// User cancelled the dialog
 						log('SimilarArtists: User cancelled playlist dialog.');
@@ -810,15 +820,15 @@ try {
 						// User selected an existing playlist - add tracks to it
 						const selectedPlaylist = dialogResult;
 						const shouldClear = overwriteMode.toLowerCase().indexOf('overwrite') > -1;
-						
+
 						updateProgress(`Adding ${allTracks.length} tracks to "${selectedPlaylist.name}"...`, 0.85);
 						log(`SimilarArtists: Adding tracks to user-selected playlist '${selectedPlaylist.name}' (ID: ${selectedPlaylist.id || selectedPlaylist.ID}), shouldClear=${shouldClear}`);
-						
-						const added = await addTracksToTarget(selectedPlaylist, allTracks, { 
+
+						const added = await addTracksToTarget(selectedPlaylist, allTracks, {
 							ignoreDupes: false,
-							clearFirst: shouldClear 
+							clearFirst: shouldClear
 						});
-						
+
 						log(`SimilarArtists: Added ${added} track(s) to playlist '${selectedPlaylist.name}'`);
 						updateProgress(`Successfully added ${added} tracks to "${selectedPlaylist.name}"!`, 1.0);
 					}
@@ -942,7 +952,7 @@ try {
 			const url = API_BASE + '?' + params.toString();
 			updateProgress(`Querying Last.fm API: getSimilar for "${artistName}"...`);
 			log('fetchSimilarArtists: querying ' + url);
-			
+
 			const res = await fetch(url);
 
 			if (!res || !res.ok) {
@@ -1055,10 +1065,10 @@ try {
 		}
 	}
 
-	 /**
-	 * In-place Fisher–Yates shuffle.
-	 * @param {any[]} arr Array to shuffle.
-	 */
+	/**
+	* In-place Fisher–Yates shuffle.
+	* @param {any[]} arr Array to shuffle.
+	*/
 	function shuffle(arr) {
 		if (!arr || arr.length <= 1) return;
 		for (let i = arr.length - 1; i > 0; --i) {
@@ -1180,7 +1190,7 @@ try {
 
 			// PASS 1: Exact match (case-insensitive) for all titles in one query
 			{
-				const titleConditions = titles.map(t => 
+				const titleConditions = titles.map(t =>
 					`UPPER(Songs.SongTitle) = '${escapeSql(t.toUpperCase())}'`
 				);
 
@@ -1205,7 +1215,7 @@ try {
 					tl.forEach((track) => {
 						if (track) {
 							// Find which title this matches (case-insensitive)
-							const matchedTitle = titles.find(t => 
+							const matchedTitle = titles.find(t =>
 								t.toUpperCase() === (track.title || track.SongTitle || '').toUpperCase()
 							);
 							if (matchedTitle) {
@@ -1272,7 +1282,7 @@ try {
 								if (track) {
 									const trackStripped = stripName(track.title || track.SongTitle || '');
 									// Find which title this matches
-									const matchedTitle = needMoreMatches.find(t => 
+									const matchedTitle = needMoreMatches.find(t =>
 										stripName(t) === trackStripped
 									);
 									if (matchedTitle) {
@@ -1288,7 +1298,7 @@ try {
 							tl.dontNotify = false;
 						}
 
-						const fuzzyMatches = Array.from(results.values()).reduce((sum, arr) => sum + arr.length, 0) - 
+						const fuzzyMatches = Array.from(results.values()).reduce((sum, arr) => sum + arr.length, 0) -
 							Array.from(results.values()).reduce((sum, arr) => sum + arr.length, 0);
 						if (fuzzyMatches > 0) {
 							log(`findLibraryTracksBatch Pass 2: Found ${fuzzyMatches} additional fuzzy matches`);
@@ -1308,9 +1318,9 @@ try {
 				if (words.length > 0) {
 					const whereParts = [];
 					if (artistClause) whereParts.push(artistClause);
-					
+
 					// Build LIKE clauses for each word
-					const likeConditions = words.map(w => 
+					const likeConditions = words.map(w =>
 						`UPPER(Songs.SongTitle) LIKE '%${escapeSql(w.toUpperCase())}%'`
 					);
 					whereParts.push(`(${likeConditions.join(' AND ')})`);
@@ -1332,7 +1342,7 @@ try {
 
 					updateProgress(`Pass 3: Partial match for "${title}" by "${artistName}"...`);
 					const tl = app?.db?.getTracklist(sql, -1);
-					
+
 					if (tl) {
 						tl.autoUpdateDisabled = true;
 						tl.dontNotify = true;
@@ -1455,7 +1465,7 @@ try {
 
 			// Create a mutable temporary tracklist
 			const tracklist = app.utils.createTracklist(true);
-			
+
 			if (!tracklist) {
 				log('addTracksToTarget: Failed to create tracklist');
 				return 0;
@@ -1568,7 +1578,7 @@ try {
 
 			// Create a mutable temporary tracklist
 			const tracklist = app.utils.createTracklist(true);
-			
+
 			if (!tracklist) {
 				log('enqueueTracks: Failed to create tracklist');
 				return;
@@ -1610,7 +1620,7 @@ try {
 		const titleTemplate = stringSetting('Name');
 		const baseName = titleTemplate.replace('%', seedName || '');
 		const overwriteText = String(overwriteMode || '');
-		
+
 		let playlist = null;
 		let shouldClear = false;
 
@@ -1626,7 +1636,7 @@ try {
 		else if (selectedPlaylist?.autoCreate || !selectedPlaylist) {
 			// Determine playlist name
 			let name = baseName;
-			
+
 			// Check if "Create new playlist" mode - always generate unique name
 			if (overwriteText.toLowerCase().indexOf('create') > -1) {
 				// Find unique name by appending index
@@ -1653,7 +1663,7 @@ try {
 				try {
 					const parentName = stringSetting('Parent');
 					let parentPlaylist = null;
-					
+
 					// Find parent playlist if specified (and not empty)
 					if (parentName && parentName.trim() !== '') {
 						parentPlaylist = findPlaylist(parentName);
@@ -1663,7 +1673,7 @@ try {
 							log(`createPlaylist: Parent playlist '${parentName}' not found, will create at root`);
 						}
 					}
-					
+
 					// Create new playlist as child of parent (or root if no parent)
 					if (parentPlaylist && typeof parentPlaylist.newPlaylist === 'function') {
 						playlist = parentPlaylist.newPlaylist();
@@ -1672,23 +1682,23 @@ try {
 						playlist = app.playlists.root.newPlaylist();
 						log('createPlaylist: Created new playlist at root level');
 					}
-					
+
 					if (!playlist) {
 						log('createPlaylist: Failed to create new playlist object');
 						return null;
 					}
-					
+
 					// Set name
 					playlist.name = name;
 					log(`createPlaylist: Set playlist name to '${name}'`);
-					
+
 					// Persist the playlist (this commits it to the database with parent relationship intact)
 					await playlist.commitAsync();
 					log(`createPlaylist: Committed playlist to database (ID: ${playlist.id || playlist.ID})`);
-					
+
 					// Mark as new for potential UI handling
 					playlist.isNew = true;
-					
+
 				} catch (e) {
 					log(`createPlaylist: Error creating playlist: ${e.toString()}`);
 					return null;
@@ -1705,9 +1715,9 @@ try {
 
 		// Add tracks to playlist using unified helper
 		if (tracks && tracks.length > 0) {
-			const added = await addTracksToTarget(playlist, tracks, { 
+			const added = await addTracksToTarget(playlist, tracks, {
 				ignoreDupes: false, // Playlists typically allow duplicates 
-				clearFirst: shouldClear 
+				clearFirst: shouldClear
 			});
 			log(`createPlaylist: Added ${added} track(s) to playlist`);
 		} else {
