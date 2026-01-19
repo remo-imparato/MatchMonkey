@@ -190,7 +190,6 @@ Found a bug or have a feature idea? Please open an issue on the [GitHub Issues](
 ### Planned Features
 
 - [ ] Configurable track matching sensitivity
-- [ ] Support for multiple Last.fm accounts
 - [ ] Integration with other music recommendation services
 - [ ] Track history to avoid repetition
 

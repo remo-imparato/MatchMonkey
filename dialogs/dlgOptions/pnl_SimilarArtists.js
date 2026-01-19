@@ -249,7 +249,12 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = function (sett, pnl
 		UI.SAOverwrite.controlClass.value = this.config.Overwrite;
 		UI.SAEnqueue.controlClass.checked = this.config.Enqueue;
 		UI.SANavigate.controlClass.value = this.config.Navigate;
-		UI.SAOnPlay.controlClass.checked = this.config.OnPlay;
+		// Single source of truth for auto-mode state when add-on is loaded
+		try {
+			UI.SAOnPlay.controlClass.checked = Boolean(window.SimilarArtists?.isAutoEnabled?.());
+		} catch (e) {
+			UI.SAOnPlay.controlClass.checked = this.config.OnPlay;
+		}
 		UI.SAClearNP.controlClass.checked = this.config.ClearNP;
 		UI.SAIgnore.controlClass.checked = this.config.Ignore;
 		UI.SABlack.controlClass.value = this.config.Black;

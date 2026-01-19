@@ -25,14 +25,8 @@ window.actions.SimilarArtistsToggleAuto = {
 	visible: true,
 	disabled: false,
 	checked: function() {
-		// Use the exported helper function if available, otherwise read directly
-		if (window.SimilarArtists?.isAutoEnabled) {
-			return window.SimilarArtists.isAutoEnabled();
-		}
-		// Fallback: read the OnPlay setting directly
 		try {
-			const config = app.getValue('SimilarArtists', {});
-			return Boolean(config.OnPlay);
+			return Boolean(window.SimilarArtists?.isAutoEnabled?.());
 		} catch (e) {
 			return false;
 		}

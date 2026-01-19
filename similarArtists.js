@@ -1931,8 +1931,9 @@ registerDebuggerEntryPoint.call(window.SimilarArtists, 'start');
 	}
 
 	/**
-	 * Check if auto-mode is currently enabled.
-	 * @returns {boolean} True if auto-mode is enabled.
+	 * Returns whether auto-mode is enabled.
+	 * This is the single source of truth for UI (actions + options) state.
+	 * @returns {boolean}
 	 */
 	function isAutoEnabled() {
 		return getSetting('OnPlay', false);
