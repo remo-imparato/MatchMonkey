@@ -1780,24 +1780,21 @@ try {
 
 	// Build a playlist title using all seed artist names up to a safe length.
 	function buildPlaylistTitle(seeds) {
-		const template = stringSetting('Name') || 'Similar - %';
+		const template = stringSetting('Name') || 'Similar to %';
 		const defaultSeedName = stringSetting('DefaultSeedName') || 'Similar Artists';
 		const names = (seeds || []).map((s) => s?.name).filter((n) => n && n.trim().length);
 		if (!names.length) return template.replace('%', defaultSeedName);
 
 		// Limit artist portion to keep playlist titles readable and within common limits.
 		const maxLabelLen = 80; // conservative limit for artist portion
-		let label = '';
-		let used = 0;
-		names.forEach((name) => {
-			const candidate = label ? `${label}, ${name}` : name;
-			if (candidate.length <= maxLabelLen || !label) {
-				label = candidate;
-				used += 1;
+		let label = names[0];
+		for (let i = 1; i < names.length; i++) {
+			const candidate = `${label}, ${names[i]}`;
+			if (candidate.length > maxLabelLen) {
+				label += '…';
+				break;
 			}
-		});
-		if (used < names.length) {
-			label += '…';
+			label = candidate;
 		}
 
 		if (template.indexOf('%') >= 0) {
