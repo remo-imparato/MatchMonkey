@@ -23,10 +23,6 @@
  * - SimilarArtists add-on installed
  */
 
- requirejs('helpers/debugTools');
-registerDebuggerEntryPoint.call(window.SimilarArtists, 'start');
-
-
 // Helper get/set that use the SimilarArtists namespace
 function setSetting(key, value) {
     try {
@@ -97,10 +93,9 @@ function log(txt) {
  * Recursively collect all manual (non-auto) playlists from the playlist tree.
  * @param {object} node Playlist node to process
  * @param {string[]} results Array to collect playlist names
- * @param {string} prefix Path prefix for nested playlists (optional)
  * @param {number} depth Current recursion depth (to prevent infinite loops)
  */
-function collectManualPlaylists(node, results, prefix = '', depth = 0) {
+function collectManualPlaylists(node, results, depth = 0) {
     if (!node || depth > 10) return; // Prevent infinite recursion
 
     try {
@@ -108,70 +103,45 @@ function collectManualPlaylists(node, results, prefix = '', depth = 0) {
         const children = node.childPlaylists;
         
         if (!children) {
-            log(`collectManualPlaylists: No childPlaylists at depth ${depth}`);
             return;
         }
 
-        // Use locked() pattern for thread safety - ALL access must be inside the lock
-        if (typeof children.locked === 'function') {
-            children.locked(() => {
-                const count = typeof children.count === 'function' ? children.count() : children.count;
-                log(`collectManualPlaylists: Found ${count} children at depth ${depth}, prefix="${prefix}"`);
+        // Get the count - must be done carefully
+        const count = typeof children.count === 'function' ? children.count() : (children.count || 0);
+        
+        if (!count || count <= 0) return;
 
-                if (!count || count <= 0) return;
+        log(`collectManualPlaylists: Found ${count} children at depth ${depth}`);
 
-                let child;
-                for (let i = 0; i < count; i++) {
-                    child = children.getFastObject ? children.getFastObject(i, child) : children.getValue(i);
-                    if (child) {
-                        processPlaylistNode(child, results, prefix, depth);
-                    }
+        // Iterate using getValue() which is safer than getFastObject for our use case
+        for (let i = 0; i < count; i++) {
+            try {
+                // Use getValue to get a proper reference we can use outside iteration
+                const child = children.getValue(i);
+                
+                if (!child) continue;
+
+                const name = child.title || child.name;
+                if (!name) continue;
+
+                // Check if this is a manual playlist (not auto-playlist)
+                const isAuto = child.isAutoPlaylist === true;
+
+                if (!isAuto) {
+                    results.push(name);
+                    log(`Found manual playlist: "${name}"`);
                 }
-            });
-        } else if (typeof children.forEach === 'function') {
-            // Fallback to forEach if locked() not available
-            children.forEach((child) => {
-                if (child) {
-                    processPlaylistNode(child, results, prefix, depth);
-                }
-            });
+
+                // Recurse into child playlists
+                collectManualPlaylists(child, results, depth + 1);
+
+            } catch (itemErr) {
+                log(`Error processing item ${i}: ${itemErr.toString()}`);
+            }
         }
+
     } catch (e) {
         log('Error collecting playlists: ' + e.toString());
-    }
-}
-
-/**
- * Process a single playlist node - add if manual, recurse for children
- * @param {object} playlist Playlist object
- * @param {string[]} results Array to collect playlist names
- * @param {string} prefix Path prefix for nested playlists
- * @param {number} depth Current recursion depth
- */
-function processPlaylistNode(playlist, results, prefix, depth) {
-    if (!playlist) return;
-
-    try {
-        const name = playlist.title || playlist.name;
-        if (!name) return;
-
-        // Check if this is a manual playlist (not auto-playlist)
-        // In MM5, auto playlists have isAutoPlaylist property
-        const isAuto = playlist.isAutoPlaylist === true;
-
-        if (!isAuto) {
-            // This is a manual playlist - add it with just the name (not nested path for simplicity)
-            results.push(name);
-            log(`Found manual playlist: "${name}" (isAuto=${isAuto})`);
-        } else {
-            log(`Skipping auto playlist: "${name}"`);
-        }
-
-        // Recurse into child playlists
-        collectManualPlaylists(playlist, results, name, depth + 1);
-
-    } catch (e) {
-        log('Error processing playlist node: ' + e.toString());
     }
 }
 
@@ -194,7 +164,7 @@ function populateParentPlaylist(pnl, storedParent) {
         log('Starting playlist enumeration...');
 
         if (app.playlists?.root) {
-            collectManualPlaylists(app.playlists.root, allPlaylists, '', 0);
+            collectManualPlaylists(app.playlists.root, allPlaylists, 0);
         }
 
         log(`Found ${allPlaylists.length} manual playlist(s)`);

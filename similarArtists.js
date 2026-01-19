@@ -22,6 +22,8 @@
  * - Last.fm API key (default provided, customizable in settings)
  * - Internet connection for Last.fm API queries
  */
+requirejs('helpers/debugTools');
+registerDebuggerEntryPoint.call(globalArg.SimilarArtists, 'start');
 
 (function (globalArg) {
 	'use strict';
