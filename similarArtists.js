@@ -473,26 +473,9 @@ try {
 
 		const selectedList = tryGetSelectedTracklist();
 
-		// Determine selection count in a way that works for both TrackList and array-like objects.
-		let selectedCount = 0;
-		try {
-			if (selectedList) {
-				if (typeof selectedList.count === 'function') selectedCount = selectedList.count();
-				else if (typeof selectedList.count === 'number') selectedCount = selectedList.count;
-				else if (typeof selectedList.length === 'number') selectedCount = selectedList.length;
-			}
-		} catch (e) {
-			selectedCount = 0;
-		}
-
-		log(`collectSeedTracks: selectedList count = ${selectedCount}`);
-
-		// IMPORTANT: If there is *any* selection, always prefer it over the currently playing track.
-		if (selectedList && selectedCount > 0) {
-			log(`collectSeedTracks: Using ${selectedCount} selected track(s) as seed(s)`);
-
+		// Try to iterate selection first; only fall back if we added nothing.
+		if (selectedList) {
 			try {
-				// MM5 TrackList typically supports forEach
 				if (typeof selectedList.forEach === 'function') {
 					selectedList.forEach((t) => {
 						if (t && t.artist) {
@@ -500,7 +483,6 @@ try {
 						}
 					});
 				} else if (typeof selectedList.getFastObject === 'function' && typeof selectedList.count === 'number') {
-					// Conservative fallback for tracklists without forEach
 					let tmp;
 					for (let i = 0; i < selectedList.count; i++) {
 						tmp = selectedList.getFastObject(i, tmp);
@@ -508,14 +490,15 @@ try {
 							seeds.push({ name: normalizeName(tmp.artist), track: tmp });
 						}
 					}
-				} else {
-					log('collectSeedTracks: selectedList is not iterable (no forEach/getFastObject)');
 				}
 			} catch (e) {
 				log('collectSeedTracks: error iterating selection: ' + e.toString());
 			}
 
-			if (seeds.length > 0) return seeds;
+			if (seeds.length > 0) {
+				log(`collectSeedTracks: Using ${seeds.length} selected track(s) as seed(s)`);
+				return seeds;
+			}
 		}
 
 		// Fallback: use current playing track if no selection
