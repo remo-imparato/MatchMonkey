@@ -72,7 +72,90 @@ function log(txt) {
 }
 
 /**
- * Populate parent playlist dropdown with available playlists
+ * Recursively collect all manual (non-auto) playlists from the playlist tree.
+ * @param {object} node Playlist node to process
+ * @param {string[]} results Array to collect playlist names
+ * @param {string} prefix Path prefix for nested playlists (optional)
+ */
+function collectManualPlaylists(node, results, prefix = '') {
+    if (!node) return;
+
+    try {
+        // Get child playlists - try different MM5 API patterns
+        let children = node.childPlaylists || node.playlists || node.children;
+        
+        // If it's a function, call it
+        if (typeof children === 'function') {
+            children = children();
+        }
+
+        // If children is not iterable, try to get count and iterate
+        if (children && typeof children.count !== 'undefined') {
+            const count = typeof children.count === 'function' ? children.count() : children.count;
+            for (let i = 0; i < count; i++) {
+                const child = typeof children.getValue === 'function' 
+                    ? children.getValue(i) 
+                    : (children[i] || children.getItem?.(i));
+                
+                if (child) {
+                    processPlaylistNode(child, results, prefix);
+                }
+            }
+        } else if (Array.isArray(children)) {
+            children.forEach(child => {
+                if (child) {
+                    processPlaylistNode(child, results, prefix);
+                }
+            });
+        } else if (children && typeof children.forEach === 'function') {
+            children.forEach(child => {
+                if (child) {
+                    processPlaylistNode(child, results, prefix);
+                }
+            });
+        }
+    } catch (e) {
+        log('Error collecting playlists: ' + e.toString());
+    }
+}
+
+/**
+ * Process a single playlist node - add if manual, recurse for children
+ * @param {object} playlist Playlist object
+ * @param {string[]} results Array to collect playlist names
+ * @param {string} prefix Path prefix for nested playlists
+ */
+function processPlaylistNode(playlist, results, prefix) {
+    if (!playlist) return;
+
+    try {
+        const name = playlist.title || playlist.name;
+        if (!name) return;
+
+        // Check if this is a manual playlist (not auto-playlist)
+        // Auto playlists typically have isAutoPlaylist=true or isAuto=true or have a query/criteria
+        const isAuto = playlist.isAutoPlaylist || playlist.isAuto || 
+                       (playlist.query && playlist.query.length > 0) ||
+                       (playlist.criteria && playlist.criteria.length > 0);
+
+        if (!isAuto) {
+            // This is a manual playlist - add it
+            const fullName = prefix ? `${prefix}/${name}` : name;
+            results.push(fullName);
+            log(`Found manual playlist: "${fullName}"`);
+        }
+
+        // Recurse into child playlists (even auto-playlists can have children)
+        const newPrefix = prefix ? `${prefix}/${name}` : name;
+        collectManualPlaylists(playlist, results, newPrefix);
+
+    } catch (e) {
+        log('Error processing playlist node: ' + e.toString());
+    }
+}
+
+/**
+ * Populate parent playlist dropdown with available manual playlists
  * @param {HTMLElement} pnl - The panel element
  * @param {string} storedParent - The currently stored parent playlist name
  */
@@ -84,70 +167,72 @@ function populateParentPlaylist(pnl, storedParent) {
             return;
         }
 
-        // Get all playlists and sort by name
-        const allPlaylists = [];
-        try {
-            if (app.playlists?.getAll && typeof app.playlists.getAll === 'function') {
-                const pls = app.playlists.getAll();
-                if (Array.isArray(pls)) {
-                    pls.forEach(p => { 
-                        if (p && (p.title || p.name)) {
-                            allPlaylists.push(p.title || p.name);
-                        }
-                    });
-                    log(`Retrieved ${allPlaylists.length} playlists via getAll()`);
-                }
-            } else if (app.playlists?.root?.playlists) {
-                // Fallback to root playlists
-                const rootPls = app.playlists.root.playlists;
-                if (Array.isArray(rootPls)) {
-                    rootPls.forEach(p => {
-                        if (p && (p.title || p.name)) {
-                            allPlaylists.push(p.title || p.name);
-                        }
-                    });
-                    log(`Retrieved ${allPlaylists.length} playlists via root.playlists`);
-                }
-            }
-        } catch (e) {
-            log('Error getting playlists: ' + e.toString());
-        }
+        // Helper function to get all manual playlists using recursive traversal
+        const getPlaylistsList = () => {
+            const allPlaylists = [];
+            
+            log('Starting playlist enumeration...');
 
-        allPlaylists.sort((a, b) => a.localeCompare(b));
-
-        // Build items array: [None] + playlists
-        const items = ['[None]'].concat(allPlaylists);
-
-        // Create a StringList dataSource (MM5 pattern) - use app.utils.newStringList()
-        try {
-            // MM5 uses app.utils.newStringList() for dropdowns
-            const stringListFactory = app.utils?.newStringList || window.newStringList;
-            if (typeof stringListFactory === 'function') {
-                const stringList = stringListFactory();
-                items.forEach(item => stringList.add(item));
-                
-                // Set dataSource on dropdown control (MM5 standard pattern)
-                parentCtrl.dataSource = stringList;
-                log('Set dataSource with ' + items.length + ' items');
-
-                // Set selected value to stored parent or default
-                const defaultParent = storedParent || 'Similar Artists Playlists';
-                let selectedIndex = 0;
-
-                // Try to find the default parent in the list
-                const foundIndex = items.indexOf(defaultParent);
-                if (foundIndex >= 0) {
-                    selectedIndex = foundIndex;
-                }
-
-                // Set focused index (MM5 pattern for dropdowns)
-                parentCtrl.focusedIndex = selectedIndex;
-                log(`Set focusedIndex to ${selectedIndex} (${items[selectedIndex]})`);
+            // Use app.playlists.root as the starting point (MM5 standard)
+            if (app.playlists?.root) {
+                log('Using app.playlists.root');
+                collectManualPlaylists(app.playlists.root, allPlaylists, '');
             } else {
-                log('newStringList() not available (checked app.utils.newStringList and window.newStringList)');
+                log('app.playlists.root not available');
             }
-        } catch (e) {
-            log('Error setting dataSource: ' + e.toString());
+
+            log(`Found ${allPlaylists.length} manual playlist(s)`);
+            return allPlaylists;
+        };
+
+        // Helper function to populate dropdown
+        const populateDropdown = (playlists) => {
+            try {
+                playlists.sort((a, b) => a.localeCompare(b));
+                const items = ['[None]'].concat(playlists);
+
+                // Create StringList dataSource (MM5 standard pattern)
+                const stringListFactory = app.utils?.newStringList || window.newStringList;
+                if (typeof stringListFactory === 'function') {
+                    const stringList = stringListFactory();
+                    items.forEach(item => stringList.add(item));
+                    
+                    // Set dataSource
+                    parentCtrl.dataSource = stringList;
+                    log('Set dataSource with ' + items.length + ' items');
+
+                    // Set focused index to match stored parent
+                    const defaultParent = storedParent || 'Similar Artists Playlists';
+                    let selectedIndex = 0;
+
+                    const foundIndex = items.indexOf(defaultParent);
+                    if (foundIndex >= 0) {
+                        selectedIndex = foundIndex;
+                    }
+
+                    parentCtrl.focusedIndex = selectedIndex;
+                    log(`Set focusedIndex to ${selectedIndex} (${items[selectedIndex]})`);
+                } else {
+                    log('newStringList() not available');
+                }
+            } catch (e) {
+                log('Error populating dropdown: ' + e.toString());
+            }
+        };
+
+        // Attempt to populate immediately
+        let playlists = getPlaylistsList();
+        
+        if (playlists.length > 0) {
+            // Got playlists immediately
+            populateDropdown(playlists);
+        } else {
+            // No playlists yet, try again after a short delay (playlists may not be loaded yet)
+            log('No playlists found immediately, retrying in 1s...');
+            setTimeout(() => {
+                playlists = getPlaylistsList();
+                populateDropdown(playlists);
+            }, 1000);
         }
 
     } catch (e) {
@@ -184,7 +269,7 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = function (sett, pnl
 		UI.SAExclude.controlClass.value = this.config.Exclude;
 		UI.SAGenre.controlClass.value = this.config.Genre;
 
-		// Populate parent playlist dropdown with available playlists
+		// Populate parent playlist dropdown with available manual playlists
 		// Default to 'Similar Artists Playlists' if not yet set
 		populateParentPlaylist(pnl, this.config.Parent || 'Similar Artists Playlists');
 

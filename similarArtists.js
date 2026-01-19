@@ -700,7 +700,7 @@
 			if (enqueue || autoRun || overwriteMode.toLowerCase().indexOf("do not") > -1) {
 				updateProgress(`Adding ${allTracks.length} tracks to Now Playing...`, 0.8);
 				await enqueueTracks(allTracks, ignoreDupes, clearNP);
-				log(`SimilarArtists: Enqueued ${allTracks.length} track(s) to Now Playing`);
+				log(`Enqueued ${allTracks.length} track(s) to Now Playing`);
 				updateProgress(`Successfully added ${allTracks.length} tracks to Now Playing!`, 1.0);
 			} else {
 				const seedName = seeds[0]?.name || 'Similar Artists';
@@ -1591,6 +1591,7 @@
 
 	/**
 	 * Add tracks to the active playback list / queue.
+	 * Uses MM5's app.player.addTracksAsync() which is the correct API for Now Playing.
 	 * @param {object[]} tracks Track objects.
 	 * @param {boolean} ignoreDupes Skip tracks that are already present.
 	 * @param {boolean} clearFirst Clear playlist/queue before adding.
@@ -1602,14 +1603,100 @@
 			return;
 		}
 
-		const playlist = player.playlist || player.nowPlayingQueue || player.getPlaylist?.();
-		if (!playlist) {
-			log('enqueueTracks: Playlist not available');
+		// MM5 uses app.player.addTracksAsync() directly for Now Playing
+		// This is the pattern used by autoDJ and other MM5 components
+		if (!player.addTracksAsync || typeof player.addTracksAsync !== 'function') {
+			log('enqueueTracks: player.addTracksAsync not available');
 			return;
 		}
 
-		const added = await addTracksToTarget(playlist, tracks, { ignoreDupes, clearFirst });
-		log(`enqueueTracks: Successfully enqueued ${added} track(s) to Now Playing`);
+		// Handle clearing Now Playing if requested
+		if (clearFirst) {
+			try {
+				// MM5 pattern: use player.clearPlaylistAsync() or similar
+				if (player.clearPlaylistAsync && typeof player.clearPlaylistAsync === 'function') {
+					await player.clearPlaylistAsync();
+					log('enqueueTracks: Cleared Now Playing');
+				} else if (player.stop && typeof player.stop === 'function') {
+					// Fallback: stop playback which effectively clears
+					player.stop();
+					log('enqueueTracks: Stopped playback (clearPlaylistAsync not available)');
+				}
+			} catch (e) {
+				log(`enqueueTracks: Error clearing Now Playing: ${e.toString()}`);
+			}
+		}
+
+		// Build set of existing track IDs for deduplication
+		const existing = new Set();
+		if (ignoreDupes) {
+			try {
+				// Get current Now Playing list via getSongList().getTracklist()
+				const songList = player.getSongList?.();
+				if (songList) {
+					const tracklist = songList.getTracklist?.();
+					if (tracklist) {
+						await tracklist.whenLoaded();
+						tracklist.forEach((t) => {
+							if (t) existing.add(t.id || t.ID);
+						});
+						log(`enqueueTracks: Found ${existing.size} existing tracks in Now Playing`);
+					}
+				}
+			} catch (e) {
+				log(`enqueueTracks: Error building existing track set: ${e.toString()}`);
+			}
+		}
+
+		// Filter out duplicates if needed
+		const tracksToAdd = ignoreDupes
+			? tracks.filter((t) => {
+				const id = t?.id || t?.ID;
+				return !id || !existing.has(id);
+			})
+			: tracks;
+
+		if (!tracksToAdd || tracksToAdd.length === 0) {
+			log('enqueueTracks: No tracks to add after filtering');
+			return;
+		}
+
+		// Create a tracklist and add tracks to it
+		try {
+			if (!app.utils?.createTracklist) {
+				log('enqueueTracks: app.utils.createTracklist not available');
+				return;
+			}
+
+			// Create a mutable temporary tracklist
+			const tracklist = app.utils.createTracklist(true);
+			
+			if (!tracklist) {
+				log('enqueueTracks: Failed to create tracklist');
+				return;
+			}
+
+			// Add all tracks to the temporary tracklist
+			for (const t of tracksToAdd) {
+				if (t && typeof tracklist.add === 'function') {
+					tracklist.add(t);
+				}
+			}
+
+			// Wait for tracklist to be ready
+			await tracklist.whenLoaded();
+
+			if (tracklist.count > 0) {
+				// Use app.player.addTracksAsync() - the correct MM5 API for Now Playing
+				await player.addTracksAsync(tracklist);
+				log(`enqueueTracks: Successfully added ${tracklist.count} track(s) to Now Playing`);
+			} else {
+				log('enqueueTracks: No tracks in tracklist to add');
+			}
+
+		} catch (e) {
+			log(`enqueueTracks: Error adding tracks: ${e.toString()}`);
+		}
 	}
 
 	/**
