@@ -21,6 +21,7 @@ window.actions.SimilarArtistsRun = {
 window.actions.SimilarArtistsToggleAuto = {
 	title: () => _('Similar Artists: &Auto On/Off'),
 	icon: 'script',
+	checkable: true,
 	hotkeyAble: true,
 	visible: true,
 	disabled: false,

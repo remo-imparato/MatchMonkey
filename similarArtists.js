@@ -845,7 +845,7 @@ try {
 				}
 				updateProgress(`Successfully added ${allTracks.length} tracks to Now Playing!`, 1.0);
 			} else {
-				const seedName = seeds[0]?.name || 'Similar Artists';
+				const seedName = buildPlaylistTitle(seeds);
 
 				// If confirm is enabled, show dialog to select/create playlist
 				if (confirm) {
@@ -1569,7 +1569,7 @@ try {
 	 */
 	async function createPlaylist(tracks, seedName, overwriteMode, selectedPlaylist) {
 		const titleTemplate = stringSetting('Name');
-		const baseName = titleTemplate.replace('%', seedName || '');
+		const baseName = titleTemplate.indexOf('%') >= 0 ? titleTemplate.replace('%', seedName || '') : `${titleTemplate} ${seedName || ''}`;
 		const overwriteText = String(overwriteMode || '');
 
 		let playlist = null;
@@ -1791,6 +1791,33 @@ try {
 	 */
 	function isAutoEnabled() {
 		return !!getSetting('OnPlay', false);
+	}
+
+	// Build a playlist title using all seed artist names up to a safe length.
+	function buildPlaylistTitle(seeds) {
+		const template = stringSetting('Name') || 'Similar - %';
+		const names = (seeds || []).map((s) => s?.name).filter((n) => n && n.trim().length);
+		if (!names.length) return template.replace('%', 'Similar Artists');
+
+		// Limit artist portion to keep playlist titles readable and within common limits.
+		const maxLabelLen = 80; // conservative limit for artist portion
+		let label = '';
+		let used = 0;
+		names.forEach((name) => {
+			const candidate = label ? `${label}, ${name}` : name;
+			if (candidate.length <= maxLabelLen || !label) {
+				label = candidate;
+				used += 1;
+			}
+		});
+		if (used < names.length) {
+			label += '…';
+		}
+
+		if (template.indexOf('%') >= 0) {
+			return template.replace('%', label);
+		}
+		return `${template} ${label}`;
 	}
 
 	// Export functions to the global scope

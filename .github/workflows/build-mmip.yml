@@ -18,10 +18,27 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Get version from info.json
-        id: get_version
+      - name: Set build version
+        id: bump_version
         run: |
-          VERSION=$(jq -r '.version' info.json)
+          # Prefer tag version when building from a tag
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG_VER="${GITHUB_REF#refs/tags/}"
+            VERSION="${TAG_VER#v}"
+          else
+            BASE=$(jq -r '.version // "0.0.0"' info.json)
+            MAJOR=$(echo "$BASE" | cut -d. -f1)
+            MINOR=$(echo "$BASE" | cut -d. -f2)
+            PATCH=$(echo "$BASE" | cut -d. -f3)
+            PATCH=${PATCH:-0}
+            BUILD=$((PATCH + GITHUB_RUN_NUMBER))
+            VERSION="$MAJOR.$MINOR.$BUILD"
+          fi
+      
+          # Persist the computed version for the package
+          tmpfile=$(mktemp)
+          jq --arg v "$VERSION" '.version = $v' info.json > "$tmpfile" && mv "$tmpfile" info.json
+      
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
       
@@ -29,7 +46,7 @@ jobs:
         run: |
           # MMIP files are just ZIP archives with .mmip extension
           # Include all necessary addon files (no icons folder - doesn't exist)
-          zip -r SimilarArtists-${{ steps.get_version.outputs.version }}.mmip \
+          zip -r SimilarArtists-${{ steps.bump_version.outputs.version }}.mmip \
             similarArtists.js \
             init.js \
             actions_add.js \
@@ -43,7 +60,7 @@ jobs:
             -x "ai_*" \
             -x "lastfm.txt"
           
-          echo "Package created: SimilarArtists-${{ steps.get_version.outputs.version }}.mmip"
+          echo "Package created: SimilarArtists-${{ steps.bump_version.outputs.version }}.mmip"
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
