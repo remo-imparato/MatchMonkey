@@ -87,6 +87,8 @@ try {
 		started: false,
 		// Used by long-running operations to support cancellation (UI not currently exposed).
 		cancelled: false,
+		// Prevent multiple auto-run invocations while one is in progress.
+		autoRunning: false,
 	};
 
 	/**
@@ -265,22 +267,45 @@ try {
 		}
 	}
 
-	/**
-	 * Toggle automatic mode (run addon when playback reaches end of playlist).
-	 */
-	function toggleAuto() {
-		const next = !getSetting('OnPlay', false);
-		setSetting('OnPlay', next);
-		// Update UI icon to reflect new state
-		refreshToggleUI();
-		if (next) {
+	// Sync listener attachment and UI based on stored setting
+	function applyAutoModeFromSettings() {
+		const enabled = isAutoEnabled();
+		if (enabled) {
 			attachAuto();
-			log('SimilarArtists: Auto-mode enabled');
 		} else {
 			detachAuto();
-			log('SimilarArtists: Auto-mode disabled');
+		}
+		refreshToggleUI();
+		try {
+			if (app.actions?.updateActionIcon)
+				app.actions.updateActionIcon(ACTION_AUTO_ID, enabled ? 32 : 33);
+			if (app.actions?.updateActionState)
+				app.actions.updateActionState(ACTION_AUTO_ID);
+		} catch (e) {
+			log('applyAutoModeFromSettings UI refresh failed: ' + e.toString());
 		}
 	}
+ 
+ 	/**
+ 	 * Toggle automatic mode (run addon when playback reaches end of playlist).
+ 	 */
+ 	function toggleAuto() {
+-		const next = !getSetting('OnPlay', false);
+-		setSetting('OnPlay', next);
+-		// Update UI icon to reflect new state
+-		refreshToggleUI();
+-		if (next) {
+-			attachAuto();
+-			log('SimilarArtists: Auto-mode enabled');
+-		} else {
+-			detachAuto();
+-			log('SimilarArtists: Auto-mode disabled');
+-		}
++		const next = !getSetting('OnPlay', false);
++		setSetting('OnPlay', next);
++		applyAutoModeFromSettings();
++		log(`SimilarArtists: Auto-mode ${next ? 'enabled' : 'disabled'}`);
+ 	}
 
 	/**
 	 * Attach playback listener for auto-mode.
@@ -338,28 +363,50 @@ try {
 			}
 
 			const player = app.player;
-			if (!player || !player.playlist) {
-				log('SimilarArtists: Player or playlist not available');
+			if (!player) {
+				log('SimilarArtists: Player not available');
 				return;
 			}
 
-			const list = player.playlist;
-			if (typeof list.getCursor === 'function' && typeof list.count === 'function') {
-				const cursor = list.getCursor();
-				const count = list.count();
-				const remainingTracks = count - cursor;
+			// AutoDJ-style remaining entries check (entriesCount - playedCount)
+			let remaining = 0;
+			try {
+				const total = typeof player.entriesCount === 'number' ? player.entriesCount : 0;
+				const played = typeof player.getCountOfPlayedEntries === 'function' ? player.getCountOfPlayedEntries() : 0;
+				if (total > 0) remaining = total - played;
+			} catch (e) {
+				log('SimilarArtists: remaining calculation failed: ' + e.toString());
+			}
 
-				log(`SimilarArtists: Playlist position: ${cursor}/${count} (${remainingTracks} tracks remaining)`);
-
-				// When fewer than 3 tracks remain, trigger auto-queue
-				if (remainingTracks < 3) {
-					log('SimilarArtists: Near end of playlist, triggering auto-queue');
-					await runSimilarArtists(true);
-					return;
+			// Fallback to playlist cursor/count if entriesCount unavailable
+			if (!remaining && player.playlist && typeof player.playlist.getCursor === 'function' && typeof player.playlist.count === 'function') {
+				try {
+					const cursor = player.playlist.getCursor();
+					const count = player.playlist.count();
+					remaining = count - cursor;
+				} catch (e) {
+					log('SimilarArtists: playlist remaining calculation failed: ' + e.toString());
 				}
 			}
 
-			log('SimilarArtists: Not near end of playlist, skipping auto-queue');
+			log(`SimilarArtists: Auto check - remaining entries: ${remaining}`);
+
+			// Trigger when 2 or fewer entries remain (similar to AutoDJ behavior)
+			if (remaining > 0 && remaining <= 2) {
+				if (state.autoRunning) {
+					log('SimilarArtists: Auto-mode already running, skipping duplicate trigger');
+					return;
+				}
+				state.autoRunning = true;
+				try {
+					log('SimilarArtists: Near end of playlist, triggering auto-queue');
+					await runSimilarArtists(true);
+				} finally {
+					state.autoRunning = false;
+				}
+			} else {
+				log('SimilarArtists: Not near end of playlist, skipping auto-queue');
+			}
 		} catch (e) {
 			log('SimilarArtists: Error in handleAuto: ' + e.toString());
 		}
@@ -1104,6 +1151,9 @@ try {
 			if (!app?.db?.getTracklist || !titles || titles.length === 0)
 				return new Map();
 
+			// Ensure titles is array of strings
+			titles = titles.map(t => String(t || ''));
+
 			const results = new Map();
 			const useBest = opts.best !== undefined ? opts.best : boolSetting('Best');
 			const excludeTitles = parseListSetting('Exclude');
@@ -1111,7 +1161,7 @@ try {
 			const ratingMin = intSetting('Rating');
 			const allowUnknown = boolSetting('Unknown');
 
-			// Build artist matching clause
+			// Helper builders (same as previous implementation)
 			const buildArtistClause = () => {
 				if (!artistName) return '';
 
@@ -1143,7 +1193,6 @@ try {
 			// Build common filters
 			const buildCommonFilters = () => {
 				const filters = [];
-
 				excludeTitles.forEach((t) => {
 					filters.push(`Songs.SongTitle NOT LIKE '%${escapeSql(t)}%'`);
 				});
@@ -1152,11 +1201,7 @@ try {
 					const genreConditions = excludeGenres
 						.map((g) => `GenreName LIKE '%${escapeSql(g)}%'`)
 						.join(' OR ');
-					filters.push(`
-						GenresSongs.IDGenre NOT IN (
-							SELECT IDGenre FROM Genres WHERE ${genreConditions}
-						)
-					`);
+					filters.push(`GenresSongs.IDGenre NOT IN (SELECT IDGenre FROM Genres WHERE ${genreConditions})`);
 				}
 
 				if (ratingMin > 0) {
@@ -1175,36 +1220,20 @@ try {
 			const artistClause = buildArtistClause();
 			const commonFilters = buildCommonFilters();
 			const orderClause = useBest ? ' ORDER BY Songs.Rating DESC, Random()' : ' ORDER BY Random()';
-			const baseJoins = `
-				FROM Songs
-				INNER JOIN ArtistsSongs 
-					ON Songs.ID = ArtistsSongs.IDSong 
-					AND ArtistsSongs.PersonType = 1
-				INNER JOIN Artists 
-					ON ArtistsSongs.IDArtist = Artists.ID
-				${excludeGenres.length > 0 ? 'LEFT JOIN GenresSongs ON Songs.ID = GenresSongs.IDSong' : ''}
-			`;
+			const baseJoins = `\n\t\t\tFROM Songs\n\t\t\tINNER JOIN ArtistsSongs \n\t\t\t\ton Songs.ID = ArtistsSongs.IDSong \n\t\t\t\tAND ArtistsSongs.PersonType = 1\n\t\t\tINNER JOIN Artists \n\t\t\t\ton ArtistsSongs.IDArtist = Artists.ID\n\t\t\t${excludeGenres.length > 0 ? 'LEFT JOIN GenresSongs ON Songs.ID = GenresSongs.IDSong' : ''}\n\t\t`;
 
-			// Initialize result map
+			// Initialize map entries
 			titles.forEach(t => results.set(t, []));
 
-			// PASS 1: Exact match (case-insensitive) for all titles in one query
+			// PASS 1: Exact matches (case-insensitive)
 			{
-				const titleConditions = titles.map(t =>
-					`UPPER(Songs.SongTitle) = '${escapeSql(t.toUpperCase())}'`
-				);
-
+				const titleConditions = titles.map(t => `UPPER(Songs.SongTitle) = '${escapeSql(t.toUpperCase())}'`);
 				const whereParts = [];
 				if (artistClause) whereParts.push(artistClause);
 				whereParts.push(`(${titleConditions.join(' OR ')})`);
 				whereParts.push(...commonFilters);
 
-				const sql = `
-					SELECT Songs.*, Songs.SongTitle as MatchedTitle
-					${baseJoins}
-					WHERE ${whereParts.join(' AND ')}
-					${orderClause}
-				`;
+				const sql = `\n\t\t\tSELECT Songs.*, Songs.SongTitle as MatchedTitle\n\t\t\t${baseJoins}\n\t\t\tWHERE ${whereParts.join(' AND ')}\n\t\t\t${orderClause}\n\t\t`;
 
 				const tl = app?.db?.getTracklist(sql, -1);
 				if (tl) {
@@ -1214,15 +1243,10 @@ try {
 
 					tl.forEach((track) => {
 						if (track) {
-							// Find which title this matches (case-insensitive)
-							const matchedTitle = titles.find(t =>
-								t.toUpperCase() === (track.title || track.SongTitle || '').toUpperCase()
-							);
+							const matchedTitle = titles.find(t => t.toUpperCase() === (track.title || track.SongTitle || '').toUpperCase());
 							if (matchedTitle) {
 								const arr = results.get(matchedTitle);
-								if (arr && arr.length < maxPerTitle) {
-									arr.push(track);
-								}
+								if (arr && arr.length < maxPerTitle) arr.push(track);
 							}
 						}
 					});
@@ -1230,22 +1254,17 @@ try {
 					tl.autoUpdateDisabled = false;
 					tl.dontNotify = false;
 				}
-
-				const exactMatches = Array.from(results.values()).reduce((sum, arr) => sum + arr.length, 0);
-				if (exactMatches > 0) {
-					log(`findLibraryTracksBatch Pass 1: Found ${exactMatches} exact matches for ${titles.length} titles`);
-				}
 			}
 
-			// PASS 2: Fuzzy match for titles that didn't get enough matches
+			// PASS 2: Fuzzy matches for titles that still need matches
 			{
-				const needMoreMatches = titles.filter(t => {
+				const needMore = titles.filter(t => {
 					const arr = results.get(t);
 					return arr && arr.length < maxPerTitle;
 				});
 
-				if (needMoreMatches.length > 0) {
-					const fuzzyConditions = needMoreMatches.map(t => {
+				if (needMore.length > 0) {
+					const fuzzyConditions = needMore.map(t => {
 						const stripped = stripName(t);
 						if (!stripped) return null;
 
@@ -1265,12 +1284,7 @@ try {
 						whereParts.push(`(${fuzzyConditions.join(' OR ')})`);
 						whereParts.push(...commonFilters);
 
-						const sql = `
-							SELECT Songs.* 
-							${baseJoins}
-							WHERE ${whereParts.join(' AND ')}
-							${orderClause}
-						`;
+						const sql = `\n\t\t\t\tSELECT Songs.* \n\t\t\t\t${baseJoins}\n\t\t\t\tWHERE ${whereParts.join(' AND ')}\n\t\t\t\t${orderClause}\n\t\t\t`;
 
 						const tl = app?.db?.getTracklist(sql, -1);
 						if (tl) {
@@ -1281,15 +1295,10 @@ try {
 							tl.forEach((track) => {
 								if (track) {
 									const trackStripped = stripName(track.title || track.SongTitle || '');
-									// Find which title this matches
-									const matchedTitle = needMoreMatches.find(t =>
-										stripName(t) === trackStripped
-									);
+									const matchedTitle = needMore.find(t => stripName(t) === trackStripped);
 									if (matchedTitle) {
 										const arr = results.get(matchedTitle);
-										if (arr && arr.length < maxPerTitle) {
-											arr.push(track);
-										}
+										if (arr && arr.length < maxPerTitle) arr.push(track);
 									}
 								}
 							});
@@ -1297,85 +1306,30 @@ try {
 							tl.autoUpdateDisabled = false;
 							tl.dontNotify = false;
 						}
-
-						const fuzzyMatches = Array.from(results.values()).reduce((sum, arr) => sum + arr.length, 0) -
-							Array.from(results.values()).reduce((sum, arr) => sum + arr.length, 0);
-						if (fuzzyMatches > 0) {
-							log(`findLibraryTracksBatch Pass 2: Found ${fuzzyMatches} additional fuzzy matches`);
-						}
 					}
 				}
 			}
 
-			// PASS 3: Partial match with wildcards (fallback for difficult cases)
-			if (title && results.length < limit) {
-				// Extract significant words (3+ chars) from title
-				const words = title
-					.split(/[\s\-_,\.]+/)
-					.filter(w => w.length >= 3)
-					.slice(0, 3); // Use up to 3 most significant words
-
-				if (words.length > 0) {
-					const whereParts = [];
-					if (artistClause) whereParts.push(artistClause);
-
-					// Build LIKE clauses for each word
-					const likeConditions = words.map(w =>
-						`UPPER(Songs.SongTitle) LIKE '%${escapeSql(w.toUpperCase())}%'`
-					);
-					whereParts.push(`(${likeConditions.join(' AND ')})`);
-					whereParts.push(...commonFilters);
-
-					// Exclude IDs we already found
-					if (foundIds.size > 0) {
-						const idList = Array.from(foundIds).join(',');
-						whereParts.push(`Songs.ID NOT IN (${idList})`);
-					}
-
-					const sql = `
-						SELECT Songs.*
-						${baseJoins}
-						WHERE ${whereParts.join(' AND ')}
-						${orderClause}
-						LIMIT ${limit - results.length}
-					`;
-
-					updateProgress(`Pass 3: Partial match for "${title}" by "${artistName}"...`);
-					const tl = app?.db?.getTracklist(sql, -1);
-
-					if (tl) {
-						tl.autoUpdateDisabled = true;
-						tl.dontNotify = true;
-						await tl?.whenLoaded();
-
-						tl.forEach((t) => {
-							if (t && !foundIds.has(t.id || t.ID)) {
-								results.push(t);
-								foundIds.add(t.id || t.ID);
-							}
-						});
-
-						tl.autoUpdateDisabled = false;
-						tl.dontNotify = false;
-					}
-
-					const newMatches = results.length - (foundIds.size - results.length);
-					if (newMatches > 0) {
-						log(`findLibraryTracks Pass 3: Found ${newMatches} additional partial match(es)${useBest ? ' (sorted by rating)' : ''}`);
-					}
-				}
-			}
-
-			if (results.length > 0) {
-				log(`findLibraryTracks: Total ${results.length} match(es) for "${title}" by "${artistName}"${useBest ? ' (highest rated prioritized)' : ''}`);
-			}
-
-			// Return up to limit
-			return results.slice(0, limit);
+			// At this point results is a Map<title, array>
+			return results;
 
 		} catch (e) {
-			log('findLibraryTracks error: ' + e.toString());
+			log('findLibraryTracksBatch error: ' + e.toString());
 			updateProgress(`Database lookup error: ${e.toString()}`);
+			return new Map();
+		}
+	}
+
+	// Backward-compatible single-title lookup wrapper
+	async function findLibraryTracks(artistName, title, limit = 1, opts = {}) {
+		try {
+			const t = String(title || '');
+			if (!t) return [];
+			const max = Number.isFinite(Number(limit)) ? Math.max(0, Number(limit)) : 1;
+			const map = await findLibraryTracksBatch(artistName, [t], max, opts);
+			return map.get(t) || [];
+		} catch (e) {
+			log('findLibraryTracks error: ' + e.toString());
 			return [];
 		}
 	}
@@ -1829,11 +1783,7 @@ try {
 		}
 
 		// Ensure listener state matches setting
-		if (isAutoEnabled())
-			attachAuto();
-		else
-			detachAuto();
-
+		applyAutoModeFromSettings();
 		log('SimilarArtists addon started successfully.');
 	}
 
@@ -1851,6 +1801,7 @@ try {
 		start,
 		runSimilarArtists,
 		toggleAuto,
+		applyAutoModeFromSettings,
 		isAutoEnabled,
 	};
 

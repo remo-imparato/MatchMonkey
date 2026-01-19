@@ -510,6 +510,15 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function (sett) {
 
 		app.setValue('SimilarArtists', this.config);
 
+		// Apply auto-mode listener/UI immediately when changed from options dialog
+		try {
+			if (window.SimilarArtists?.applyAutoModeFromSettings) {
+				window.SimilarArtists.applyAutoModeFromSettings();
+			}
+		} catch (e) {
+			log('save: applyAutoModeFromSettings failed: ' + e.toString());
+		}
+
 	} catch (e) {
 		log('save error: ' + e.toString());
 	}
