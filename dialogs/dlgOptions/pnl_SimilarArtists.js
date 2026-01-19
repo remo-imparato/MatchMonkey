@@ -306,18 +306,41 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = function (sett, pnl
         UI.SARank.controlClass.checked = this.config.Rank;
 
         const ratingValue = parseInt(this.config.Rating, 10) || 0;
-        UI.SARating.controlClass.rating = ratingValue;
+        if (UI.SARating?.controlClass) {
+            UI.SARating.controlClass.rating = ratingValue;
+        }
         log(`load: Rating set to ${ratingValue}`);
 
         UI.SAUnknown.controlClass.checked = this.config.Unknown;
         UI.SAOverwrite.controlClass.value = this.config.Overwrite;
         UI.SAEnqueue.controlClass.checked = this.config.Enqueue;
         UI.SANavigate.controlClass.value = this.config.Navigate;
+
+        // Options panel can be loaded in a different window context than the main UI,
+        // so window.SimilarArtists may not be present. Try to load it; otherwise fallback to stored setting.
+        const setOnPlayCheckbox = () => {
+            try {
+                if (window.SimilarArtists?.isAutoEnabled) {
+                    UI.SAOnPlay.controlClass.checked = Boolean(window.SimilarArtists.isAutoEnabled());
+                } else {
+                    UI.SAOnPlay.controlClass.checked = this.config.OnPlay;
+                }
+            } catch (e) {
+                UI.SAOnPlay.controlClass.checked = this.config.OnPlay;
+            }
+        };
+
         try {
-            UI.SAOnPlay.controlClass.checked = Boolean(window.SimilarArtists?.isAutoEnabled?.());
+            if (!window.SimilarArtists && typeof window.localRequirejs === 'function') {
+                window.localRequirejs('similarArtists');
+            }
         } catch (e) {
-            UI.SAOnPlay.controlClass.checked = this.config.OnPlay;
+            // ignore, handled by fallback
         }
+
+        setTimeout(setOnPlayCheckbox, 0);
+        setTimeout(setOnPlayCheckbox, 300);
+
         UI.SAClearNP.controlClass.checked = this.config.ClearNP;
         UI.SAIgnore.controlClass.checked = this.config.Ignore;
         UI.SABlack.controlClass.value = this.config.Black;
@@ -325,8 +348,9 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = function (sett, pnl
         UI.SAGenre.controlClass.value = this.config.Genre;
 
         // Populate parent playlist dropdown with available manual playlists
-        // Default to 'Similar Artists Playlists' if not yet set
+        // playlists may not be fully loaded when options panel is created
         populateParentPlaylist(pnl, this.config.Parent || 'Similar Artists Playlists');
+        setTimeout(() => populateParentPlaylist(pnl, this.config.Parent || 'Similar Artists Playlists'), 1000);
 
     } catch (e) {
         log('load error: ' + e.toString());
@@ -351,8 +375,8 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function (sett) {
 		this.config.Rank = UI.SARank.controlClass.checked;
 		
 		// Rating control uses 'rating' property (0-100 scale, or -1 for unset)
-		const ratingValue = UI.SARating.controlClass.rating;
-		this.config.Rating = (ratingValue !== undefined && ratingValue >= 0) ? ratingValue : 0;
+		const ratingValue = UI.SARating?.controlClass?.rating;
+		this.config.Rating = (ratingValue !== undefined && ratingValue !== null && ratingValue >= 0) ? ratingValue : 0;
 		log(`save: Rating = ${this.config.Rating}`);
 		
 		this.config.Unknown = UI.SAUnknown.controlClass.checked;

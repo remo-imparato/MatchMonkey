@@ -142,7 +142,11 @@ registerDebuggerEntryPoint.call(window.SimilarArtists, 'start');
 	 */
 	function intSetting(key) {
 		const v = getSetting(key, defaults[key]);
-		return parseInt(v, 10) || 0;
+		// Rating and other numeric settings can come in as strings or as objects; be defensive
+		if (v === undefined || v === null) return 0;
+		if (typeof v === 'number') return v;
+		const n = parseInt(String(v), 10);
+		return Number.isFinite(n) ? n : 0;
 	}
 
 	/**

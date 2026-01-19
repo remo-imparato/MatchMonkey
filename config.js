@@ -110,9 +110,11 @@ window.configInfo = {
 		UI.SABest.controlClass.checked = this.config.Best;
 		UI.SARank.controlClass.checked = this.config.Rank;
 		
-		// Rating control uses 'rating' property (0-100 scale, or -1 for unset)
+		// Rating control uses 'rating' property (0-100 scale)
 		const ratingValue = parseInt(this.config.Rating, 10) || 0;
-		UI.SARating.controlClass.rating = ratingValue;
+		if (UI.SARating?.controlClass) {
+			UI.SARating.controlClass.rating = ratingValue;
+		}
 		this.log(`load: Rating set to ${ratingValue}`);
 		
 		UI.SAUnknown.controlClass.checked = this.config.Unknown;
@@ -305,10 +307,9 @@ window.configInfo = {
 
 			// Attempt to populate immediately, then retry after a short delay if empty
 			populateWithFallback().then(() => {
-				// if still empty, retry once in 1s (playlists may not be fully loaded)
 				setTimeout(() => {
 					populateWithFallback();
-				}, 1000);
+				}, 1500);
 			});
 
 		} catch (e) {
@@ -333,8 +334,8 @@ window.configInfo = {
 		this.config.Rank = UI.SARank.controlClass.checked;
 		
 		// Rating control uses 'rating' property (0-100 scale, or -1 for unset)
-		const ratingValue = UI.SARating.controlClass.rating;
-		this.config.Rating = (ratingValue !== undefined && ratingValue >= 0) ? ratingValue : 0;
+		const ratingValue = UI.SARating?.controlClass?.rating;
+		this.config.Rating = (ratingValue !== undefined && ratingValue !== null && ratingValue >= 0) ? ratingValue : 0;
 		this.log(`save: Rating = ${this.config.Rating}`);
 		
 		this.config.Unknown = UI.SAUnknown.controlClass.checked;
