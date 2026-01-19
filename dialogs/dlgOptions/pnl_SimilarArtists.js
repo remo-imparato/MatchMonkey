@@ -23,6 +23,10 @@
  * - SimilarArtists add-on installed
  */
 
+ requirejs('helpers/debugTools');
+registerDebuggerEntryPoint.call(window.SimilarArtists, 'start');
+
+
 // Helper get/set that use the SimilarArtists namespace
 function setSetting(key, value) {
     try {
@@ -108,15 +112,14 @@ function collectManualPlaylists(node, results, prefix = '', depth = 0) {
             return;
         }
 
-        // Get count - it's a property in MM5, not a function
-        const count = typeof children.count === 'function' ? children.count() : children.count;
-        log(`collectManualPlaylists: Found ${count} children at depth ${depth}, prefix="${prefix}"`);
-
-        if (!count || count <= 0) return;
-
-        // Iterate using locked() pattern for thread safety (MM5 standard)
+        // Use locked() pattern for thread safety - ALL access must be inside the lock
         if (typeof children.locked === 'function') {
             children.locked(() => {
+                const count = typeof children.count === 'function' ? children.count() : children.count;
+                log(`collectManualPlaylists: Found ${count} children at depth ${depth}, prefix="${prefix}"`);
+
+                if (!count || count <= 0) return;
+
                 let child;
                 for (let i = 0; i < count; i++) {
                     child = children.getFastObject ? children.getFastObject(i, child) : children.getValue(i);
@@ -126,20 +129,12 @@ function collectManualPlaylists(node, results, prefix = '', depth = 0) {
                 }
             });
         } else if (typeof children.forEach === 'function') {
-            // Fallback to forEach if available
+            // Fallback to forEach if locked() not available
             children.forEach((child) => {
                 if (child) {
                     processPlaylistNode(child, results, prefix, depth);
                 }
             });
-        } else {
-            // Manual iteration fallback
-            for (let i = 0; i < count; i++) {
-                const child = children.getValue ? children.getValue(i) : children[i];
-                if (child) {
-                    processPlaylistNode(child, results, prefix, depth);
-                }
-            }
         }
     } catch (e) {
         log('Error collecting playlists: ' + e.toString());
