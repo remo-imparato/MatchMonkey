@@ -205,12 +205,16 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 		UI.SAClearNP.controlClass.checked = this.config.ClearNP;
 		UI.SAIgnore.controlClass.checked = this.config.Ignore;
 		UI.SAParent.controlClass.value = this.config.Parent;
+		UI.SAExclude.controlClass.value = this.config.Exclude;
+		UI.SABlack.controlClass.value = this.config.Black;
+		UI.SAGenre.controlClass.value = this.config.Genre;
 
+		/*
 		// Populate Exclude Artists control (Dropdown multi) - set value directly and apply checked flags if datasource present
 		try {
 			if (UI.SABlack && UI.SABlack.controlClass) {
 				// Let the control populate itself via dbFunc; set the effective value (CSV or array) so control reflects stored config
-				try { UI.SABlack.controlClass.value = this.config.Black || ''; } catch (e) { /* ignore */ }
+				try { UI.SABlack.controlClass.value = this.config.Black || ''; } catch (e) { }
 
 				// If datasource is already available, attempt best-effort to mark checked items (non-blocking)
 				try {
@@ -242,7 +246,6 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 			console.error('Similar Artists: load: error setting SABlack control: ' + e.toString());
 		}
 
-		UI.SAExclude.controlClass.value = this.config.Exclude;
 		// Populate Exclude Genres control (ImageGrid) with existing genres and mark checked ones
 		try {
 			if (UI.SAGenre && UI.SAGenre.controlClass) {
@@ -268,7 +271,7 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 							}
 							gds = new ArrayDataSource(arr, { isLoaded: true });
 						}
-					} catch (e) { /* ignore */ }
+					} catch (e) { }
 				}
 				if (gds) {
 					UI.SAGenre.controlClass.dataSource = gds; // dropdown will auto-populate via dbFunc in HTML, but keep if present
@@ -325,6 +328,7 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 		} catch (e) {
 			console.error('Similar Artists: load: error wiring SAGenre buttons: ' + e.toString());
 		}
+		*/
 
 		// Populate parent playlist dropdown with available manual playlists
 		// Wait for playlists tree to be available instead of using a fixed timeout
@@ -394,6 +398,11 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function (sett) {
 		this.config.ClearNP = UI.SAClearNP.controlClass.checked;
 		this.config.Ignore = UI.SAIgnore.controlClass.checked;
 
+		this.config.Exclude = UI.SAExclude.controlClass.value;
+		this.config.Black = UI.SABlack.controlClass.value;
+		this.config.Genre = UI.SAGenre.controlClass.value;
+
+		/*
 		// Read selected excluded artists from control value or datasource
 		try {
 			const val = UI.SABlack?.controlClass?.value;
@@ -418,7 +427,6 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function (sett) {
 			this.config.Black = UI.SABlack?.controlClass?.value || '';
 		}
 
-		this.config.Exclude = UI.SAExclude.controlClass.value;
 		// Persist selected genres from control value or datasource
 		try {
 			const gval = UI.SAGenre?.controlClass?.value;
@@ -441,6 +449,7 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function (sett) {
 			console.error('Similar Artists: save: error reading SAGenre selections: ' + e.toString());
 			this.config.Genre = UI.SAGenre?.controlClass?.value || '';
 		}
+		*/
 
 		// Update settings
 		for (let k in this.config) {
@@ -452,17 +461,17 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function (sett) {
 		// Report updated values for debug
 		console.log('Similar Artists: save: updated settings:', JSON.stringify(this.config, null, 2));
 
-		// Special case: Some users may have upgraded from old portable builds where the DB path was relative.
-		// To avoid confusion, we force-reset the stored Last.fm API key if it differs from the current one.
-		try {
-			const currentApiKey = app?.utils?.web?.getAPIKey('lastfmApiKey');
-			if (currentApiKey && currentApiKey !== this.config.ApiKey) {
-				console.log('Similar Artists: save: detected API key change, resetting stored key');
-				app.setValue('SimilarArtists', 'ApiKey', currentApiKey);
-			}
-		} catch (e) {
-			console.error('Similar Artists: save: error handling API key reset: ' + e.toString());
-		}
+		//// Special case: Some users may have upgraded from old portable builds where the DB path was relative.
+		//// To avoid confusion, we force-reset the stored Last.fm API key if it differs from the current one.
+		//try {
+		//	const currentApiKey = app?.utils?.web?.getAPIKey('lastfmApiKey');
+		//	if (currentApiKey && currentApiKey !== this.config.ApiKey) {
+		//		console.log('Similar Artists: save: detected API key change, resetting stored key');
+		//		app.setValue('SimilarArtists', 'ApiKey', currentApiKey);
+		//	}
+		//} catch (e) {
+		//	console.error('Similar Artists: save: error handling API key reset: ' + e.toString());
+		//}
 
 	} catch (e) {
 		console.error('Similar Artists: save error: ' + e.toString());
