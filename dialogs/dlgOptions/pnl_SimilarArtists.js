@@ -199,10 +199,15 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function (sett) {
 		this.config.Genre = UI.SAGenre.controlClass.value;
 
 		// Update settings
-		for (let k in this.config) {
-			if (Object.hasOwnProperty.call(this.config, k)) {
-				setSetting(k, this.config[k]);
+		try {
+			if (app && typeof app.setValue === 'function') {
+				app.setValue('SimilarArtists', this.config);
+			} else {
+				// Fallback: try global setValue if available
+				if (typeof setValue === 'function') setValue('SimilarArtists', this.config);
 			}
+		} catch (e) {
+			console.error('Similar Artists: save: failed to persist settings via app.setValue: ' + e.toString());
 		}
 
 		// Report updated values for debug
