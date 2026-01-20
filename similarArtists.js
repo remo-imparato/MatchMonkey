@@ -77,8 +77,8 @@ try {
 		return String(name || '').trim().toUpperCase();
 	}
 
-	function cacheKeyTopTracks(artistName, limit) {
-		return `${cacheKeyArtist(artistName)}|${Number(limit) || ''}`;
+	function cacheKeyTopTracks(artistName, limit, withPlaycount = false) {
+		return `${cacheKeyArtist(artistName)}|${Number(limit) || ''}|pc:${withPlaycount ? 1 : 0}`;
 	}
 
 	// Runtime state for the add-on (not persisted).
@@ -669,17 +669,23 @@ try {
 						updateProgress(`Ranking: Batch lookup of ${rankTitles.length} tracks from "${artName}"...`, seedProgress * 0.3);
 
 						// Use batch lookup for ranking (up to 5 matches per title for better scoring)
-						const rankMatches = await findLibraryTracksBatch(artName, rankTitles, 5, {
+						const titlesOnly = rankTitles.map(rt => rt.title || rt.name || rt);
+
+						// Use batch lookup for ranking (up to 5 matches per title for better scoring)
+						const rankMatches = await findLibraryTracksBatch(artName, titlesOnly, 5, {
 							rank: false,
 							best: bestEnabled
 						});
 
 						// Score all matched tracks
 						let scoredCount = 0;
-						rankTitles.forEach((title, rankIdx) => {
+						rankTitles.forEach((rt, rankIdx) => {
+							const title = rt.title || rt.name || rt;
 							const matches = rankMatches.get(title) || [];
-							const rankScore = 101 - (rankIdx + 1); // Higher score for earlier positions
-
+							const playcountScore = Number(rt.playcount) || 0;
+							const fallbackScore = 101 - (rankIdx + 1);
+							const rankScore = playcountScore > 0 ? playcountScore : fallbackScore; // higher playcount wins; fallback to position
+ 
 							matches.forEach(track => {
 								const trackId = track.id || track.ID;
 								const currentScore = trackRankMap.get(trackId) || 0;
@@ -1060,12 +1066,12 @@ try {
 	 * @param {number} limit Max number of titles to return.
 	 * @returns {Promise<string[]>} Track titles.
 	 */
-	async function fetchTopTracks(artistName, limit) {
+	async function fetchTopTracks(artistName, limit, includePlaycount = false) {
 		try {
 			if (!artistName)
 				return [];
 
-			const cacheKey = cacheKeyTopTracks(artistName, limit);
+			const cacheKey = cacheKeyTopTracks(artistName, limit, includePlaycount);
 			if (lastfmRunCache?.topTracks?.has(cacheKey)) {
 				return lastfmRunCache.topTracks.get(cacheKey) || [];
 			}
@@ -1104,20 +1110,27 @@ try {
 			}
 			let tracks = data?.toptracks?.track || [];
 			if (tracks && !Array.isArray(tracks)) tracks = [tracks];
-			const titles = [];
+			const rows = [];
 			tracks.forEach((t) => {
-				if (t && (t.name || t.title))
-					titles.push(t.name || t.title);
+				if (!t) return;
+				const title = t.name || t.title;
+				if (!title) return;
+				if (includePlaycount) {
+					const pc = Number(t.playcount) || 0;
+					rows.push({ title, playcount: pc });
+				} else {
+					rows.push(title);
+				}
 			});
-			log(`fetchTopTracks: Retrieved ${titles.length} top tracks for "${artistName}" (${purpose})`);
-			const out = typeof lim === 'number' ? titles.slice(0, lim) : titles;
+			log(`fetchTopTracks: Retrieved ${rows.length} top tracks for "${artistName}" (${purpose})`);
+			const out = typeof lim === 'number' ? rows.slice(0, lim) : rows;
 			lastfmRunCache?.topTracks?.set(cacheKey, out);
 			return out;
 		} catch (e) {
 			log(e.toString());
 			updateProgress(`Error fetching top tracks: ${e.toString()}`);
 			try {
-				lastfmRunCache?.topTracks?.set(cacheKeyTopTracks(artistName, limit), []);
+				lastfmRunCache?.topTracks?.set(cacheKeyTopTracks(artistName, limit, includePlaycount), []);
 			} catch (_) {
 				// ignore
 			}
@@ -1146,7 +1159,7 @@ try {
 	 * @returns {Promise<string[]>}
 	 */
 	async function fetchTopTracksForRank(artistName) {
-		return fetchTopTracks(artistName, 100);
+		return fetchTopTracks(artistName, 100, true);
 	}
 
 	/**
