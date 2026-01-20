@@ -16,9 +16,8 @@ SimilarArtists is a MediaMonkey 5 add-on that leverages the Last.fm API to disco
 - 🎵 **Smart Discovery**: Query Last.fm for similar artists based on selected tracks or currently playing music
 - 🎯 **Intelligent Matching**: Advanced multi-pass fuzzy matching finds tracks in your local library with high accuracy
 - 📋 **Flexible Output**: Create new playlists, overwrite existing ones, or queue tracks directly to Now Playing
-- 🤖 **Auto-Queue Mode**: Automatically queue similar tracks when approaching the end of your playlist
+- 🤖 **Auto-Queue / Endless music**: Automatically queue similar tracks when approaching the end of your playlist; in auto-mode the add-on can continuously add tracks near the end to keep playback going
 - ⭐ **Ranking System**: Prioritize popular tracks using Last.fm's popularity rankings
-- 🎛️ **Advanced Filtering**: Filter by genre, rating, artist blacklist, and title exclusions
 - 🎲 **Randomization**: Optionally shuffle results for varied listening experiences
 - 🔄 **Prefix Handling**: Intelligent handling of artist name prefixes (e.g., "The Beatles" vs "Beatles, The")
 
@@ -192,12 +191,13 @@ Found a bug or have a feature idea? Please open an issue on the [GitHub Issues](
 - [ ] Configurable track matching sensitivity
 - [ ] Integration with other music recommendation services
 - [ ] Track history to avoid repetition
+- [ ] Advanced Filtering: Filter by genre, rating, artist blacklist, and title exclusions
 
 ---
 
 ## 🔄 Changelog
 
-### Version 1.0.0 (Current)
+### Version 1.0.50 (Current)
 
 - ✨ Complete rewrite for MediaMonkey 5
 - ✨ Modern async/await patterns throughout
@@ -240,4 +240,4 @@ Found a bug or have a feature idea? Please open an issue on the [GitHub Issues](
 
 <p align="center">
   <sub>Built with ❤️ for the MediaMonkey community</sub>
-</p>
+</p></p>
