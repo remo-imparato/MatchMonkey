@@ -80,11 +80,21 @@
 				<div data-id="SABest" data-control-class="Checkbox">Select highest rated in library?</div>
 				<div data-id="SARank" data-control-class="Checkbox">Select highest ranked by Last.fm?</div>
 			</div>
+			<div class="uiRow">
+				<label class="inline">Minimum rating to use in local library:</label>
+			</div>
+			<div class="uiRow">
+				<div data-id="SARating" class="left" data-control-class="Rating"></div>
+			</div>
+			<div class="uiRow">
+				<div data-id="SAUnknown" data-control-class="Checkbox">Include unknown rating?</div>
+			</div>
+
 		</div>
 	</fieldset>
 
 	<!-- Filters and Parent Playlist -->
-	<fieldset style="">
+	<fieldset style="display:none;">
 		<legend>Filters and parent playlist</legend>
 		<div class="uiRows">
 			<div class="uiRow">
@@ -107,13 +117,6 @@
 				<div data-id="SAExclude" data-control-class="Edit" data-init-params="{'hint':'Comma separated list of words in titles'}"></div>
 			</div>
 
-			<div class="uiRow">
-				<label class="inline">Minimum rating to use in local library:</label>
-			</div>
-			<div class="uiRow left-indent">
-				<div data-id="SARating" class="left" data-control-class="Rating"></div>
-				<div data-id="SAUnknown" data-control-class="Checkbox">Include unknown rating?</div>
-			</div>
 		</div>
 	</fieldset>
 
@@ -129,13 +132,6 @@
 					<option>Navigate to now playing</option>
 				</div>
 			</div>
-			<!--<div class="uiRow">
-				<label class="inline">Minimum rating:</label>
-			</div>
-			<div class="uiRow left-indent">
-				<div data-id="SARating" data-control-class="Rating"></div>
-				<div data-id="SAUnknown" data-control-class="Checkbox">Include unknown rating?</div>
-			</div>-->
 
 			<div class="uiRow">
 				<div data-id="SAOnPlay" data-control-class="Checkbox">Automatically run when approaching end of playlist?</div>
