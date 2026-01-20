@@ -302,16 +302,16 @@ try {
 			console.error('Similar Artists: applyAutoModeFromSettings UI refresh failed: ' + e.toString());
 		}
 	}
- 
- 	/**
- 	 * Toggle automatic mode (run addon when playback reaches end of playlist).
- 	 */
- 	function toggleAuto() {
+
+	/**
+	 * Toggle automatic mode (run addon when playback reaches end of playlist).
+	 */
+	function toggleAuto() {
 		const next = !getSetting('OnPlay', false);
 		setSetting('OnPlay', next);
 		applyAutoModeFromSettings();
 		console.log(`Similar Artists: Auto-mode ${next ? 'enabled' : 'disabled'}`);
- 	}
+	}
 
 	/**
 	 * Attach playback listener for auto-mode.
@@ -609,7 +609,7 @@ try {
 			includeSeedArtist,
 			rankEnabled,
 			bestEnabled
-		} = settings; 
+		} = settings;
 
 		const allTracks = [];
 
@@ -738,11 +738,11 @@ try {
 				await sleep(300);
 				seedsRaw = collectSeedTracks();
 			}
- 			const seeds = uniqueArtists(seedsRaw);
- 			if (!seeds.length) {
- 				showToast('SimilarArtists: Select at least one track to seed the playlist.');
- 				return;
- 			}
+			const seeds = uniqueArtists(seedsRaw);
+			if (!seeds.length) {
+				showToast('SimilarArtists: Select at least one track to seed the playlist.');
+				return;
+			}
 			console.log(`SimilarArtists: Collected ${seeds.length} seed artist(s): ${seeds.map(s => s.name).join(', ')}`);
 
 			showToast('SimilarArtists: Running');
@@ -765,31 +765,31 @@ try {
 			let tracksPerArtist = intSetting('TPA');
 			let totalLimit = intSetting('TPL');
 			let includeSeedArtist = boolSetting('Seed');
- 			let randomise = boolSetting('Random');
- 			let enqueue = boolSetting('Enqueue');
- 			let ignoreDupes = boolSetting('Ignore');
+			let randomise = boolSetting('Random');
+			let enqueue = boolSetting('Enqueue');
+			let ignoreDupes = boolSetting('Ignore');
 			let clearNP = boolSetting('ClearNP');
 			let overwriteMode = config.Overwrite;
 			let confirm = boolSetting('Confirm');
 			let rankEnabled = boolSetting('Rank');
 			let bestEnabled = boolSetting('Best');
 
- 			// In auto-mode, force enqueue and set tighter/default limits
- 			if (autoRun) {
- 				enqueue = true;
- 				// Auto-mode defaults requested by user
- 				seedLimit = 5; // use 5 seed artist in auto-mode
- 				similarLimit = 5; // artist limit
- 				tracksPerArtist = 2; // tracks per artist
- 				totalLimit = 10; // total tracks to add
- 				// Include the seed artist in auto-mode
- 				includeSeedArtist = true;
- 				// Randomize the final trackset in auto-mode
- 				randomise = true;
- 				// Always avoid duplicating tracks in Now Playing when auto-queueing
- 				ignoreDupes = true;
- 				console.log('Similar Artists: Auto-mode enabled - forcing enqueue to Now Playing with settings: seedLimit=' + seedLimit + ', similarLimit=' + similarLimit + ', tracksPerArtist=' + tracksPerArtist + ', totalLimit=' + totalLimit + ', includeSeedArtist=' + includeSeedArtist + ', randomise=' + randomise);
- 			}
+			// In auto-mode, force enqueue and set tighter/default limits
+			if (autoRun) {
+				enqueue = true;
+				// Auto-mode defaults requested by user
+				seedLimit = 5; // use 5 seed artist in auto-mode
+				similarLimit = 5; // artist limit
+				tracksPerArtist = 2; // tracks per artist
+				totalLimit = 10; // total tracks to add
+				// Include the seed artist in auto-mode
+				includeSeedArtist = true;
+				// Randomize the final trackset in auto-mode
+				randomise = true;
+				// Always avoid duplicating tracks in Now Playing when auto-queueing
+				ignoreDupes = true;
+				console.log('Similar Artists: Auto-mode enabled - forcing enqueue to Now Playing with settings: seedLimit=' + seedLimit + ', similarLimit=' + similarLimit + ', tracksPerArtist=' + tracksPerArtist + ', totalLimit=' + totalLimit + ', includeSeedArtist=' + includeSeedArtist + ', randomise=' + randomise);
+			}
 
 			// Log settings for debugging
 			console.log(`Settings loaded: includeSeedArtist=${includeSeedArtist}, randomise=${randomise}, rankEnabled=${rankEnabled}, bestEnabled=${bestEnabled}`);
@@ -1493,7 +1493,7 @@ try {
 					console.log('Similar Artists: enqueueTracks: Cleared Now Playing');
 				} else if (player.stop && typeof player.stop === 'function') {
 					// Fallback: stop playback which effectively clears
-				 player.stop();
+					player.stop();
 					console.log('Similar Artists: enqueueTracks: Stopped playback (clearPlaylistAsync not available)');
 				}
 			} catch (e) {
@@ -1810,7 +1810,6 @@ try {
 
 	// Build a playlist title using all seed artist names up to a safe length.
 	function buildPlaylistTitle(seeds) {
-	 {
 		const template = stringSetting('Name') || 'Similar - %';
 		const names = (seeds || []).map((s) => s?.name).filter((n) => n && n.trim().length);
 		if (!names.length) {
