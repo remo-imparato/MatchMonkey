@@ -372,7 +372,9 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 			? 0
 			: parseInt(this.config.Rating, 10);
 		const ratingValue = Number.isFinite(ratingValueRaw) ? Math.max(0, Math.min(100, ratingValueRaw)) : 0;
+		UI.SARating.controlClass.value = ratingValue;
 
+		/*
 		const applyRatingUI = () => {
 			if (!UI.SARating?.controlClass) return;
 			UI.SARating.controlClass.useUnknown = allowUnknown;
@@ -387,7 +389,6 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 		// Reapply after control is ready to ensure correct display
 		applyRatingUI();
 
-		UI.SAUnknown.controlClass.checked = allowUnknown;
 
 		// Keep rating control in sync when toggling "Include unknown rating?"
 		try {
@@ -416,7 +417,9 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 		}
 
 		console.log(`Similar Artists: load: Rating set to ${UI.SARating?.controlClass?.value} (useUnknown=${allowUnknown})`);
+		*/
 
+		UI.SAUnknown.controlClass.checked = allowUnknown;
 		UI.SAOverwrite.controlClass.value = this.config.Overwrite;
 		UI.SAEnqueue.controlClass.checked = this.config.Enqueue;
 		UI.SANavigate.controlClass.value = this.config.Navigate;
@@ -435,6 +438,7 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 			}
 		};
 
+		/*
 		try {
 			if (!window.SimilarArtists && typeof window.localRequirejs === 'function') {
 				window.localRequirejs('similarArtists');
@@ -444,6 +448,7 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 		} catch (e) {
 			// ignore, handled by fallback
 		}
+		*/
 
 		// Set checkbox now that we've attempted to ensure module is loaded
 		setOnPlayCheckbox();
@@ -459,14 +464,10 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 					// wait for datasource to load then mark checked items from config.Black
 					await ds.whenLoaded();
 
-					// Ensure control initializes (some MM builds require Initialize() to render grids)
+					// Refresh control view (preferred over calling Initialize())
 					try {
-						if (typeof UI.SABlack.controlClass.Initialize === 'function') {
-							UI.SABlack.controlClass.Initialize();
-						}
-					} catch (ie) {
-						console.error('Similar Artists: SABlack Initialize() failed: ' + ie.toString());
-					}
+						if (UI.SABlack.controlClass.callEvent) UI.SABlack.controlClass.callEvent('change');
+					} catch (ie) { console.error('Similar Artists: SABlack refresh failed: ' + ie.toString()); }
 
 					const blacks = (this.config.Black || '').split(',').map(s => s.trim()).filter(Boolean);
 					if (blacks.length) {
@@ -474,20 +475,19 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 							ds.forEach((item, idx) => {
 								const name = item.name || item.title || item.toString();
 								if (blacks.indexOf(name) >= 0) {
-									if (typeof ds.setChecked === 'function')
-										ds.setChecked(idx, true);
-									else
-										item.checked = true;
+									if (typeof ds.setChecked === 'function') ds.setChecked(idx, true);
+									else item.checked = true;
 								}
 							});
 						} else if (typeof ds.getValue === 'function') {
 							for (let i = 0; i < ds.count; i++) {
 								const item = ds.getValue(i);
 								const name = item.name || item.title || item.toString();
-								if (blacks.indexOf(name) >= 0)
-									item.checked = true;
+								if (blacks.indexOf(name) >= 0) item.checked = true;
 							}
 						}
+						// Ensure UI reflects checked state
+						try { if (UI.SABlack.controlClass.callEvent) UI.SABlack.controlClass.callEvent('change'); } catch (e) { }
 					}
 				}
 			}
@@ -544,7 +544,7 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 
 			// Buttons may exist before control initialization, so call setup now and again shortly after
 			setupButtons();
-			requestAnimationFrame(setupButtons);
+			//requestAnimationFrame(setupButtons);
 		} catch (e) {
 			console.error('Similar Artists: load: error wiring SABlack buttons: ' + e.toString());
 		}
@@ -570,8 +570,8 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 							let arr = [];
 							if (typeof tl.forEach === 'function') {
 								tl.forEach((row) => {
-								try { const v = row.getValue ? row.getValue('name') : row['name']; if (v) arr.push({ title: String(v) }); } catch(e){}
-							});
+									try { const v = row.getValue ? row.getValue('name') : row['name']; if (v) arr.push({ title: String(v) }); } catch (e) { }
+								});
 							}
 							gds = new ArrayDataSource(arr, { isLoaded: true });
 						}
@@ -581,25 +581,26 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 					UI.SAGenre.controlClass.dataSource = gds;
 					await gds.whenLoaded?.();
 
-					// Ensure control initializes (some MM builds require Initialize() to render grids)
+					// Refresh control view (preferred over calling Initialize())
 					try {
-						if (typeof UI.SAGenre.controlClass.Initialize === 'function') {
-							UI.SAGenre.controlClass.Initialize();
-						}
-					} catch (ie) {
-						console.error('Similar Artists: SAGenre Initialize() failed: ' + ie.toString());
-					}
+						if (UI.SAGenre.controlClass.callEvent) UI.SAGenre.controlClass.callEvent('change');
+					} catch (ie) { console.error('Similar Artists: SAGenre refresh failed: ' + ie.toString()); }
 
 					const blacks = (this.config.Genre || '').split(',').map(s => s.trim()).filter(Boolean);
 					if (blacks.length) {
 						if (typeof gds.forEach === 'function') {
 							gds.forEach((item, idx) => {
 								const name = item.title || item.name || item.toString();
-								if (blacks.indexOf(name) >= 0) { if (typeof gds.setChecked === 'function') gds.setChecked(idx, true); else item.checked = true; }
+								if (blacks.indexOf(name) >= 0) {
+									if (typeof gds.setChecked === 'function') gds.setChecked(idx, true);
+									else item.checked = true;
+								}
 							});
 						} else if (typeof gds.getValue === 'function') {
 							for (let i = 0; i < gds.count; i++) { const it = gds.getValue(i); const name = it.title || it.name || it.toString(); if (blacks.indexOf(name) >= 0) it.checked = true; }
 						}
+						// Ensure UI reflects checked state
+						try { if (UI.SAGenre.controlClass.callEvent) UI.SAGenre.controlClass.callEvent('change'); } catch (e) { }
 					}
 				}
 			}
@@ -620,27 +621,27 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 						const ds2 = UI.SAGenre.controlClass.dataSource;
 						if (!ds2) return;
 						if (typeof ds2.forEach === 'function') { ds2.forEach((item, idx) => { if (typeof ds2.setChecked === 'function') ds2.setChecked(idx, true); else item.checked = true; }); }
-						else if (typeof ds2.getValue === 'function') { for (let i=0;i<ds2.count;i++){ const it=ds2.getValue(i); if(it) it.checked = true; } }
-					} catch (e) {}
+						else if (typeof ds2.getValue === 'function') { for (let i = 0; i < ds2.count; i++) { const it = ds2.getValue(i); if (it) it.checked = true; } }
+					} catch (e) { }
 				};
 				btnClearG.controlClass.onexecute = () => {
 					try {
 						const ds2 = UI.SAGenre.controlClass.dataSource;
 						if (!ds2) return;
 						if (typeof ds2.forEach === 'function') { ds2.forEach((item, idx) => { if (typeof ds2.setChecked === 'function') ds2.setChecked(idx, false); else item.checked = false; }); }
-						else if (typeof ds2.getValue === 'function') { for (let i=0;i<ds2.count;i++){ const it=ds2.getValue(i); if(it) it.checked = false; } }
-					} catch (e) {}
+						else if (typeof ds2.getValue === 'function') { for (let i = 0; i < ds2.count; i++) { const it = ds2.getValue(i); if (it) it.checked = false; } }
+					} catch (e) { }
 				};
 			};
 			setupGenreButtons();
-			requestAnimationFrame(setupGenreButtons);
+			//requestAnimationFrame(setupGenreButtons);
 		} catch (e) {
 			console.error('Similar Artists: load: error wiring SAGenre buttons: ' + e.toString());
 		}
 
 		// Populate parent playlist dropdown with available manual playlists
 		// Wait for playlists tree to be available instead of using a fixed timeout
-		await waitFor(() => app.playlists && app.playlists.root, 2000, 100);
+		//await waitFor(() => app.playlists && app.playlists.root, 2000, 100);
 
 		// Robustly wait for playlists to be initialized (different MM builds expose different hooks)
 		try {
@@ -687,116 +688,3 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function (sett) {
 		this.config.Seed = UI.SASeed.controlClass.checked;
 		this.config.Best = UI.SABest.controlClass.checked;
 		this.config.Rank = UI.SARank.controlClass.checked;
-
-		// Persist unknown toggle.
-		this.config.Unknown = UI.SAUnknown.controlClass.checked;
-
-		// Rating control API: `value` is -1..100.
-		// Mapping:
-		// - If Unknown is enabled and control is -1 => store Rating=0 (no minimum) and Unknown=true.
-		// - Otherwise store Rating clamped to 0..100.
-		const ratingValue = UI.SARating?.controlClass?.value;
-		const parsed = parseInt(ratingValue, 10);
-		if (this.config.Unknown && Number.isFinite(parsed) && parsed < 0) {
-			this.config.Rating = 0;
-		} else {
-			this.config.Rating = Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : 0;
-		}
-		console.log(`Similar Artists: save: Rating = ${this.config.Rating} (control=${ratingValue}, Unknown=${this.config.Unknown})`);
-
-		this.config.Overwrite = UI.SAOverwrite.controlClass.value;
-		this.config.Enqueue = UI.SAEnqueue.controlClass.checked;
-		this.config.Navigate = UI.SANavigate.controlClass.value;
-		this.config.OnPlay = UI.SAOnPlay.controlClass.checked;
-		this.config.ClearNP = UI.SAClearNP.controlClass.checked;
-		this.config.Ignore = UI.SAIgnore.controlClass.checked;
-		// Read selected excluded artists from ArtistGrid datasource
-		try {
-			const blackNames = [];
-			if (UI.SABlack && UI.SABlack.controlClass && UI.SABlack.controlClass.dataSource) {
-				const ds = UI.SABlack.controlClass.dataSource;
-				if (typeof ds.forEach === 'function') {
-					ds.forEach((item) => {
-						if (item && item.checked) {
-							const name = item.name || item.title || item.toString();
-							blackNames.push(name);
-						}
-					});
-				} else if (typeof ds.getValue === 'function') {
-					for (let i = 0; i < ds.count; i++) {
-						const item = ds.getValue(i);
-						if (item && item.checked) {
-							blackNames.push(item.name || item.title || item.toString());
-						}
-					}
-				}
-			}
-			this.config.Black = blackNames.join(', ');
-		} catch (e) {
-			console.error('Similar Artists: save: error reading SABlack selections: ' + e.toString());
-			this.config.Black = UI.SABlack?.controlClass?.value || '';
-		}
-		this.config.Exclude = UI.SAExclude.controlClass.value;
-		this.config.Genre = UI.SAGenre.controlClass.value;
-
-		// Get selected parent playlist using MM5 pattern (focusedIndex + dataSource)
-		try {
-			const parentCtrl = UI.SAParent?.controlClass;
-			if (parentCtrl && parentCtrl.dataSource && typeof parentCtrl.focusedIndex !== 'undefined') {
-				const ds = parentCtrl.dataSource;
-				const idx = parentCtrl.focusedIndex;
-				const count = typeof ds.count === 'function' ? ds.count() : ds.count;
-
-				// Get the selected item from dataSource using forEach (safer)
-				if (idx >= 0 && idx < count) {
-					let selectedValue = '';
-					let currentIdx = 0;
-
-					if (typeof ds.forEach === 'function') {
-						ds.forEach((item) => {
-							if (currentIdx === idx) {
-								selectedValue = item ? item.toString() : '';
-							}
-							currentIdx++;
-						});
-					} else if (typeof ds.getValue === 'function') {
-						const item = ds.getValue(idx);
-						selectedValue = item ? item.toString() : '';
-					}
-
-					// Store empty string if [None] is selected, otherwise store the playlist name
-					this.config.Parent = (selectedValue === '[None]') ? '' : selectedValue;
-					console.log(`Similar Artists: save: Parent playlist = "${this.config.Parent}" (index ${idx})`);
-				} else {
-					this.config.Parent = '';
-					console.log('Similar Artists: save: No valid selection, Parent = ""');
-				}
-			} else {
-				// Fallback if dataSource not available
-				this.config.Parent = '';
-				console.log('Similar Artists: save: dataSource not available, Parent = ""');
-			}
-		} catch (e) {
-			console.error('Similar Artists: save: Error reading Parent playlist: ' + e.toString());
-			this.config.Parent = '';
-		}
-
-		app.setValue('SimilarArtists', this.config);
-
-		// Apply auto-mode listener/UI immediately when changed from options dialog
-		try {
-			if (window.SimilarArtists?.applyAutoModeFromSettings) {
-				window.SimilarArtists.applyAutoModeFromSettings();
-			}
-		} catch (e) {
-			console.error('Similar Artists: save: applyAutoModeFromSettings failed: ' + e.toString());
-		}
-
-	} catch (e) {
-		console.error('Similar Artists: save error: ' + e.toString());
-	}
-}
-
-optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.beforeWindowCleanup = function () {
-	// Cleanup if needed
-}
