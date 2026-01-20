@@ -750,24 +750,27 @@ try {
 			const legacyLimit = intSetting('Limit');
 			const seedLimit = intSetting('SeedLimit') || legacyLimit;
 			const similarLimit = intSetting('SimilarLimit') || legacyLimit;
-			const tracksPerArtist = intSetting('TPA');
-			const totalLimit = intSetting('TPL');
-			const includeSeedArtist = boolSetting('Seed');
-			const includeSeedTrack = boolSetting('Seed2');
-			const randomise = boolSetting('Random');
-			let enqueue = boolSetting('Enqueue');
-			const ignoreDupes = boolSetting('Ignore');
-			const clearNP = boolSetting('ClearNP');
-			const overwriteMode = config.Overwrite;
-			const confirm = boolSetting('Confirm');
-			const rankEnabled = boolSetting('Rank');
-			const bestEnabled = boolSetting('Best');
+			let tracksPerArtist = intSetting('TPA');
+			let totalLimit = intSetting('TPL');
+			let includeSeedArtist = boolSetting('Seed');
+			let includeSeedTrack = boolSetting('Seed2');
+ 			const randomise = boolSetting('Random');
+ 			let enqueue = boolSetting('Enqueue');
+ 			const ignoreDupes = boolSetting('Ignore');
+ 			const clearNP = boolSetting('ClearNP');
+ 			const overwriteMode = config.Overwrite;
+ 			const confirm = boolSetting('Confirm');
+ 			const rankEnabled = boolSetting('Rank');
+ 			const bestEnabled = boolSetting('Best');
 
-			// In auto-mode, force enqueue and suppress UI
-			if (autoRun) {
-				enqueue = true;
-				log('SimilarArtists: Auto-mode enabled - forcing enqueue to Now Playing');
-			}
+ 			// In auto-mode, force enqueue and suppress UI
+ 			if (autoRun) {
+ 				enqueue = true;
+				totalLimit = 5;
+				includeSeedArtist = false;
+				includeSeedTrack = false;
+ 				log('SimilarArtists: Auto-mode enabled - forcing enqueue to Now Playing');
+ 			}
 
 			// Log settings for debugging
 			log(`Settings loaded: includeSeedArtist=${includeSeedArtist}, includeSeedTrack=${includeSeedTrack}, randomise=${randomise}, rankEnabled=${rankEnabled}, bestEnabled=${bestEnabled}`);
