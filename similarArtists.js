@@ -773,7 +773,7 @@ try {
 			let includeSeedTrack = boolSetting('Seed2');
  			const randomise = boolSetting('Random');
  			let enqueue = boolSetting('Enqueue');
- 			const ignoreDupes = boolSetting('Ignore');
+ 			let ignoreDupes = boolSetting('Ignore');
  			const clearNP = boolSetting('ClearNP');
  			const overwriteMode = config.Overwrite;
  			const confirm = boolSetting('Confirm');
@@ -783,11 +783,11 @@ try {
  			// In auto-mode, force enqueue and suppress UI
  			if (autoRun) {
  				enqueue = true;
-				totalLimit = 5;
-				includeSeedArtist = false;
-				includeSeedTrack = false;
-				// Always avoid duplicating tracks in Now Playing when auto-queueing
-				ignoreDupes = true;
+ 				totalLimit = 5;
+ 				includeSeedArtist = false;
+ 				includeSeedTrack = false;
+ 				// Always avoid duplicating tracks in Now Playing when auto-queueing
+ 				ignoreDupes = true;
  				log('SimilarArtists: Auto-mode enabled - forcing enqueue to Now Playing');
  			}
 
@@ -854,7 +854,7 @@ try {
 			} else {
 				const seedName = buildPlaylistTitle(seeds);
 
-				// If confirm is enabled, show dialog to select/create playlist
+				// If confirm is enabled, show dialog to select/create a playlist
 				if (confirm) {
 					const dialogResult = await confirmPlaylist(seedName, overwriteMode);
 
@@ -1189,7 +1189,7 @@ try {
 					} else {
 						// "Beatles" -> also match "Beatles, The" and "The Beatles"
 						artistConds.push(`Artists.Artist = '${escapeSql(`${artistName}, ${prefix}`)}'`);
-						artistConds.push(`Artists.Artist = '${escapeSql`${prefix} ${artistName}`}'`);
+						artistConds.push(`Artists.Artist = '${escapeSql(`${prefix} ${artistName}`)}'`);
 					}
 				}
 
