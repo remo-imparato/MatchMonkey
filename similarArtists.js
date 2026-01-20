@@ -784,7 +784,6 @@ try {
  				totalLimit = 10; // total tracks to add
  				// Include the seed artist in auto-mode
  				includeSeedArtist = true;
- 				// Respect existing seed-track inclusion setting for now
  				// Randomize the final trackset in auto-mode
  				randomise = true;
  				// Always avoid duplicating tracks in Now Playing when auto-queueing
