@@ -89,33 +89,23 @@
 		<div class="uiRows">
 			<div class="uiRow">
 				<label class="inline">Parent playlist:</label>
-				<div data-id="SAParent" data-control-class="Dropdown" data-init-params='{"dbFunc":"getStringList","dbFuncParams":{"category":"playlist"},readOnly: true}'></div>
+				<div data-id="SAParent" data-control-class="Dropdown" data-init-params="{dbFunc:'getStringList',dbFuncParams: {category: 'playlist'}, readOnly: false}"></div>
 			</div>
 
 			<div class="uiRow">
 				<label class="inline">Exclude artists:</label>
-				<div class="inline" style="display:flex;flex-direction:column;align-items:flex-start;">
-                    <div class="smallHint" style="font-size:0.85em;margin-bottom:4px;color:var(--hint-color, #666);">Select artists to exclude from results (multiple selection supported)</div>
-                    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
-                        <div data-id="btnBlackSelectAll" data-control-class="Button" class="inline" data-add-dots>Select all</div>
-                        <div data-id="btnBlackClear" data-control-class="Button" class="inline" data-add-dots>Clear</div>
-                    </div>
-                    <div data-id="SABlack" class="showInline" data-control-class="Dropdown" data-init-params='{"dbFunc":"getPeople","dbFuncParams":{"category":"artist"},"multi":true,"autoWidth":false}'></div>
-                </div>
+				<div data-id="SABlack" data-control-class="Edit" data-init-params="{'hint':'Comma separated list of artists names'}"></div>
 			</div>
 
 			<div class="uiRow">
 				<label class="inline">Exclude genres:</label>
-				<div class="inline" style="display:flex;flex-direction:column;align-items:flex-start;">
-                    <div class="smallHint" style="font-size:0.85em;margin-bottom:4px;color:var(--hint-color, #666);">Select genres to exclude from results (multiple selection supported)</div>
-                    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
-                        <div data-id="btnGenreSelectAll" data-control-class="Button" class="inline" data-add-dots>Select all</div>
-                        <div data-id="btnGenreClear" data-control-class="Button" class="inline" data-add-dots>Clear</div>
-                    </div>
-                    <div data-id="SAGenre" class="showInline" data-control-class="Dropdown" data-init-params='{"dbFunc":"getStringList","dbFuncParams":{"category":"genre"},"multi":true,"autoWidth":false}'></div>
-                </div>
+				<div data-id="SAGenre" data-control-class="Edit" data-init-params="{'hint':'Comma separated list of genres'}"></div>
 			</div>
 
+			<div class="uiRow">
+				<label class="inline">Exclude titles:</label>
+				<div data-id="SAExclude" data-control-class="Edit" data-init-params="{'hint':'Comma separated list of words in titles'}"></div>
+			</div>
 			<div class="uiRow">
 				<label class="inline">Exclude titles:</label>
 				<div data-id="SAExclude"
