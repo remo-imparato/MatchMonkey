@@ -67,8 +67,8 @@ const defaults = {
 	// New, explicit settings (fallback to `Limit` if undefined).
 	SeedLimit: 5,
 	SimilarLimit: 5,
-	Name: 'Similar to %',
-	DefaultSeedName: 'Similar Artists',
+	Name: '- Similar to %',
+	DefaultSeedName: '- Similar Artists',
 	TPA: 9999,
 	TPL: 9999,
 	Random: false,
