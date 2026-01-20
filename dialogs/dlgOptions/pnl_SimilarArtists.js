@@ -436,8 +436,8 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = function (sett, pnl
 
 		// Populate parent playlist dropdown with available manual playlists
 		// playlists may not be fully loaded when options panel is created
-		populateParentPlaylist(pnl, this.config.Parent || 'Similar Artists Playlists');
-		setTimeout(() => populateParentPlaylist(pnl, this.config.Parent || 'Similar Artists Playlists'), 1000);
+		//populateParentPlaylist(pnl, this.config.Parent || 'Similar Artists Playlists');
+		//setTimeout(() => populateParentPlaylist(pnl, this.config.Parent || 'Similar Artists Playlists'), 1000);
 
 	} catch (e) {
 		console.error('Similar Artists: load error: ' + e.toString());
