@@ -263,6 +263,7 @@ async function getManualPlaylistsViaDb() {
  * @param {HTMLElement} pnl - The panel element
  * @param {string} storedParent - The currently stored parent playlist name
  */
+/*
 async function populateParentPlaylist(pnl, storedParent) {
 	try {
 		const parentCtrl = getAllUIElements(pnl)?.SAParent?.controlClass;
@@ -324,7 +325,8 @@ async function populateParentPlaylist(pnl, storedParent) {
 		console.error('Similar Artists: populateParentPlaylist error: ' + e.toString());
 	}
 }
-
+*/
+/*
 // Small helper to wait for a condition with timeout
 async function waitFor(conditionFn, timeout = 2000, interval = 50) {
 	const start = Date.now();
@@ -338,6 +340,7 @@ async function waitFor(conditionFn, timeout = 2000, interval = 50) {
 		await new Promise(r => setTimeout(r, interval));
 	}
 }
+*/
 
 optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (sett, pnl, wndParams) {
 	try {
@@ -580,7 +583,7 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 		// Populate parent playlist dropdown with available manual playlists
 		// Wait for playlists tree to be available instead of using a fixed timeout
 		//await waitFor(() => app.playlists && app.playlists.root, 2000, 100);
-
+		/*
 		// Robustly wait for playlists to be initialized (different MM builds expose different hooks)
 		try {
 			if (app.playlists && app.playlists.root) {
@@ -601,7 +604,8 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 			console.error('Similar Artists: waiting for playlists readiness failed: ' + e.toString());
 		}
 		// call populate and await it so UI is ready when load completes
-		//await populateParentPlaylist(pnl, this.config.Parent);
+		await populateParentPlaylist(pnl, this.config.Parent);
+		*/
 	} catch (e) {
 		console.error('Similar Artists: load error: ' + e.toString());
 	}
