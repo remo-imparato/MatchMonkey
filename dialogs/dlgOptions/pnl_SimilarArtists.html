@@ -84,13 +84,13 @@
 	</fieldset>
 
 	<!-- Filters and Parent Playlist -->
-	<fieldset>
+	<fieldset style="display:none;">
 		<legend>Filters and parent playlist</legend>
 		<div class="uiRows">
-			<!--<div class="uiRow">
+			<div class="uiRow">
 				<label class="inline">Parent playlist:</label>
 				<div data-id="SAParent" data-control-class="Dropdown" data-init-params="{readOnly: true}"></div>
-			</div>-->
+			</div>
 
 			<div class="uiRow">
 				<label class="inline">Exclude artists:</label>
@@ -134,6 +134,13 @@
 					<option>Navigate to new playlist</option>
 					<option>Navigate to now playing</option>
 				</div>
+			</div>
+			<div class="uiRow">
+				<label class="inline">Minimum rating:</label>
+			</div>
+			<div class="uiRow left-indent">
+				<div data-id="SARating" data-control-class="Rating"></div>
+				<div data-id="SAUnknown" data-control-class="Checkbox">Include unknown rating?</div>
 			</div>
 
 			<div class="uiRow">
