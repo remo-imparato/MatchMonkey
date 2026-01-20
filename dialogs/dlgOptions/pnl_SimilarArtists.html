@@ -40,7 +40,7 @@
 	<fieldset>
 		<legend>Playlist creation</legend>
 		<div class="uiRows">
-			<div class="left-indent uiRow">
+			<div class="uiRow">
 				<label class="inline">Playlist name:</label>
 				<div data-id="SAName"
 					 data-control-class="Edit"
@@ -89,7 +89,7 @@
 		<div class="uiRows">
 			<div class="uiRow">
 				<label class="inline">Parent playlist:</label>
-				<div data-id="SAParent" data-control-class="Dropdown" data-init-params="{dbFunc:'getStringList',dbFuncParams: {category: 'playlist'}, readOnly: false}"></div>
+				<div data-id="SAParent" data-control-class="Edit" data-init-params="{'hint':'Name of the parent playlist'}"></div>
 			</div>
 
 			<div class="uiRow">
