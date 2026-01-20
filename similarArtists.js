@@ -769,6 +769,8 @@ try {
 				totalLimit = 5;
 				includeSeedArtist = false;
 				includeSeedTrack = false;
+				// Always avoid duplicating tracks in Now Playing when auto-queueing
+				ignoreDupes = true;
  				log('SimilarArtists: Auto-mode enabled - forcing enqueue to Now Playing');
  			}
 
@@ -846,7 +848,7 @@ try {
 					} else if (dialogResult.autoCreate) {
 						// User clicked OK without selecting a playlist - auto-create one
 						updateProgress(`Creating new playlist "${seedName}" with ${allTracks.length} tracks...`, 0.85);
-						await createPlaylist(allTracks, seedName, overwriteMode, dialogResult);
+						await createPlaylist(allTracks, seedName, overwriteMode, dialogResult, ignoreDupes);
 						updateProgress(`Playlist created successfully with ${allTracks.length} tracks!`, 1.0);
 					} else {
 						// User selected an existing playlist - add tracks to it
@@ -857,7 +859,7 @@ try {
 						log(`SimilarArtists: Adding tracks to user-selected playlist '${selectedPlaylist.name}' (ID: ${selectedPlaylist.id || selectedPlaylist.ID}), shouldClear=${shouldClear}`);
 
 						const added = await addTracksToTarget(selectedPlaylist, allTracks, {
-							ignoreDupes: false,
+							ignoreDupes: ignoreDupes,
 							clearFirst: shouldClear
 						});
 
@@ -867,7 +869,7 @@ try {
 				} else {
 					// confirm is disabled, so skip playlist dialog and create automatically
 					updateProgress(`Creating new playlist "${seedName}" with ${allTracks.length} tracks...`, 0.85);
-					await createPlaylist(allTracks, seedName, overwriteMode, null);
+					await createPlaylist(allTracks, seedName, overwriteMode, null, ignoreDupes);
 					updateProgress(`Playlist created successfully with ${allTracks.length} tracks!`, 1.0);
 				}
 			}
@@ -1466,7 +1468,7 @@ try {
 					log('enqueueTracks: Cleared Now Playing');
 				} else if (player.stop && typeof player.stop === 'function') {
 					// Fallback: stop playback which effectively clears
-					player.stop();
+				 player.stop();
 					log('enqueueTracks: Stopped playback (clearPlaylistAsync not available)');
 				}
 			} catch (e) {
@@ -1555,7 +1557,7 @@ try {
 	 * @param {object|null} selectedPlaylist Pre-selected playlist from dialog (if provided), or { autoCreate: true } to create new.
 	 * @returns {Promise<object|null>} Playlist object.
 	 */
-	async function createPlaylist(tracks, seedName, overwriteMode, selectedPlaylist) {
+	async function createPlaylist(tracks, seedName, overwriteMode, selectedPlaylist, ignoreDupes = false) {
 		const titleTemplate = stringSetting('Name');
 		const baseName = titleTemplate.indexOf('%') >= 0 ? titleTemplate.replace('%', seedName || '') : `${titleTemplate} ${seedName || ''}`;
 		const overwriteText = String(overwriteMode || '');
@@ -1655,7 +1657,7 @@ try {
 		// Add tracks to playlist using unified helper
 		if (tracks && tracks.length > 0) {
 			const added = await addTracksToTarget(playlist, tracks, {
-				ignoreDupes: false, // Playlists typically allow duplicates 
+				ignoreDupes: ignoreDupes,
 				clearFirst: shouldClear
 			});
 			log(`createPlaylist: Added ${added} track(s) to playlist`);
