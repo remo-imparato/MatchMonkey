@@ -97,7 +97,6 @@ jobs:
           release_name: ${{ github.ref_name }}
           draft: false
           prerelease: false
-          allow_updates: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
