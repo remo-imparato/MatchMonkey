@@ -17,17 +17,10 @@
 				 style="width:220px"
 				 data-init-params='{"hint":"Enter your Last.fm API key"}'></div>
 		</div>
-		<div class="uiRows">
-			<div>
-				<div data-id="SAConfirm" data-control-class="Checkbox">Show confirmation prompt?</div>
-			</div>
-			<div>
-				<div data-id="SARandom" data-control-class="Checkbox">Randomise playlists?</div>
-			</div>
-			<div>
-				<div data-id="SASeed" data-control-class="Checkbox">Include seed artist?</div>
-			</div>
+		<div class="uiRow">
+			<div data-id="SAOnPlay" data-control-class="Checkbox">Auto‑queue similar tracks when Now Playing is near the end?</div>
 		</div>
+
 	</fieldset>
 
 	<!-- Playlist Creation Settings -->
@@ -48,7 +41,15 @@
 					<option>Do not create playlist</option>
 				</div>
 			</div>
-
+			<div class="uiRows">
+				<div data-id="SAConfirm" data-control-class="Checkbox">Show confirmation prompt?</div>
+			</div>
+			<div class="uiRows">
+				<div data-id="SARandom" data-control-class="Checkbox">Randomise playlists?</div>
+			</div>
+			<div class="uiRows">
+				<div data-id="SASeed" data-control-class="Checkbox">Include seed artist?</div>
+			</div>
 			<div class="uiRow">
 				<label class="inline">Max similar artists per seed:</label>
 				<div data-id="SALimit"
@@ -126,15 +127,13 @@
 			</div>
 
 			<div class="uiRow">
-				<div data-id="SAOnPlay" data-control-class="Checkbox">Auto‑queue similar tracks when Now Playing is near the end?</div>
-			</div>
-			<div class="uiRow">
 				<div data-id="SAEnqueue" data-control-class="Checkbox">Enqueue similar tracks to Now Playing instead of creating a playlist</div>
 				<div data-id="SAClearNP" data-control-class="Checkbox">Clear Now Playing before enqueuing tracks?</div>
 			</div>
 			<div class="uiRow">
 				<div data-id="SAIgnore" data-control-class="Checkbox">Skip tracks already in Now Playing when enqueuing?</div>
 			</div>
+
 		</div>
 	</fieldset>
 
