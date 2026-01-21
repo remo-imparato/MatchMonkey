@@ -1303,32 +1303,50 @@ try {
 			const ratingMin = intSetting('Rating');
 			const allowUnknown = boolSetting('Unknown');
 
-			// Helper builders (same as previous implementation)
+			// Replace the existing buildArtistClause implementation with this one
 			const buildArtistClause = () => {
 				if (!artistName) return '';
 
 				const artistConds = [];
-				// Exact match
-				artistConds.push(`Artists.Artist = '${escapeSql(artistName)}'`);
+
+				// Helper that safely quotes a string for SQL literals
+				const quoteSqlString = (s) => {
+					if (s === undefined || s === null) return "''";
+					// remove control chars that may break SQL/logging
+					const cleaned = String(s).replace(/[\u0000-\u001F]/g, '');
+					return `'${escapeSql(cleaned)}'`;
+				};
+
+				const addArtistCond = (name) => {
+					const n = String(name || '').trim();
+					if (!n) return;
+					artistConds.push(`Artists.Artist = ${quoteSqlString(n)}`);
+				};
+
+				// exact match
+				addArtistCond(artistName);
 
 				// Handle prefix variations (e.g., "The Beatles" vs "Beatles, The")
 				const prefixes = getIgnorePrefixes();
-				const nameLower = artistName.toLowerCase();
+				const nameLower = (artistName || '').toLowerCase();
 
-				// Check if artist starts with a prefix
 				for (const prefix of prefixes) {
-					const prefixLower = prefix.toLowerCase();
-					if (nameLower.startsWith(prefixLower + ' ')) {
+					const p = String(prefix || '').trim();
+					if (!p) continue;
+
+					if (nameLower.startsWith(p.toLowerCase() + ' ')) {
 						// "The Beatles" -> also match "Beatles, The"
-						const withoutPrefix = artistName.slice(prefix.length + 1);
-						artistConds.push(`Artists.Artist = '${escapeSql(`${withoutPrefix}, ${prefix}`)}'`);
+						const withoutPrefix = artistName.slice(p.length + 1).trim();
+						addArtistCond(`${withoutPrefix}, ${p}`);
 					} else {
 						// "Beatles" -> also match "Beatles, The" and "The Beatles"
-						artistConds.push(`Artists.Artist = '${escapeSql(`${artistName}, ${prefix}`)}'`);
-						artistConds.push(`Artists.Artist = '${escapeSql(`${prefix} ${artistName}`)}'`);
+						addArtistCond(`${artistName}, ${p}`);
+						addArtistCond(`${p} ${artistName}`);
 					}
 				}
 
+				// Defensive: if somehow nothing added, still return empty string
+				if (artistConds.length === 0) return '';
 				return `(${artistConds.join(' OR ')})`;
 			};
 
