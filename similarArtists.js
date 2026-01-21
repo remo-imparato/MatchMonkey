@@ -468,7 +468,7 @@ try {
 	 * Fallback to current playing track if no selection exists.
 	 * @returns {{name: string, track?: object}[]}
 	 */
-	function collectSeedTracks() {
+	async function collectSeedTracks() {
 		if (typeof app === 'undefined') return [];
 
 		const seeds = [];
@@ -503,10 +503,14 @@ try {
 			return null;
 		}
 
-		const selectedList = tryGetSelectedTracklist();
+		let selectedList = tryGetSelectedTracklist();
+
 
 		// Try to iterate selection first; only fall back if we added nothing.
 		if (selectedList) {
+
+			await selectedList.whenLoaded();
+
 			try {
 				if (typeof selectedList.forEach === 'function') {
 					selectedList.forEach((t) => {
@@ -526,6 +530,7 @@ try {
 			} catch (e) {
 				console.error('Similar Artists: collectSeedTracks: error iterating selection: ' + e.toString());
 			}
+
 
 			if (seeds.length > 0) {
 				console.log(`collectSeedTracks: Using ${seeds.length} selected track(s) as seed(s)`);
@@ -774,10 +779,10 @@ try {
 		initLastfmRunCache();
 
 		try {
-			let seedsRaw = collectSeedTracks();
+			let seedsRaw = await collectSeedTracks();
 			if (autoRun && !seedsRaw.length) {
 				await sleep(300);
-				seedsRaw = collectSeedTracks();
+				seedsRaw = await collectSeedTracks();
 			}
 			const seeds = uniqueArtists(seedsRaw);
 			if (!seeds.length) {
