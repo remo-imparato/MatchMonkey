@@ -120,9 +120,18 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 		const ratingValueRaw = (this.config.Rating === undefined || this.config.Rating === null) ? 0 : parseInt(this.config.Rating, 10);
 		const ratingValue = Number.isFinite(ratingValueRaw) ? Math.max(0, Math.min(100, ratingValueRaw)) : 0;
 
-		UI.SARating.controlClass.value = ratingValue;
-		UI.SARating2.controlClass.value = ratingValue;
-		UI.SARating3.controlClass.setValue(ratingValue);
+		// Ensure rating controls render correctly on load by forcing the rating update
+		try {
+			if (ratingValue > 0) {
+				if (UI.SARating && UI.SARating.controlClass && typeof UI.SARating.controlClass.setRating === 'function') {
+					UI.SARating.controlClass.setRating(ratingValue, { force: true, disableChangeEvent: true });
+				} else if (UI.SARating && UI.SARating.controlClass) {
+					UI.SARating.controlClass.value = ratingValue;
+				}
+			}
+		} catch (e) {
+			console.error('Similar Artists: error setting rating controls: ' + e.toString());
+		}
 
 		UI.SAUnknown.controlClass.checked = allowUnknown;
 		UI.SAOverwrite.controlClass.value = this.config.Overwrite;
