@@ -197,7 +197,7 @@ Found a bug or have a feature idea? Please open an issue on the [GitHub Issues](
 
 ## 🔄 Changelog
 
-### Version 1.0.50 (Current)
+### Version 1.0 (Current)
 
 - ✨ Complete rewrite for MediaMonkey 5
 - ✨ Modern async/await patterns throughout
@@ -211,7 +211,7 @@ Found a bug or have a feature idea? Please open an issue on the [GitHub Issues](
 - 🐛 Fixed playlist name uniqueness logic
 - 📚 Comprehensive code documentation
 
-### Version 1.x (MediaMonkey 4)
+### Version (MediaMonkey 4)
 
 - Original implementation by Trixmoto
 - Basic Last.fm integration
