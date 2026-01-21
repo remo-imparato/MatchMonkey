@@ -1077,8 +1077,6 @@ try {
 					}
 				});
 
-
-
 				dlg.whenClosed = function () {
 					try {
 						// User clicked Cancel (modalResult !== 1)
@@ -1308,13 +1306,11 @@ try {
 			const ratingMin = intSetting('Rating');
 			const allowUnknown = boolSetting('Unknown');
 
-			// Replace the existing buildArtistClause implementation with this one
 			const buildArtistClause = () => {
 				if (!artistName) return '';
 
 				const artistConds = [];
 
-				// Helper that safely quotes a string for SQL literals
 				const quoteSqlString = (s) => {
 					if (s === undefined || s === null) return "''";
 					// remove control chars that may break SQL/logging
@@ -1392,92 +1388,59 @@ try {
 			// Initialize map entries
 			titles.forEach(t => results.set(t, []));
 
-			// PASS 1: Exact matches (case-insensitive)
-			{
-				const titleConditions = titles.map(t => `UPPER(Songs.SongTitle) = '${escapeSql(t.toUpperCase())}'`);
-				const whereParts = [];
-				if (artistClause) whereParts.push(artistClause);
-				whereParts.push(`(${titleConditions.join(' OR ')})`);
-				whereParts.push(...commonFilters);
+			// Precompute normalized inputs once
+			const wantedRows = titles.map((title, idx) => {
+				const raw = String(title || '');
+				const rawUpper = raw.toUpperCase();
+				const norm = stripName(raw);
+				return { idx, raw, rawUpper, norm };
+			});
 
-				const sql = `\n\t\t\tSELECT Songs.*, Songs.SongTitle as MatchedTitle\n\t\t\t${baseJoins}\n\t\t\tWHERE ${whereParts.join(' AND ')}\n\t\t\t${orderClause}\n\t\t`;
+			// Filter out empty titles (still keep them in results as empty arrays)
+			const wantedNonEmpty = wantedRows.filter(r => r.raw && r.raw.trim().length > 0);
+			if (wantedNonEmpty.length === 0) return results;
 
-				const tl = app?.db?.getTracklist(sql, -1);
-				if (tl) {
-					tl.autoUpdateDisabled = true;
-					tl.dontNotify = true;
-					await tl?.whenLoaded();
+			// Build VALUES list for CTE. Note: rawUpper/norm are safe-quoted.
+			const wantedValuesSql = wantedNonEmpty
+				.map(r => `(${r.idx}, '${escapeSql(r.raw)}', '${escapeSql(r.rawUpper)}', '${escapeSql(r.norm)}')`)
+				.join(',');
 
-					tl.forEach((track) => {
-						if (track) {
-							const matchedTitle = titles.find(t => t.toUpperCase() === (track.title || track.SongTitle || '').toUpperCase());
-							if (matchedTitle) {
-								const arr = results.get(matchedTitle);
-								if (arr && arr.length < maxPerTitle) arr.push(track);
-							}
-						}
-					});
+			// SQL-side normalization expression (must match stripName's semantics)
+			const songTitleNormExpr =
+				"REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(" +
+				"REPLACE(REPLACE(REPLACE(REPLACE(" +
+				"UPPER(Songs.SongTitle)," +
+				"'&','AND'),'+','AND'),' N ','AND'),'''N''','AND'),' ',''),'.','')," +
+				"',',''),':',''),';',''),'-',''),'_',''),'!',''),'''',''),'\"','')";
 
-					tl.autoUpdateDisabled = false;
-					tl.dontNotify = false;
-				}
-			}
+			// We only need to match against the requested titles (via the CTE), avoiding large OR lists.
+			const whereParts = [];
+			if (artistClause) whereParts.push(artistClause);
+			whereParts.push(`(UPPER(Songs.SongTitle) = Wanted.RawUpper OR ${songTitleNormExpr} = Wanted.Norm)`);
+			whereParts.push(...commonFilters);
 
-			// PASS 2: Fuzzy matches for titles that still need matches
-			{
-				const needMore = titles.filter(t => {
-					const arr = results.get(t);
-					return arr && arr.length < maxPerTitle;
-				});
+			const sql = `\n\t\t\tWITH Wanted(Idx, Raw, RawUpper, Norm) AS (VALUES ${wantedValuesSql})\n\t\t\tSELECT Songs.*, Wanted.Raw AS RequestedTitle\n\t\t\t${baseJoins}\n\t\t\tINNER JOIN Wanted\n\t\t\t\tON (UPPER(Songs.SongTitle) = Wanted.RawUpper OR ${songTitleNormExpr} = Wanted.Norm)\n\t\t\tWHERE ${whereParts.join(' AND ')}\n\t\t\t${orderClause}\n\t\t`;
 
-				if (needMore.length > 0) {
-					const fuzzyConditions = needMore.map(t => {
-						const stripped = stripName(t);
-						if (!stripped) return null;
+			const tl = app?.db?.getTracklist(sql, -1);
+			if (!tl) return results;
 
-						const stripExpr =
-							"REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(" +
-							"REPLACE(REPLACE(REPLACE(REPLACE(" +
-							"UPPER(Songs.SongTitle)," +
-							"'&','AND'),'+','AND'),' N ','AND'),'''N''','AND'),' ',''),'.','')," +
-							",',''),':',''),';',''),'-',''),'_',''),'!',''),'''',''),'\"','')";
+			tl.autoUpdateDisabled = true;
+			tl.dontNotify = true;
+			await tl.whenLoaded();
 
-						return `${stripExpr} = '${escapeSql(stripped)}'`;
-					}).filter(c => c !== null);
+			// Fill Map<title, tracks[]> with maxPerTitle cap.
+			tl.forEach((track) => {
+				if (!track) return;
+				const requested = track.RequestedTitle || track.requestedTitle || track.requestedtitle;
+				const key = requested ? String(requested) : '';
+				if (!key || !results.has(key)) return;
+				const arr = results.get(key);
+				if (arr && arr.length < maxPerTitle) arr.push(track);
+			});
 
-					if (fuzzyConditions.length > 0) {
-						const whereParts = [];
-						if (artistClause) whereParts.push(artistClause);
-						whereParts.push(`(${fuzzyConditions.join(' OR ')})`);
-						whereParts.push(...commonFilters);
+			tl.autoUpdateDisabled = false;
+			tl.dontNotify = false;
 
-						const sql = `\n\t\t\t\tSELECT Songs.* \n\t\t\t\t${baseJoins}\n\t\t\t\tWHERE ${whereParts.join(' AND ')}\n\t\t\t\t${orderClause}\n\t\t\t`;
-
-						const tl = app?.db?.getTracklist(sql, -1);
-						if (tl) {
-							tl.autoUpdateDisabled = true;
-							tl.dontNotify = true;
-							await tl?.whenLoaded();
-
-							tl.forEach((track) => {
-								if (track) {
-									const trackStripped = stripName(track.title || track.SongTitle || '');
-									const matchedTitle = needMore.find(t => stripName(t) === trackStripped);
-									if (matchedTitle) {
-										const arr = results.get(matchedTitle);
-										if (arr && arr.length < maxPerTitle) arr.push(track);
-									}
-								}
-							});
-
-							tl.autoUpdateDisabled = false;
-							tl.dontNotify = false;
-						}
-					}
-				}
-			}
-
-			// At this point results is a Map<title, array>
 			return results;
 
 		} catch (e) {
