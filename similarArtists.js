@@ -951,7 +951,6 @@ try {
 								seenTrackKeys.add(key);
 								allTracks.push(track);
 								addedFromArtist++;
-								tracksAddedThisSeed++;
 							}
 						}
 
@@ -2122,7 +2121,7 @@ return results.filter(Boolean);
 				return new Map();
 
 			// Ensure titles is array of strings
-			titles = titles.map(t => String(t || ''));
+			titles = titles.map(t => String(t || '');
 
 			const results = new Map();
 			const useBest = opts.best !== undefined ? opts.best : boolSetting('Best');
@@ -2271,7 +2270,8 @@ return results.filter(Boolean);
 			// Fill Map<title, tracks[]> with maxPerTitle cap.
 			tl.forEach((track) => {
 				if (!track) return;
-				const requested = track.title;
+				// Use the requested title from the CTE to ensure we bucket matches correctly
+				const requested = track.RequestedTitle || track.requestedTitle || track.title;
 				const key = requested ? String(requested) : '';
 				if (!key || !results.has(key)) return;
 				const arr = results.get(key);
@@ -2526,7 +2526,7 @@ return results.filter(Boolean);
 			await tracklist.whenLoaded();
 
 			if (tracklist.count > 0) {
-				// Use app.player.addTracksAsync() - the correct MM5 API for Now Playing
+				// Use app.player.addTracksAsync - the correct MM5 API for Now Playing
 				await player.addTracksAsync(tracklist);
 				console.log(`enqueueTracks: Successfully added ${tracklist.count} track(s) to Now Playing`);
 			} else {

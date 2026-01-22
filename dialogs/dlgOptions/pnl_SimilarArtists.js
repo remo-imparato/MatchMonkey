@@ -61,9 +61,9 @@ function stringSetting(key) {
 const defaults = {
 	ApiKey: app?.utils?.web?.getAPIKey('lastfmApiKey') || '7fd988db0c4e9d8b12aed27d0a91a932',
 	Confirm: false,
-	Limit: 5,
-	SeedLimit: 5,
-	SimilarLimit: 5,
+	Limit: 10,
+	SeedLimit: 10,
+	SimilarLimit: 10,
 	Name: '- Similar to %',
 	TPA: 9999,
 	TPL: 9999,
