@@ -2193,12 +2193,14 @@ try {
 
 				if (ratingMin > 0) {
 					if (allowUnknown) {
-						filters.push(`(Songs.Rating < 0 OR Songs.Rating >= ${ratingMin})`);
+						// Include unrated tracks (NULL or negative) as well as those meeting the minimum
+						filters.push(`(Songs.Rating IS NULL OR Songs.Rating < 0 OR Songs.Rating >= ${ratingMin})`);
 					} else {
 						filters.push(`(Songs.Rating >= ${ratingMin} AND Songs.Rating <= 100)`);
 					}
 				} else if (!allowUnknown) {
-					filters.push(`(Songs.Rating >= 0 AND Songs.Rating <= 100)`);
+					// Exclude unrated tracks explicitly (NULL or negative) when unknowns are not allowed
+					filters.push(`(Songs.Rating IS NOT NULL AND Songs.Rating >= 0 AND Songs.Rating <= 100)`);
 				}
 
 				return filters;
