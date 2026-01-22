@@ -1497,10 +1497,11 @@ try {
 
 			// SQL-side normalization expression (must match stripName's semantics)
 			const songTitleNormExpr =
-				"REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TRIM(REPLACE(REPLACE(" +
-				"REPLACE(REPLACE(REPLACE(REPLACE(UPPER(Songs.SongTitle)," +
-				"'&','AND'),'+','AND'),' N ','AND'),'''N''','AND'),' '," +
-				"'.',''),','),'\\',''),':',''),';',''),'-',''),'_',''),'!',''),'''',''),'\"','')";
+				"REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(" +
+				"REPLACE(REPLACE(REPLACE(REPLACE(" +
+				"UPPER(Songs.SongTitle)," +
+				"'&','AND'),'+','AND'),' N ','AND'),'''N''','AND'),' ',''),'.','')," +
+				"',',''),':',''),';',''),'-',''),'_',''),'!',''),'''',''),'\"','')";
 
 			// We only need to match against the requested titles (via the CTE), avoiding large OR lists.
 			const whereParts = [];
