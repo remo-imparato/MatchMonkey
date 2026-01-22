@@ -949,9 +949,9 @@ try {
 			if (autoRun) {
 				enqueue = true;
 				// Auto-mode defaults requested by user
-				seedLimit = 5; // number of similar artists to process
-				similarLimit = 5; // lookup tracks per artist limit
-				tracksPerArtist = 5; // add to queue tracks per artist
+				seedLimit = 10; // number of similar artists to process
+				similarLimit = 10; // lookup tracks per artist limit
+				tracksPerArtist = 10; // add to queue tracks per artist
 				totalLimit = 25; // total tracks to add
 				// Include the seed artist in auto-mode
 				includeSeedArtist = true;
