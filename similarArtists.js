@@ -794,7 +794,10 @@ try {
 					}
 
 					console.log(`Track-based discovery: Added ${allTracks.length} matched tracks to playlist`);
-					return allTracks;
+					// Only short-circuit when track-based mode actually produced tracks; otherwise fall back to artist-based discovery below
+					if (allTracks.length > 0) {
+						return allTracks;
+					}
 
 				} catch (e) {
 					console.error(`Track-based discovery error: ${e.toString()}`);
@@ -1762,25 +1765,12 @@ try {
 							console.warn(`fetchArtistBatch: API error or no artist data for "${name}"`);
 							cacheSetWithTtl(lastfmRunCache?.artistInfo, cacheKey, null);
 							return null;
-						}
+							}
 
-						const info = {
-							name: normalizeName(data.artist.name),
-							listeners: Number(data.artist.stats?.listeners) || 0,
-							playcount: Number(data.artist.stats?.playcount) || 0,
-							bio: (data.artist.bio?.summary || '').substring(0, 500) // limit bio length
-						};
+		}
+	);
 
-	cacheSetWithTtl(lastfmRunCache?.artistInfo, cacheKey, info);
-	return info;
-} catch (e) {
-	console.error(`fetchArtistBatch: Error for "${name}": ${e.toString()}`);
-	return null;
-}
-}
-);
-
-return results.filter(Boolean);
+	return results.filter(Boolean);
 } catch (e) {
 	console.error('fetchArtistBatch error: ' + e.toString());
 	return [];
@@ -2242,7 +2232,7 @@ return results.filter(Boolean);
 				"REPLACE(REPLACE(REPLACE(REPLACE(" +
 				"UPPER(Songs.SongTitle)," +
 				"'&','AND'),'+','AND'),' N ','AND'),'''N''','AND'),' ',''),'.','')," +
-				"',',''),':',''),';',''),'-',''),'_',''),'!',''),'''',''),'\"','')";
+				",',''),':',''),';',''),'-',''),'_',''),'!',''),'''',''),'\"','')";
 
 			// We only need to match against the requested titles (via the CTE), avoiding large OR lists.
 			const whereParts = [];
