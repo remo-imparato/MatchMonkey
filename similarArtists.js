@@ -889,17 +889,19 @@ try {
 			// In auto-mode, force enqueue and set tighter/default limits
 			if (autoRun) {
 				enqueue = true;
-				// Auto-mode defaults requested by user
-				seedLimit = 10; // number of similar artists to process
-				similarLimit = 100; // lookup tracks per artist limit
-				tracksPerArtist = 2; // add to queue tracks per artist
-				totalLimit = 10; // total tracks to add
-				// Include the seed artist in auto-mode
-				includeSeedArtist = true;
+				// Auto-mode: add a handful of similar-artist tracks near end of playlist
+				seedLimit = 1; // process only the current seed artist
+				similarLimit = 10; // number of similar artists to consider
+				tracksPerArtist = 5; // top tracks to request per similar artist
+				totalLimit = 20; // total tracks to add
+				// Do not include the seed artist itself in auto-mode
+				includeSeedArtist = false;
 				// Randomize the final trackset in auto-mode
 				randomise = true;
 				// Always avoid duplicating tracks in Now Playing when auto-queueing
 				ignoreDupes = true;
+				// Never clear Now Playing in auto-mode
+				clearNP = false;
 				console.log('Similar Artists: Auto-mode enabled - forcing enqueue to Now Playing with settings: seedLimit=' + seedLimit + ', similarLimit=' + similarLimit + ', tracksPerArtist=' + tracksPerArtist + ', totalLimit=' + totalLimit + ', includeSeedArtist=' + includeSeedArtist + ', randomise=' + randomise);
 			}
 
