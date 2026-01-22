@@ -764,7 +764,7 @@ try {
 
 						// Title-only lookup because track.getSimilar may not return artist consistently
 						const matches = await findLibraryTracks(simTrack.artist, simTrack.title, 1, { rank: false, best: bestEnabled, titleOnly: true });
-						
+
 						for (const track of matches) {
 							if (allTracks.length >= totalLimit) break;
 
@@ -1422,7 +1422,7 @@ try {
 				cacheSetWithTtl(lastfmRunCache?.similarArtists, cacheKey, []);
 				return [];
 			}
-		 let data;
+			let data;
 			try {
 				data = await res.json();
 			} catch (e) {
@@ -1765,7 +1765,7 @@ try {
 							console.warn(`fetchArtistBatch: API error or no artist data for "${name}"`);
 							cacheSetWithTtl(lastfmRunCache?.artistInfo, cacheKey, null);
 							return null;
-						 }
+						}
 
 						// Successful response: normalize and cache the artist info
 						const info = {
@@ -2198,7 +2198,7 @@ try {
 				if (ratingMin > 0) {
 					if (allowUnknown) {
 						// Include unrated tracks (NULL or negative) as well as those meeting the minimum
-					.filters.push(`(Songs.Rating IS NULL OR Songs.Rating <= 0 OR Songs.Rating >= ${ratingMin})`);
+						filters.push(`(Songs.Rating IS NULL OR Songs.Rating <= 0 OR Songs.Rating >= ${ratingMin})`);
 					} else {
 						filters.push(`(Songs.Rating >= ${ratingMin} AND Songs.Rating <= 100)`);
 					}
