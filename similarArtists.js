@@ -59,6 +59,11 @@ try {
 	const LASTFM_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 	const LASTFM_CONCURRENCY = 2;
 
+	// Persistent cache keys (stored in settings under the SimilarArtists config object)
+	const LASTFM_TOPTRACKS_CACHE_KEY = 'TopTracksCacheV1';
+	const LASTFM_TOPTRACKS_PERSIST_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+	const LASTFM_TOPTRACKS_PERSIST_MAX_ENTRIES = 500;
+
 	// Simple per-run request rate limiter (serializes requests and enforces min interval)
 	const lastfmRateLimiter = {
 		minInterval: LASTFM_MIN_REQUEST_INTERVAL_MS,
@@ -101,10 +106,19 @@ try {
 		lastfmRunCache = {
 			similarArtists: new Map(), // key: normalized artist name -> artists[]
 			topTracks: new Map(), // key: normalized artist name + '|' + limit -> titles[]
+			persistedTopTracks: loadPersistedTopTracksCache(), // key -> {ts,value}
+			persistedDirty: false,
 		};
 	}
 
 	function clearLastfmRunCache() {
+		try {
+			if (lastfmRunCache?.persistedDirty && lastfmRunCache?.persistedTopTracks) {
+				savePersistedTopTracksCache(lastfmRunCache.persistedTopTracks);
+			}
+		} catch (e) {
+			console.error('Similar Artists: clearLastfmRunCache: failed to persist cache: ' + e.toString());
+		}
 		lastfmRunCache = null;
 	}
 
@@ -1228,8 +1242,7 @@ try {
 				return [];
 			}
 			const artists = data?.similarartists?.artist || [];
-			let asArr = artists;
-			if (!Array.isArray(asArr) && asArr) asArr = [asArr];
+			const asArr = minimizeSimilarArtists(artists);
 			console.log(`fetchSimilarArtists: Retrieved ${asArr.length} similar artists for "${artistName}"`);
 			cacheSetWithTtl(lastfmRunCache?.similarArtists, cacheKey, asArr);
 			return asArr;
@@ -1257,6 +1270,16 @@ try {
 				return [];
 
 			const cacheKey = cacheKeyTopTracks(artistName, limit, includePlaycount);
+
+			// 1) Persisted (cross-run) cache
+			const persisted = cacheGetWithTtl(lastfmRunCache?.persistedTopTracks, cacheKey, LASTFM_TOPTRACKS_PERSIST_TTL_MS);
+			if (persisted !== undefined) {
+				// also seed per-run cache for this run
+				cacheSetWithTtl(lastfmRunCache?.topTracks, cacheKey, persisted);
+				return persisted || [];
+			}
+
+			// 2) Per-run cache
 			const cached = cacheGetWithTtl(lastfmRunCache?.topTracks, cacheKey);
 			if (cached !== undefined) {
 				return cached || [];
@@ -1296,22 +1319,21 @@ try {
 				return [];
 			}
 			let tracks = data?.toptracks?.track || [];
+			// normalize to array
 			if (tracks && !Array.isArray(tracks)) tracks = [tracks];
-			const rows = [];
-			tracks.forEach((t) => {
-				if (!t) return;
-				const title = t.name || t.title;
-				if (!title) return;
-				if (includePlaycount) {
-					const pc = Number(t.playcount) || 0;
-					rows.push({ title, playcount: pc });
-				} else {
-					rows.push(title);
-				}
-			});
-			console.log(`fetchTopTracks: Retrieved ${rows.length} top tracks for "${artistName}" (${purpose})`);
-			const out = typeof lim === 'number' ? rows.slice(0, lim) : rows;
+			const minimized = minimizeTopTracks(tracks, includePlaycount);
+			console.log(`fetchTopTracks: Retrieved ${minimized.length} top tracks for "${artistName}" (${purpose})`);
+			const out = typeof lim === 'number' ? minimized.slice(0, lim) : minimized;
 			cacheSetWithTtl(lastfmRunCache?.topTracks, cacheKey, out);
+
+			// Write-through to persisted cache so subsequent runs can reuse
+			try {
+				cacheSetWithTtl(lastfmRunCache?.persistedTopTracks, cacheKey, out);
+				if (lastfmRunCache) lastfmRunCache.persistedDirty = true;
+			} catch (_) {
+				// ignore
+			}
+
 			return out;
 		} catch (e) {
 			console.error(e.toString());
@@ -1475,11 +1497,10 @@ try {
 
 			// SQL-side normalization expression (must match stripName's semantics)
 			const songTitleNormExpr =
-				"REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(" +
-				"REPLACE(REPLACE(REPLACE(REPLACE(" +
-				"UPPER(Songs.SongTitle)," +
-				"'&','AND'),'+','AND'),' N ','AND'),'''N''','AND'),' ',''),'.','')," +
-				"',',''),':',''),';',''),'-',''),'_',''),'!',''),'''',''),'\"','')";
+				"REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TRIM(REPLACE(REPLACE(" +
+				"REPLACE(REPLACE(REPLACE(REPLACE(UPPER(Songs.SongTitle)," +
+				"'&','AND'),'+','AND'),' N ','AND'),'''N''','AND'),' '," +
+				"'.',''),','),'\\',''),':',''),';',''),'-',''),'_',''),'!',''),'''',''),'\"','')";
 
 			// We only need to match against the requested titles (via the CTE), avoiding large OR lists.
 			const whereParts = [];
@@ -1756,7 +1777,7 @@ try {
 
 		} catch (e) {
 			console.error(`enqueueTracks: Error adding tracks: ${e.toString()}`);
-		}
+				}
 	}
 
 	/**
@@ -2088,4 +2109,95 @@ try {
 		}
 	}
 
+	/**
+	 * Load the persisted top-tracks cache from settings.
+	 * Restores a map of artistName|limit -> track data objects.
+	 * @returns {Map} Restored cache map.
+	 */
+	function loadPersistedTopTracksCache() {
+		try {
+			const raw = getSetting(LASTFM_TOPTRACKS_CACHE_KEY, null);
+			if (!raw || typeof raw !== 'object') return new Map();
+
+			const now = Date.now();
+			const map = new Map();
+			for (const k of Object.keys(raw)) {
+				const e = raw[k];
+				if (!e || typeof e !== 'object') continue;
+				const ts = Number(e.ts || 0);
+				if (ts > 0 && (now - ts) > LASTFM_TOPTRACKS_PERSIST_TTL_MS) continue;
+				if ('value' in e) map.set(k, e);
+			}
+			return map;
+		} catch (e) {
+			console.error('Similar Artists: loadPersistedTopTracksCache error: ' + e.toString());
+			return new Map();
+		}
+	}
+
+	/**
+	 * Prune the persistent top-tracks cache map to enforce max entries and TTL.
+	 * @param {Map} map Cache map to prune.
+	 * @returns {Map} Pruned cache map.
+	 */
+	function prunePersistedTopTracksCache(map) {
+		try {
+			const entries = Array.from(map.entries());
+			// keep newest entries
+			entries.sort((a, b) => Number(b[1]?.ts || 0) - Number(a[1]?.ts || 0));
+			const capped = entries.slice(0, LASTFM_TOPTRACKS_PERSIST_MAX_ENTRIES);
+			const out = new Map();
+			for (const [k, v] of capped) out.set(k, v);
+			return out;
+		} catch (_) {
+			return map;
+		}
+	}
+
+	/**
+	 * Save the top-tracks cache to persistent settings.
+	 * Stores a pruned snapshot of the current cache.
+	 * @param {Map} map Cache map to save.
+	 */
+	function savePersistedTopTracksCache(map) {
+		try {
+			const pruned = prunePersistedTopTracksCache(map);
+			const obj = {};
+			for (const [k, v] of pruned.entries()) {
+				obj[k] = v;
+			}
+			setSetting(LASTFM_TOPTRACKS_CACHE_KEY, obj);
+		} catch (e) {
+			console.error('Similar Artists: savePersistedTopTracksCache error: ' + e.toString());
+		}
+	}
+
+	function normalizeTopTrackTitle(t) {
+		return String(t || '').trim();
+	}
+
+	function minimizeSimilarArtists(list) {
+		const arr = Array.isArray(list) ? list : (list ? [list] : []);
+		return arr
+			.map((a) => ({ name: normalizeName(a?.name || a) }))
+			.filter((a) => a.name);
+	}
+
+	function minimizeTopTracks(list, includePlaycount) {
+		const arr = Array.isArray(list) ? list : (list ? [list] : []);
+		if (includePlaycount) {
+			return arr
+				.map((t) => {
+					const title = normalizeTopTrackTitle(t?.title || t?.name || t);
+					if (!title) return null;
+					const playcount = Number(t?.playcount) || 0;
+					const rank = Number(t?.rank || t?.['@attr']?.rank) || 0;
+					return { title, playcount, rank };
+				})
+				.filter(Boolean);
+		}
+		return arr
+			.map((t) => normalizeTopTrackTitle(t?.title || t?.name || t))
+			.filter(Boolean);
+	}
 })(typeof window !== 'undefined' ? window : global);
