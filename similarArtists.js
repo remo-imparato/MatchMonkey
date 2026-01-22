@@ -53,6 +53,42 @@ try {
 	// Last.fm API base endpoint.
 	const API_BASE = 'https://ws.audioscrobbler.com/2.0/';
 
+	// Last.fm request controls
+	const LASTFM_MIN_REQUEST_INTERVAL_MS = 300;
+	const LASTFM_MAX_RETRIES = 5;
+	const LASTFM_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+	const LASTFM_CONCURRENCY = 2;
+
+	// Simple per-run request rate limiter (serializes requests and enforces min interval)
+	const lastfmRateLimiter = {
+		minInterval: LASTFM_MIN_REQUEST_INTERVAL_MS,
+		lastTs: 0,
+		queue: [],
+		running: false,
+		schedule(fn) {
+			return new Promise((resolve, reject) => {
+				this.queue.push({ fn, resolve, reject });
+				if (!this.running) this._run();
+			});
+		},
+		async _run() {
+			this.running = true;
+			while (this.queue.length) {
+				const now = Date.now();
+				const wait = Math.max(0, this.minInterval - (now - this.lastTs));
+				if (wait) await new Promise((r) => setTimeout(r, wait));
+				const { fn, resolve, reject } = this.queue.shift();
+				try {
+					resolve(await fn());
+				} catch (e) {
+					reject(e);
+				}
+				this.lastTs = Date.now();
+			}
+			this.running = false;
+		}
+	};
+
 	// Default settings (kept commented-out here because this add-on reads defaults from the Options page).
 	const defaults = {
 		Name: '- Similar to %',
@@ -723,10 +759,14 @@ try {
 
 			updateProgress(`Found ${similar.length} similar artist(s) for "${seed.name}", querying tracks...`, seedProgress * 0.3);
 
-			// Process each artist in the deduped pool using for..of for proper early breaks
-			for (const artName of artistPool) {
-				// Early exit check
-				if (allTracks.length >= totalLimit) break;
+			// Process each artist in the deduped pool with limited concurrency
+			let stop = false;
+			await runWithConcurrency(artistPool, LASTFM_CONCURRENCY, async (artName) => {
+				if (stop) return;
+				if (allTracks.length >= totalLimit) {
+					stop = true;
+					return;
+				}
 
 				try {
 					// Prepare a container for rank titles if we fetch them for ranking
@@ -769,6 +809,10 @@ try {
 					}
 
 					// COLLECTION MODE: Fetch top N tracks for playlist
+					if (allTracks.length >= totalLimit) {
+						stop = true;
+						return;
+					}
 					updateProgress(`Collecting: Fetching top ${tracksPerArtist} tracks from "${artName}"...`, seedProgress * 0.3);
 					let titles;
 					if (rankTitles && rankTitles.length > 0) {
@@ -778,23 +822,29 @@ try {
 						titles = await fetchTopTracks(fixPrefixes(artName), tracksPerArtist);
 					}
 
-					if (titles && titles.length > 0) {
+					if (titles && titles.length > 0 && !stop) {
 						updateProgress(`Collecting: Batch lookup of ${titles.length} tracks from "${artName}"...`, seedProgress * 0.3);
 
 						const matches = await findLibraryTracksBatch(artName, titles, 1, { rank: false, best: bestEnabled });
 
 						let addedFromArtist = 0;
 						for (const title of titles) {
-							if (allTracks.length >= totalLimit) break;
+							if (allTracks.length >= totalLimit) {
+								stop = true;
+								break;
+							}
 							const trackMatches = matches.get(title) || [];
 							for (const track of trackMatches) {
+								if (allTracks.length >= totalLimit) {
+									stop = true;
+									break;
+								}
 								// Deduplicate by key across the whole run
 								const key = getTrackKey(track);
 								if (!key || seenTrackKeys.has(key)) continue;
 								seenTrackKeys.add(key);
 								allTracks.push(track);
 								addedFromArtist++;
-								if (allTracks.length >= totalLimit) break;
 							}
 						}
 
@@ -804,12 +854,7 @@ try {
 				} catch (e) {
 					console.error(`Similar Artists: Error processing artist "${artName}": ${e.toString()}`);
 				}
-
-				// continue to next artist (for..of handles it)
-			}
-
-			// If reached desired total, stop processing further seeds
-			if (allTracks.length >= totalLimit) break;
+			});
 		}
 
 		// Post-filter to ensure no duplicates remain and enforce totalLimit
@@ -890,10 +935,10 @@ try {
 			if (autoRun) {
 				enqueue = true;
 				// Auto-mode defaults requested by user
-				seedLimit = 10; // number of similar artists to process
-				similarLimit = 100; // lookup tracks per artist limit
-				tracksPerArtist = 2; // add to queue tracks per artist
-				totalLimit = 10; // total tracks to add
+				seedLimit = 5; // number of similar artists to process
+				similarLimit = 5; // lookup tracks per artist limit
+				tracksPerArtist = 5; // add to queue tracks per artist
+				totalLimit = 25; // total tracks to add
 				// Include the seed artist in auto-mode
 				includeSeedArtist = true;
 				// Randomize the final trackset in auto-mode
@@ -910,15 +955,42 @@ try {
 			const trackRankMap = rankEnabled ? new Map() : null;
 
 			// Process seed artists to find similar artists and tracks
-			const allTracks = await processSeedArtists(seeds, {
-				seedLimit,
-				similarLimit,
-				tracksPerArtist,
-				totalLimit,
-				includeSeedArtist,
-				rankEnabled,
-				bestEnabled
-			}, trackRankMap);
+			let allTracks = [];
+			if (seeds.length <= 1) {
+				allTracks = await processSeedArtists(seeds, {
+					seedLimit,
+					similarLimit,
+					tracksPerArtist,
+					totalLimit,
+					includeSeedArtist,
+					rankEnabled,
+					bestEnabled
+				}, trackRankMap);
+			} else {
+				// Run seed processing with limited concurrency by processing each seed individually.
+				// This avoids waking too many parallel Last.fm requests if multiple seeds are selected.
+				const perSeed = await runWithConcurrency(seeds.slice(0, seedLimit || seeds.length), LASTFM_CONCURRENCY, async (seed) => {
+					return processSeedArtists([seed], {
+						seedLimit: 1,
+						similarLimit,
+						tracksPerArtist,
+						totalLimit,
+						includeSeedArtist,
+						rankEnabled,
+						bestEnabled
+					}, trackRankMap);
+				});
+				for (const arr of perSeed) {
+					if (!arr || arr.length === 0) continue;
+					for (const t of arr) {
+						allTracks.push(t);
+						if (allTracks.length >= totalLimit) break;
+					}
+					if (allTracks.length >= totalLimit) break;
+				}
+				// Ensure we never exceed totalLimit
+				if (allTracks.length > totalLimit) allTracks = allTracks.slice(0, totalLimit);
+			}
 
 			if (!allTracks.length) {
 				showToast('SimilarArtists: No matching tracks found in library.');
@@ -1117,8 +1189,9 @@ try {
 				return [];
 
 			const cacheKey = cacheKeyArtist(artistName);
-			if (lastfmRunCache?.similarArtists?.has(cacheKey)) {
-				return lastfmRunCache.similarArtists.get(cacheKey) || [];
+			const cached = cacheGetWithTtl(lastfmRunCache?.similarArtists, cacheKey);
+			if (cached !== undefined) {
+				return cached || [];
 			}
 
 			const apiKey = getApiKey();
@@ -1131,12 +1204,12 @@ try {
 			updateProgress(`Querying Last.fm API: getSimilar for "${artistName}"...`);
 			console.log('Similar Artists: fetchSimilarArtists: querying ' + url);
 
-			const res = await fetch(url);
+			const res = await fetchWithBackoff(url);
 
 			if (!res || !res.ok) {
 				console.log(`fetchSimilarArtists: HTTP ${res?.status} ${res?.statusText} for ${artistName}`);
 				updateProgress(`Failed to fetch similar artists for "${artistName}" (HTTP ${res?.status})`);
-				lastfmRunCache?.similarArtists?.set(cacheKey, []);
+				cacheSetWithTtl(lastfmRunCache?.similarArtists, cacheKey, []);
 				return [];
 			}
 			let data;
@@ -1145,20 +1218,20 @@ try {
 			} catch (e) {
 				console.warn('Similar Artists: fetchSimilarArtists: invalid JSON response: ' + e.toString());
 				updateProgress(`Error parsing Last.fm response for "${artistName}"`);
-				lastfmRunCache?.similarArtists?.set(cacheKey, []);
+				cacheSetWithTtl(lastfmRunCache?.similarArtists, cacheKey, []);
 				return [];
 			}
 			if (data?.error) {
 				console.warn('Similar Artists: fetchSimilarArtists: API error: ' + (data.message || data.error));
 				updateProgress(`Last.fm API error for "${artistName}": ${data.message || data.error}`);
-				lastfmRunCache?.similarArtists?.set(cacheKey, []);
+				cacheSetWithTtl(lastfmRunCache?.similarArtists, cacheKey, []);
 				return [];
 			}
 			const artists = data?.similarartists?.artist || [];
 			let asArr = artists;
 			if (!Array.isArray(asArr) && asArr) asArr = [asArr];
 			console.log(`fetchSimilarArtists: Retrieved ${asArr.length} similar artists for "${artistName}"`);
-			lastfmRunCache?.similarArtists?.set(cacheKey, asArr);
+			cacheSetWithTtl(lastfmRunCache?.similarArtists, cacheKey, asArr);
 			return asArr;
 		} catch (e) {
 			console.error(e.toString());
@@ -1184,9 +1257,11 @@ try {
 				return [];
 
 			const cacheKey = cacheKeyTopTracks(artistName, limit, includePlaycount);
-			if (lastfmRunCache?.topTracks?.has(cacheKey)) {
-				return lastfmRunCache.topTracks.get(cacheKey) || [];
+			const cached = cacheGetWithTtl(lastfmRunCache?.topTracks, cacheKey);
+			if (cached !== undefined) {
+				return cached || [];
 			}
+
 			const apiKey = getApiKey();
 			const lim = Number(limit) || undefined;
 			const params = new URLSearchParams({ method: 'artist.getTopTracks', api_key: apiKey, format: 'json', artist: artistName, autocorrect: '1' });
@@ -1198,11 +1273,11 @@ try {
 			updateProgress(`Querying Last.fm: getTopTracks ${purpose} for "${artistName}" (limit: ${lim || 'default'})...`);
 			console.log(`fetchTopTracks: querying ${url} (${purpose})`);
 
-			const res = await fetch(url);
+			const res = await fetchWithBackoff(url);
 			if (!res || !res.ok) {
 				console.log(`fetchTopTracks: HTTP ${res?.status} ${res?.statusText} for ${artistName}`);
 				updateProgress(`Failed to fetch top tracks for "${artistName}" (HTTP ${res?.status})`);
-				lastfmRunCache?.topTracks?.set(cacheKey, []);
+				cacheSetWithTtl(lastfmRunCache?.topTracks, cacheKey, []);
 				return [];
 			}
 			let data;
@@ -1211,13 +1286,13 @@ try {
 			} catch (e) {
 				console.warn('Similar Artists: fetchTopTracks: invalid JSON response: ' + e.toString());
 				updateProgress(`Error parsing Last.fm response for "${artistName}"`);
-				lastfmRunCache?.topTracks?.set(cacheKey, []);
+				cacheSetWithTtl(lastfmRunCache?.topTracks, cacheKey, []);
 				return [];
 			}
 			if (data?.error) {
 				console.warn('Similar Artists: fetchTopTracks: API error: ' + (data.message || data.error));
 				updateProgress(`Last.fm API error for "${artistName}": ${data.message || data.error}`);
-				lastfmRunCache?.topTracks?.set(cacheKey, []);
+				cacheSetWithTtl(lastfmRunCache?.topTracks, cacheKey, []);
 				return [];
 			}
 			let tracks = data?.toptracks?.track || [];
@@ -1236,13 +1311,13 @@ try {
 			});
 			console.log(`fetchTopTracks: Retrieved ${rows.length} top tracks for "${artistName}" (${purpose})`);
 			const out = typeof lim === 'number' ? rows.slice(0, lim) : rows;
-			lastfmRunCache?.topTracks?.set(cacheKey, out);
+			cacheSetWithTtl(lastfmRunCache?.topTracks, cacheKey, out);
 			return out;
 		} catch (e) {
 			console.error(e.toString());
 			updateProgress(`Error fetching top tracks: ${e.toString()}`);
 			try {
-				lastfmRunCache?.topTracks?.set(cacheKeyTopTracks(artistName, limit, includePlaycount), []);
+				cacheSetWithTtl(lastfmRunCache?.topTracks, cacheKeyTopTracks(artistName, limit, includePlaycount), []);
 			} catch (_) {
 				// ignore
 			}
@@ -1947,5 +2022,70 @@ try {
 		applyAutoModeFromSettings,
 		isAutoEnabled,
 	};
+
+	/**
+	 * Limited concurrency helper for running tasks in parallel with a cap on active promises.
+	 * @param {Array} items Array of items to process.
+	 * @param {number} concurrency Concurrency limit (max simultaneous tasks).
+	 * @param {Function} worker Worker function to process each item. Should return a Promise.
+	 * @returns {Promise<Array>} Array of results from the worker function.
+	 */
+	async function runWithConcurrency(items, concurrency, worker) {
+		const list = Array.isArray(items) ? items : [];
+		const c = Math.max(1, Number(concurrency) || 1);
+		const results = new Array(list.length);
+		let idx = 0;
+		const runners = new Array(Math.min(c, list.length)).fill(0).map(async () => {
+			while (true) {
+				const cur = idx++;
+				if (cur >= list.length) return;
+				results[cur] = await worker(list[cur], cur);
+			}
+		});
+		await Promise.all(runners);
+		return results;
+	}
+
+	/**
+	 * Cache getter with optional TTL (time-to-live) for entry expiration.
+	 * Returns undefined for expired or non-existent entries.
+	 * @param {Map} map Cache map.
+	 * @param {any} key Cache key.
+	 * @param {number} [ttlMs=LASTFM_CACHE_TTL_MS] TTL in milliseconds.
+	 * @returns {any} Cached value or undefined.
+	 */
+	function cacheGetWithTtl(map, key, ttlMs = LASTFM_CACHE_TTL_MS) {
+		try {
+			if (!map || !map.has(key)) return undefined;
+			const entry = map.get(key);
+			// Backward compatibility: entry can be raw cached value
+			if (!entry || typeof entry !== 'object' || !('ts' in entry) || !('value' in entry)) {
+				return entry;
+			}
+			const age = Date.now() - Number(entry.ts || 0);
+			if (ttlMs > 0 && age > ttlMs) {
+				map.delete(key);
+				return undefined;
+			}
+			return entry.value;
+		} catch (_) {
+			return undefined;
+		}
+	}
+
+	/**
+	 * Cache setter with TTL (time-to-live) for entry expiration.
+	 * @param {Map} map Cache map.
+	 * @param {any} key Cache key.
+	 * @param {any} value Cache value.
+	 */
+	function cacheSetWithTtl(map, key, value) {
+		try {
+			if (!map) return;
+			map.set(key, { ts: Date.now(), value });
+		} catch (_) {
+			// ignore
+		}
+	}
 
 })(typeof window !== 'undefined' ? window : global);
