@@ -1765,497 +1765,513 @@ try {
 							console.warn(`fetchArtistBatch: API error or no artist data for "${name}"`);
 							cacheSetWithTtl(lastfmRunCache?.artistInfo, cacheKey, null);
 							return null;
-						}
+								}
 
-						// Successful response: normalize and cache the artist info
-						const info = {
-							name: normalizeName(data.artist.name),
-							listeners: Number(data.artist.listeners) || 0,
-							playcount: Number(data.artist.playcount) || 0,
-							bio: data.artist.bio?.summary ? data.artist.bio.summary.trim() : ''
-						};
+		// Successful response: normalize and cache the artist info
+		const info = {
+			name: normalizeName(data.artist.name),
+			listeners: Number(data.artist.listeners) || 0,
+			playcount: Number(data.artist.playcount) || 0,
+			bio: data.artist.bio?.summary ? data.artist.bio.summary.trim() : ''
+		};
 
-						cacheSetWithTtl(lastfmRunCache?.artistInfo, cacheKey, info);
-						return info;
-					} catch (e) {
-						console.error('fetchArtistBatch: Error processing artist info: ' + e.toString());
-						return null;
-					}
-				}
-			);
-
-			return results.filter(Boolean);
-		} catch (e) {
-			console.error('fetchArtistBatch error: ' + e.toString());
-			return [];
-		}
+		cacheSetWithTtl(lastfmRunCache?.artistInfo, cacheKey, info);
+		return info;
+	} catch (e) {
+		console.error('fetchArtistBatch: Error processing artist info: ' + e.toString());
+		return null;
 	}
+}
 
-	function sleep(ms) {
-		return new Promise((r) => setTimeout(r, Math.max(0, Number(ms) || 0)));
-	}
+);
 
-	async function fetchWithBackoff(url, options = {}) {
-		const maxRetries = Math.max(0, Number(LASTFM_MAX_RETRIES) || 0);
-		let attempt = 0;
-		let lastErr;
+return results.filter(Boolean);
+} catch (e) {
+	console.error('fetchArtistBatch error: ' + e.toString());
+	return [];
+}
+}
 
-		while (attempt <= maxRetries) {
-			try {
-				// MM environment may or may not provide global fetch; assume it exists where addon runs.
-				const res = await lastfmRateLimiter.schedule(() => fetch(url, options));
-				// Retry only on explicit rate limiting or transient server errors.
-				if (res && (res.status === 429 || (res.status >= 500 && res.status <= 599))) {
-					lastErr = new Error(`HTTP ${res.status}`);
-					throw lastErr;
-				}
-				return res;
-			} catch (e) {
-				lastErr = e;
-				if (attempt >= maxRetries) break;
-				// Exponential backoff with jitter
-				const base = 300;
-				const backoff = Math.min(5000, base * Math.pow(2, attempt));
-				const jitter = Math.floor(Math.random() * 250);
-				await sleep(backoff + jitter);
-				attempt += 1;
-			}
-		}
+/**
+ * Sleep for the specified number of milliseconds.
+ * @param {number} ms Milliseconds to sleep.
+ * @returns {Promise} Promise that resolves after the delay.
+ */
+function sleep(ms) {
+	return new Promise((r) => setTimeout(r, Math.max(0, Number(ms) || 0)));
+}
 
-		throw lastErr || new Error('fetchWithBackoff failed');
-	}
+/**
+ * Fetch with exponential backoff retry on rate limit or transient errors.
+ * @param {string} url URL to fetch.
+ * @param {object} options Fetch options.
+ * @returns {Promise<Response>} Fetch response.
+ */
+async function fetchWithBackoff(url, options = {}) {
+	const maxRetries = Math.max(0, Number(LASTFM_MAX_RETRIES) || 0);
+	let attempt = 0;
+	let lastErr;
 
-	/**
-	 * Fetch with request deduplication to prevent duplicate in-flight API calls.
-	 * If multiple requests arrive for the same URL before the first completes,
-	 * all wait for the same promise rather than making duplicate API calls.
-	 * @param {string} url URL to fetch.
-	 * @param {object} options Fetch options.
-	 * @returns {Promise<Response>} Fetch response.
-	 */
-	async function fetchWithDedup(url, options = {}) {
-		// Check if request deduplication is enabled
-		const useDedup = boolSetting('UseRequestDedup');
-		if (!useDedup) {
-			// Deduplication disabled, use normal fetch
-			return fetchWithBackoff(url, options);
-		}
-
-		// Return existing promise if request already in-flight
-		if (requestCache.has(url)) {
-			console.log(`fetchWithDedup: Reusing in-flight request for ${url}`);
-			return requestCache.get(url);
-		}
-
-		// Create new request promise
-		const promise = fetchWithBackoff(url, options)
-			.then(res => {
-				// Clear from cache after a short delay to allow concurrent requests to share result
-				setTimeout(() => requestCache.delete(url), 100);
-				return res;
-			})
-			.catch(err => {
-				// Clear from cache immediately on error so retry attempts can proceed
-				requestCache.delete(url);
-				throw err;
-			});
-
-		requestCache.set(url, promise);
-		return promise;
-	}
-
-	/**
-	 * In-place Fisher–Yates shuffle.
-	 * @param {any[]} arr Array to shuffle.
-	 */
-	function shuffle(arr) {
-		if (!arr || arr.length <= 1) return;
-		for (let i = arr.length - 1; i > 0; --i) {
-			const j = Math.floor(Math.random() * (i + 1));
-			const temp = arr[i];
-			arr[i] = arr[j];
-			arr[j] = temp;
-		}
-	}
-
-	/**
-	 * Normalize a string for fuzzy title comparison in SQL.
-	 * @param {string} name Title.
-	 * @returns {string} Uppercased string with punctuation/whitespace removed.
-	 */
-	function stripName(name) {
-		if (!name) return '';
-		let result = name.toUpperCase();
-		result = result.replace(/&/g, 'AND');
-		result = result.replace(/\+/g, 'AND');
-		result = result.replace(/ N /g, 'AND');
-		result = result.replace(/'N'/g, 'AND');
-		result = result.replace(/ /g, '');
-		result = result.replace(/\./g, '');
-		result = result.replace(/,/g, '');
-		result = result.replace(/:/g, '');
-		result = result.replace(/;/g, '');
-		result = result.replace(/-/g, '');
-		result = result.replace(/_/g, '');
-		result = result.replace(/!/g, '');
-		result = result.replace(/'/g, '');
-		result = result.replace(/"/g, '');
-		return result;
-	}
-
-	/**
-	 * Escape single quotes for SQL queries
-	 * @param {string} str - String to escape
-	 * @returns {string} Escaped string
-	 */
-	function escapeSql(str) {
-		return (str || '').replace(/'/g, "''");
-	}
-
-	/**
-	 * Build a comma-separated artist label from seed artists (used to plug into the Name template).
-	 * This returns only the artist label portion (e.g. "Pink Floyd, Fuel") and does NOT apply the template.
-	 * @param {{name: string, track?: object}[]} seeds Array of seed artist objects.
-	 * @returns {string} Comma-separated artist names.
-	 */
-	function buildPlaylistTitle(seeds) {
-		const names = (seeds || []).map((s) => s?.name).filter((n) => n && n.trim().length);
-		if (!names.length) return '';
-
-		// Limit artist portion to keep playlist titles readable and within common limits.
-		const maxLabelLen = 80; // conservative limit for artist portion
-		let label = names[0];
-		for (let i = 1; i < names.length; i++) {
-			const candidate = `${label}, ${names[i]}`;
-			if (candidate.length > maxLabelLen) {
-				label += '…';
-				break;
-			}
-			label = candidate;
-		}
-		return label;
-	}
-
-	/**
-	 * Limited concurrency helper for running tasks in parallel with a cap on active promises.
-	 * @param {Array} items Array of items to process.
-	 * @param {number} concurrency Concurrency limit (max simultaneous tasks).
-	 * @param {Function} worker Worker function to process each item. Should return a Promise.
-	 * @returns {Promise<Array>} Array of results from the worker function.
-	 */
-	async function runWithConcurrency(items, concurrency, worker) {
-		const list = Array.isArray(items) ? items : [];
-		const c = Math.max(1, Number(concurrency) || 1);
-		const results = new Array(list.length);
-		let idx = 0;
-		const runners = new Array(Math.min(c, list.length)).fill(0).map(async () => {
-			while (true) {
-				const cur = idx++;
-				if (cur >= list.length) return;
-				results[cur] = await worker(list[cur], cur);
-			}
-		});
-		await Promise.all(runners);
-		return results;
-	}
-
-	/**
-	 * Cache getter with optional TTL (time-to-live) for entry expiration.
-	 * Returns undefined for expired or non-existent entries.
-	 * @param {Map} map Cache map.
-	 * @param {any} key Cache key.
-	 * @param {number} [ttlMs=LASTFM_CACHE_TTL_MS] TTL in milliseconds.
-	 * @returns {any} Cached value or undefined.
-	 */
-	function cacheGetWithTtl(map, key, ttlMs = LASTFM_CACHE_TTL_MS) {
+	while (attempt <= maxRetries) {
 		try {
-			if (!map || !map.has(key)) return undefined;
-			const entry = map.get(key);
-			// Backward compatibility: entry can be raw cached value
-			if (!entry || typeof entry !== 'object' || !('ts' in entry) || !('value' in entry)) {
-				return entry;
+			// MM environment may or may not provide global fetch; assume it exists where addon runs.
+			const res = await lastfmRateLimiter.schedule(() => fetch(url, options));
+			// Retry only on explicit rate limiting or transient server errors.
+			if (res && (res.status === 429 || (res.status >= 500 && res.status <= 599))) {
+				lastErr = new Error(`HTTP ${res.status}`);
+				throw lastErr;
 			}
-			const age = Date.now() - Number(entry.ts || 0);
-			if (ttlMs > 0 && age > ttlMs) {
-				map.delete(key);
-				return undefined;
-			}
-			return entry.value;
-		} catch (_) {
+			return res;
+		} catch (e) {
+			lastErr = e;
+			if (attempt >= maxRetries) break;
+			// Exponential backoff with jitter
+			const base = 300;
+			const backoff = Math.min(5000, base * Math.pow(2, attempt));
+			const jitter = Math.floor(Math.random() * 250);
+			await sleep(backoff + jitter);
+			attempt += 1;
+		}
+	}
+
+	throw lastErr || new Error('fetchWithBackoff failed');
+}
+
+/**
+ * Fetch with request deduplication to prevent duplicate in-flight API calls.
+ * If multiple requests arrive for the same URL before the first completes,
+ * all wait for the same promise rather than making duplicate API calls.
+ * @param {string} url URL to fetch.
+ * @param {object} options Fetch options.
+ * @returns {Promise<Response>} Fetch response.
+ */
+async function fetchWithDedup(url, options = {}) {
+	// Check if request deduplication is enabled
+	const useDedup = boolSetting('UseRequestDedup');
+	if (!useDedup) {
+		// Deduplication disabled, use normal fetch
+		return fetchWithBackoff(url, options);
+	}
+
+	// Return existing promise if request already in-flight
+	if (requestCache.has(url)) {
+		console.log(`fetchWithDedup: Reusing in-flight request for ${url}`);
+		return requestCache.get(url);
+	}
+
+	// Create new request promise
+	const promise = fetchWithBackoff(url, options)
+		.then(res => {
+			// Clear from cache after a short delay to allow concurrent requests to share result
+			setTimeout(() => requestCache.delete(url), 100);
+			return res;
+		})
+		.catch(err => {
+			// Clear from cache immediately on error so retry attempts can proceed
+			requestCache.delete(url);
+			throw err;
+		});
+
+	requestCache.set(url, promise);
+	return promise;
+}
+
+/**
+ * In-place Fisher–Yates shuffle.
+ * @param {any[]} arr Array to shuffle.
+ */
+function shuffle(arr) {
+	if (!arr || arr.length <= 1) return;
+	for (let i = arr.length - 1; i > 0; --i) {
+		const j = Math.floor(Math.random() * (i + 1));
+		const temp = arr[i];
+		arr[i] = arr[j];
+		arr[j] = temp;
+	}
+}
+
+/**
+ * Normalize a string for fuzzy title comparison in SQL.
+ * @param {string} name Title.
+ * @returns {string} Uppercased string with punctuation/whitespace removed.
+ */
+function stripName(name) {
+	if (!name) return '';
+	let result = name.toUpperCase();
+	result = result.replace(/&/g, 'AND');
+	result = result.replace(/\+/g, 'AND');
+	result = result.replace(/ N /g, 'AND');
+	result = result.replace(/'N'/g, 'AND');
+	result = result.replace(/ /g, '');
+	result = result.replace(/\./g, '');
+	result = result.replace(/,/g, '');
+	result = result.replace(/:/g, '');
+	result = result.replace(/;/g, '');
+	result = result.replace(/-/g, '');
+	result = result.replace(/_/g, '');
+	result = result.replace(/!/g, '');
+	result = result.replace(/'/g, '');
+	result = result.replace(/"/g, '');
+	return result;
+}
+
+/**
+ * Escape single quotes for SQL queries
+ * @param {string} str - String to escape
+ * @returns {string} Escaped string
+ */
+function escapeSql(str) {
+	return (str || '').replace(/'/g, "''");
+}
+
+/**
+ * Build a comma-separated artist label from seed artists (used to plug into the Name template).
+ * This returns only the artist label portion (e.g. "Pink Floyd, Fuel") and does NOT apply the template.
+ * @param {{name: string, track?: object}[]} seeds Array of seed artist objects.
+ * @returns {string} Comma-separated artist names.
+ */
+function buildPlaylistTitle(seeds) {
+	const names = (seeds || []).map((s) => s?.name).filter((n) => n && n.trim().length);
+	if (!names.length) return '';
+
+	// Limit artist portion to keep playlist titles readable and within common limits.
+	const maxLabelLen = 80; // conservative limit for artist portion
+	let label = names[0];
+	for (let i = 1; i < names.length; i++) {
+		const candidate = `${label}, ${names[i]}`;
+		if (candidate.length > maxLabelLen) {
+			label += '…';
+			break;
+		}
+		label = candidate;
+	}
+	return label;
+}
+
+/**
+ * Limited concurrency helper for running tasks in parallel with a cap on active promises.
+ * @param {Array} items Array of items to process.
+ * @param {number} concurrency Concurrency limit (max simultaneous tasks).
+ * @param {Function} worker Worker function to process each item. Should return a Promise.
+ * @returns {Promise<Array>} Array of results from the worker function.
+ */
+async function runWithConcurrency(items, concurrency, worker) {
+	const list = Array.isArray(items) ? items : [];
+	const c = Math.max(1, Number(concurrency) || 1);
+	const results = new Array(list.length);
+	let idx = 0;
+	const runners = new Array(Math.min(c, list.length)).fill(0).map(async () => {
+		while (true) {
+			const cur = idx++;
+			if cur >= list.length) return;
+			results[cur] = await worker(list[cur], cur);
+		}
+	});
+	await Promise.all(runners);
+	return results;
+}
+
+/**
+ * Cache getter with optional TTL (time-to-live) for entry expiration.
+ * Returns undefined for expired or non-existent entries.
+ * @param {Map} map Cache map.
+ * @param {any} key Cache key.
+ * @param {number} [ttlMs=LASTFM_CACHE_TTL_MS] TTL in milliseconds.
+ * @returns {any} Cached value or undefined.
+ */
+function cacheGetWithTtl(map, key, ttlMs = LASTFM_CACHE_TTL_MS) {
+	try {
+		if (!map || !map.has(key)) return undefined;
+		const entry = map.get(key);
+		// Backward compatibility: entry can be raw cached value
+		if (!entry || typeof entry !== 'object' || !('ts' in entry) || !('value' in entry)) {
+			return entry;
+		}
+		const age = Date.now() - Number(entry.ts || 0);
+		if (ttlMs > 0 && age > ttlMs) {
+			map.delete(key);
 			return undefined;
 		}
+		return entry.value;
+	} catch (_) {
+		return undefined;
 	}
+}
 
-	/**
-	 * Cache setter with TTL (time-to-live) for entry expiration.
-	 * @param {Map} map Cache map.
-	 * @param {any} key Cache key.
-	 * @param {any} value Cache value.
-	 */
-	function cacheSetWithTtl(map, key, value) {
-		try {
-			if (!map) return;
-			map.set(key, { ts: Date.now(), value });
-		} catch (_) {
-			// ignore
+/**
+ * Cache setter with TTL (time-to-live) for entry expiration.
+ * @param {Map} map Cache map.
+ * @param {any} key Cache key.
+ * @param {any} value Cache value.
+ */
+function cacheSetWithTtl(map, key, value) {
+	try {
+		if (!map) return;
+		map.set(key, { ts: Date.now(), value });
+	} catch (_) {
+		// ignore
+	}
+}
+
+/**
+ * Load the persisted top-tracks cache from settings.
+ * Restores a map of artistName|limit -> track data objects.
+ * @returns {Map} Restored cache map.
+ */
+function loadPersistedTopTracksCache() {
+	try {
+		const raw = getSetting(LASTFM_TOPTRACKS_CACHE_KEY, null);
+		if (!raw || typeof raw !== 'object') return new Map();
+
+		const now = Date.now();
+		const map = new Map();
+		for (const k of Object.keys(raw)) {
+			const e = raw[k];
+			if (!e || typeof e !== 'object') continue;
+			const ts = Number(e.ts || 0);
+			if (ts > 0 && (now - ts) > LASTFM_TOPTRACKS_PERSIST_TTL_MS) continue;
+			if ('value' in e) map.set(k, e);
 		}
+		return map;
+	} catch (e) {
+		console.error('Similar Artists: loadPersistedTopTracksCache error: ' + e.toString());
+		return new Map();
 	}
+}
 
-	/**
-	 * Load the persisted top-tracks cache from settings.
-	 * Restores a map of artistName|limit -> track data objects.
-	 * @returns {Map} Restored cache map.
-	 */
-	function loadPersistedTopTracksCache() {
-		try {
-			const raw = getSetting(LASTFM_TOPTRACKS_CACHE_KEY, null);
-			if (!raw || typeof raw !== 'object') return new Map();
+/**
+ * Prune the persistent top-tracks cache map to enforce max entries and TTL.
+ * @param {Map} map Cache map to prune.
+ * @returns {Map} Pruned cache map.
+ */
+function prunePersistedTopTracksCache(map) {
+	try {
+		const entries = Array.from(map.entries());
+		// keep newest entries
+		entries.sort((a, b) => Number(b[1]?.ts || 0) - Number(a[1]?.ts || 0));
+		const capped = entries.slice(0, LASTFM_TOPTRACKS_PERSIST_MAX_ENTRIES);
+		const out = new Map();
+		for (const [k, v] of capped) out.set(k, v);
+		return out;
+	} catch (_) {
+		return map;
+	}
+}
 
-			const now = Date.now();
-			const map = new Map();
-			for (const k of Object.keys(raw)) {
-				const e = raw[k];
-				if (!e || typeof e !== 'object') continue;
-				const ts = Number(e.ts || 0);
-				if (ts > 0 && (now - ts) > LASTFM_TOPTRACKS_PERSIST_TTL_MS) continue;
-				if ('value' in e) map.set(k, e);
-			}
-			return map;
-		} catch (e) {
-			console.error('Similar Artists: loadPersistedTopTracksCache error: ' + e.toString());
-			return new Map();
+/**
+ * Save the top-tracks cache to persistent settings.
+ * Stores a pruned snapshot of the current cache.
+ * @param {Map} map Cache map to save.
+ */
+function savePersistedTopTracksCache(map) {
+	try {
+		const pruned = prunePersistedTopTracksCache(map);
+		const obj = {};
+		for (const [k, v] of pruned.entries()) {
+			obj[k] = v;
 		}
+		setSetting(LASTFM_TOPTRACKS_CACHE_KEY, obj);
+	} catch (e) {
+		console.error('Similar Artists: savePersistedTopTracksCache error: ' + e.toString());
 	}
+}
 
-	/**
-	 * Prune the persistent top-tracks cache map to enforce max entries and TTL.
-	 * @param {Map} map Cache map to prune.
-	 * @returns {Map} Pruned cache map.
-	 */
-	function prunePersistedTopTracksCache(map) {
-		try {
-			const entries = Array.from(map.entries());
-			// keep newest entries
-			entries.sort((a, b) => Number(b[1]?.ts || 0) - Number(a[1]?.ts || 0));
-			const capped = entries.slice(0, LASTFM_TOPTRACKS_PERSIST_MAX_ENTRIES);
-			const out = new Map();
-			for (const [k, v] of capped) out.set(k, v);
-			return out;
-		} catch (_) {
-			return map;
-		}
-	}
+/**
+ * Normalize top track title.
+ * @param {string|object} t Track title or track object.
+ * @returns {string} Normalized title.
+ */
+function normalizeTopTrackTitle(t) {
+	return String(t || '').trim();
+}
 
-	/**
-	 * Save the top-tracks cache to persistent settings.
-	 * Stores a pruned snapshot of the current cache.
-	 * @param {Map} map Cache map to save.
-	 */
-	function savePersistedTopTracksCache(map) {
-		try {
-			const pruned = prunePersistedTopTracksCache(map);
-			const obj = {};
-			for (const [k, v] of pruned.entries()) {
-				obj[k] = v;
-			}
-			setSetting(LASTFM_TOPTRACKS_CACHE_KEY, obj);
-		} catch (e) {
-			console.error('Similar Artists: savePersistedTopTracksCache error: ' + e.toString());
-		}
-	}
+/**
+ * Minimize similar artists array to reduce memory footprint.
+ * @param {any[]|object} list Similar artists from Last.fm API.
+ * @returns {object[]} Minimized array with {name} properties.
+ */
+function minimizeSimilarArtists(list) {
+	const arr = Array.isArray(list) ? list : (list ? [list] : []);
+	return arr
+		.map((a) => ({ name: normalizeName(a?.name || a) }))
+		.filter((a) => a.name);
+}
 
-	/**
-	 * Normalize top track title.
-	 * @param {string|object} t Track title or track object.
-	 * @returns {string} Normalized title.
-	 */
-	function normalizeTopTrackTitle(t) {
-		return String(t || '').trim();
-	}
-
-	/**
-	 * Minimize similar artists array to reduce memory footprint.
-	 * @param {any[]|object} list Similar artists from Last.fm API.
-	 * @returns {object[]} Minimized array with {name} properties.
-	 */
-	function minimizeSimilarArtists(list) {
-		const arr = Array.isArray(list) ? list : (list ? [list] : []);
+/**
+ * Minimize top tracks array to reduce memory footprint.
+ * @param {any[]|object} list Top tracks from Last.fm API.
+ * @param {boolean} includePlaycount Whether to include playcount/rank metadata.
+ * @returns {string[]|object[]} Minimized array of track titles or objects.
+ */
+function minimizeTopTracks(list, includePlaycount) {
+	const arr = Array.isArray(list) ? list : (list ? [list] : []);
+	if (includePlaycount) {
 		return arr
-			.map((a) => ({ name: normalizeName(a?.name || a) }))
-			.filter((a) => a.name);
-	}
-
-	/**
-	 * Minimize top tracks array to reduce memory footprint.
-	 * @param {any[]|object} list Top tracks from Last.fm API.
-	 * @param {boolean} includePlaycount Whether to include playcount/rank metadata.
-	 * @returns {string[]|object[]} Minimized array of track titles or objects.
-	 */
-	function minimizeTopTracks(list, includePlaycount) {
-		const arr = Array.isArray(list) ? list : (list ? [list] : []);
-		if (includePlaycount) {
-			return arr
-				.map((t) => {
-					const title = normalizeTopTrackTitle(t?.title || t?.name || t);
-					if (!title) return null;
-					const playcount = Number(t?.playcount) || 0;
-					const rank = Number(t?.rank || t?.['@attr']?.rank) || 0;
-					return { title, playcount, rank };
-				})
-				.filter(Boolean);
-		}
-		return arr
-			.map((t) => normalizeTopTrackTitle(t?.title || t?.name || t))
+			.map((t) => {
+				const title = normalizeTopTrackTitle(t?.title || t?.name || t);
+				if (!title) return null;
+				const playcount = Number(t?.playcount) || 0;
+				const rank = Number(t?.rank || t?.['@attr']?.rank) || 0;
+				return { title, playcount, rank };
+			})
 			.filter(Boolean);
 	}
+	return arr
+		.map((t) => normalizeTopTrackTitle(t?.title || t?.name || t))
+		.filter(Boolean);
+}
 
-	/**
-	 * Batch find matching tracks in the MediaMonkey library for multiple titles.
-	 * This is much more efficient than calling findLibraryTracks() for each title individually.
-	 * 
-	 * @param {string} artistName Artist to match.
-	 * @param {string[]} titles Array of track titles to search for.
-	 * @param {number} maxPerTitle Max matches to return per title.
-	 * @param {{rank?: boolean, best?: boolean}} opts Controls ordering.
-	 * @returns {Promise<Map<string, object[]>>} Map of title -> array of matched tracks.
-	 */
-	async function findLibraryTracksBatch(artistName, titles, maxPerTitle = 1, opts = {}) {
-		try {
-			if (!app?.db?.getTracklist || !titles || titles.length === 0)
-				return new Map();
+/**
+ * Batch find matching tracks in the MediaMonkey library for multiple titles.
+ * This is much more efficient than calling findLibraryTracks() for each title individually.
+ * 
+ * @param {string} artistName Artist to match.
+ * @param {string[]} titles Array of track titles to search for.
+ * @param {number} maxPerTitle Max matches to return per title.
+ * @param {{rank?: boolean, best?: boolean}} opts Controls ordering.
+ * @returns {Promise<Map<string, object[]>>} Map of title -> array of matched tracks.
+ */
+async function findLibraryTracksBatch(artistName, titles, maxPerTitle = 1, opts = {}) {
+	try {
+		if (!app?.db?.getTracklist || !titles || titles.length === 0)
+			return new Map();
 
-			// Ensure titles is array of strings
-			titles = titles.map(t => String(t || ''));
+		// Ensure titles is array of strings
+		titles = titles.map(t => String(t || ''));
 
-			const results = new Map();
-			const useBest = opts.best !== undefined ? opts.best : boolSetting('Best');
-			const excludeTitles = parseListSetting('Exclude');
-			const excludeGenres = parseListSetting('Genre');
-			const ratingMin = intSetting('Rating');
-			const allowUnknown = boolSetting('Unknown');
+		const results = new Map();
+		const useBest = opts.best !== undefined ? opts.best : boolSetting('Best');
+		const excludeTitles = parseListSetting('Exclude');
+		const excludeGenres = parseListSetting('Genre');
+		const ratingMin = intSetting('Rating');
+		const allowUnknown = boolSetting('Unknown');
 
-			const buildArtistClause = () => {
-				if (!artistName) return '';
+		const buildArtistClause = () => {
+			if (!artistName) return '';
 
-				const artistConds = [];
+			const artistConds = [];
 
-				const quoteSqlString = (s) => {
-					if (s === undefined || s === null) return "''";
-					// remove control chars that may break SQL/logging
-					const cleaned = String(s).replace(/[\u0000-\u001F]/g, '');
-					return `'${escapeSql(cleaned)}'`;
-				};
-
-				const addArtistCond = (name) => {
-					const n = String(name || '').trim();
-					if (!n) return;
-					artistConds.push(`Artists.Artist = ${quoteSqlString(n)}`);
-				};
-
-				// exact match
-				addArtistCond(artistName);
-
-				// Handle prefix variations (e.g., "The Beatles" vs "Beatles, The")
-				const prefixes = getIgnorePrefixes();
-				const nameLower = (artistName || '').toLowerCase();
-
-				for (const prefix of prefixes) {
-					const p = String(prefix || '').trim();
-					if (!p) continue;
-
-					if (nameLower.startsWith(p.toLowerCase() + ' ')) {
-						// "The Beatles" -> also match "Beatles, The"
-						const withoutPrefix = artistName.slice(p.length + 1).trim();
-						addArtistCond(`${withoutPrefix}, ${p}`);
-					} else {
-						// "Beatles" -> also match "Beatles, The" and "The Beatles"
-						addArtistCond(`${artistName}, ${p}`);
-						addArtistCond(`${p} ${artistName}`);
-					}
-				}
-
-				// Defensive: if somehow nothing added, still return empty string
-				if (artistConds.length === 0) return '';
-				return `(${artistConds.join(' OR ')})`;
+			const quoteSqlString = (s) => {
+				if (s === undefined || s === null) return "''";
+				// remove control chars that may break SQL/logging
+				const cleaned = String(s).replace(/[\u0000-\u001F]/g, '');
+				return `'${escapeSql(cleaned)}'`;
 			};
 
-			// Build common filters
-			const buildCommonFilters = () => {
-				const filters = [];
-				excludeTitles.forEach((t) => {
-					// case-insensitive exclude: compare uppercased title
-					const titleExclude = escapeSql(String(t || '').toUpperCase());
-					filters.push(`UPPER(Songs.SongTitle) NOT LIKE '%${titleExclude}%'`);
-				});
-
-				if (excludeGenres.length > 0) {
-					const genreConditions = excludeGenres
-						.map((g) => `GenreName LIKE '%${escapeSql(g)}%'`)
-						.join(' OR ');
-					filters.push(`GenresSongs.IDGenre NOT IN (SELECT IDGenre FROM Genres WHERE ${genreConditions})`);
-				}
-
-				if (ratingMin > 0) {
-					if (allowUnknown) {
-						// Include unrated tracks (NULL or negative) as well as those meeting the minimum
-						filters.push(`(Songs.Rating IS NULL OR Songs.Rating <= 0 OR Songs.Rating >= ${ratingMin})`);
-					} else {
-						filters.push(`(Songs.Rating >= ${ratingMin} AND Songs.Rating <= 100)`);
-					}
-				} else if (!allowUnknown) {
-					// Exclude unrated tracks explicitly (NULL or negative) when unknowns are not allowed
-					filters.push(`(Songs.Rating IS NOT NULL AND Songs.Rating >= 0 AND Songs.Rating <= 100)`);
-				}
-
-				return filters;
+			const addArtistCond = (name) => {
+				const n = String(name || '').trim();
+				if (!n) return;
+				artistConds.push(`Artists.Artist = ${quoteSqlString(n)}`);
 			};
 
-			const artistClause = buildArtistClause();
-			const commonFilters = buildCommonFilters();
-			const orderClause = useBest ? ' ORDER BY Songs.Rating DESC, Random()' : ' ORDER BY Random()';
-			const baseJoins = `
+			// exact match
+			addArtistCond(artistName);
+
+			// Handle prefix variations (e.g., "The Beatles" vs "Beatles, The")
+			const prefixes = getIgnorePrefixes();
+			const nameLower = (artistName || '').toLowerCase();
+
+			for (const prefix of prefixes) {
+				const p = String(prefix || '').trim();
+				if (!p) continue;
+
+				if (nameLower.startsWith(p.toLowerCase() + ' ')) {
+					// "The Beatles" -> also match "Beatles, The"
+					const withoutPrefix = artistName.slice(p.length + 1).trim();
+					addArtistCond(`${withoutPrefix}, ${p}`);
+				} else {
+					// "Beatles" -> also match "Beatles, The" and "The Beatles"
+					addArtistCond(`${artistName}, ${p}`);
+					addArtistCond(`${p} ${artistName}`);
+				}
+			}
+
+			// Defensive: if somehow nothing added, still return empty string
+			if (artistConds.length === 0) return '';
+			return `(${artistConds.join(' OR ')})`;
+		};
+
+		// Build common filters
+		const buildCommonFilters = () => {
+			const filters = [];
+			excludeTitles.forEach((t) => {
+				// case-insensitive exclude: compare uppercased title
+				const titleExclude = escapeSql(String(t || '').toUpperCase());
+				filters.push(`UPPER(Songs.SongTitle) NOT LIKE '%${titleExclude}%'`);
+			});
+
+			if (excludeGenres.length > 0) {
+				const genreConditions = excludeGenres
+					.map((g) => `GenreName LIKE '%${escapeSql(g)}%'`)
+					.join(' OR ');
+				filters.push(`GenresSongs.IDGenre NOT IN (SELECT IDGenre FROM Genres WHERE ${genreConditions})`);
+			}
+
+			if (ratingMin > 0) {
+				if (allowUnknown) {
+					// Include unrated tracks (NULL or negative) as well as those meeting the minimum
+					filters.push(`(Songs.Rating IS NULL OR Songs.Rating <= 0 OR Songs.Rating >= ${ratingMin})`);
+				} else {
+					filters.push(`(Songs.Rating >= ${ratingMin} AND Songs.Rating <= 100)`);
+				}
+			} else if (!allowUnknown) {
+				// Exclude unrated tracks explicitly (NULL or negative) when unknowns are not allowed
+				filters.push(`(Songs.Rating IS NOT NULL AND Songs.Rating >= 0 AND Songs.Rating <= 100)`);
+			}
+
+			return filters;
+		};
+
+		const artistClause = buildArtistClause();
+		const commonFilters = buildCommonFilters();
+		const orderClause = useBest ? ' ORDER BY Songs.Rating DESC, Random()' : ' ORDER BY Random()';
+		const baseJoins = `
 			FROM Songs
 			${artistClause ? 'INNER JOIN ArtistsSongs on Songs.ID = ArtistsSongs.IDSong AND ArtistsSongs.PersonType IN (1,2)' : ''}
 			${artistClause ? 'INNER JOIN Artists on ArtistsSongs.IDArtist = Artists.ID' : ''}
 			${excludeGenres.length > 0 ? 'LEFT JOIN GenresSongs ON Songs.ID = GenresSongs.IDSong' : ''}
 		`;
 
-			// Initialize map entries
-			titles.forEach(t => results.set(t, []));
+		// Initialize map entries
+		titles.forEach(t => results.set(t, []));
 
-			// Precompute normalized inputs once
-			const wantedRows = titles.map((title, idx) => {
-				const raw = String(title || '');
-				const rawUpper = raw.toUpperCase();
-				const norm = stripName(raw);
-				return { idx, raw, rawUpper, norm };
-			});
+		// Precompute normalized inputs once
+		const wantedRows = titles.map((title, idx) => {
+			const raw = String(title || '');
+			const rawUpper = raw.toUpperCase();
+			const norm = stripName(raw);
+			// Pre-escape for SQL once
+			const safeRaw = escapeSql(raw);
+			const safeRawUpper = escapeSql(rawUpper);
+			const safeNorm = escapeSql(norm);
+			return { idx, raw, rawUpper, norm, safeRaw, safeRawUpper, safeNorm };
+		});
 
-			// Filter out empty titles (still keep them in results as empty arrays)
-			const wantedNonEmpty = wantedRows.filter(r => r.raw && r.raw.trim().length > 0);
-			if (wantedNonEmpty.length === 0) return results;
+		// Filter out empty titles (still keep them in results as empty arrays)
+		const wantedNonEmpty = wantedRows.filter(r => r.raw && r.raw.trim().length > 0);
+		if (wantedNonEmpty.length === 0) return results;
 
-			// Build VALUES list for CTE. Note: rawUpper/norm are safe-quoted.
-			// Build CTE rows using UNION ALL SELECT to avoid trailing comma/VALUES syntax issues
-			const wantedValuesSql = wantedNonEmpty
-				.map(r => `SELECT ${r.idx} AS Idx, '${escapeSql(r.raw)}' AS Raw, '${escapeSql(r.rawUpper)}' AS RawUpper, '${escapeSql(r.norm)}' AS Norm`)
-				.join(' UNION ALL ');
+		// Build CTE rows using UNION ALL SELECT to avoid trailing comma/VALUES syntax issues
+		// Use the pre-escaped safe* properties
+		const wantedValuesSql = wantedNonEmpty
+			.map(r => `SELECT ${parseInt(r.idx, 10) || 0} AS Idx, '${r.safeRaw}' AS Raw, '${r.safeRawUpper}' AS RawUpper, '${r.safeNorm}' AS Norm`)
+			.join(' UNION ALL ');
 
-			// SQL-side normalization expression (must match stripName's semantics)
-			const songTitleNormExpr =
-				"REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(" +
-				"REPLACE(REPLACE(REPLACE(REPLACE(" +
-				"UPPER(Songs.SongTitle)," +
-				"'&','AND'),'+','AND'),' N ','AND'),'''N''','AND'),' ',''),'.','')," +
-				",',''),':',''),';',''),'-',''),'_',''),'!',''),'''',''),'\"','')";
+		// SQL-side normalization expression (must match stripName's semantics)
+		const songTitleNormExpr =
+			"REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(" +
+			"REPLACE(REPLACE(REPLACE(REPLACE(" +
+			"UPPER(Songs.SongTitle)," +
+			"'&','AND'),'+','AND'),' N ','AND'),'''N''','AND'),' ',''),'.','')," +
+			",',''),':',''),';',''),'-',''),'_',''),'!',''),'''',''),'\"','')";
 
-			// We only need to match against the requested titles (via the CTE), avoiding large OR lists.
-			const whereParts = [];
-			if (artistClause) whereParts.push(artistClause);
-			whereParts.push(`(UPPER(Songs.SongTitle) = Wanted.RawUpper OR ${songTitleNormExpr} = Wanted.Norm)`);
-			whereParts.push(...commonFilters);
+		// We only need to match against the requested titles (via the CTE), avoiding large OR lists.
+		const whereParts = [];
+		if (artistClause) whereParts.push(artistClause);
+		whereParts.push(`(UPPER(Songs.SongTitle) = Wanted.RawUpper OR ${songTitleNormExpr} = Wanted.Norm)`);
+		whereParts.push(...commonFilters);
 
-			const sql = `
+		const sql = `
 			WITH Wanted(Idx, Raw, RawUpper, Norm) AS (${wantedValuesSql})
 			SELECT Songs.*, Wanted.Raw AS RequestedTitle
 			${baseJoins}
@@ -2265,475 +2281,475 @@ try {
 			${orderClause}
 		`;
 
-			const tl = app?.db?.getTracklist(sql, -1);
-			if (!tl) return results;
+		const tl = app?.db?.getTracklist(sql, -1);
+		if (!tl) return results;
 
-			tl.autoUpdateDisabled = true;
-			tl.dontNotify = true;
-			await tl.whenLoaded();
+		tl.autoUpdateDisabled = true;
+		tl.dontNotify = true;
+		await tl.whenLoaded();
 
-			// Fill Map<title, tracks[]> with maxPerTitle cap.
-			tl.forEach((track) => {
-				if (!track) return;
-				// Use the requested title from the CTE to ensure we bucket matches correctly
-				const requested = track.RequestedTitle || track.requestedTitle || track.title;
-				const key = requested ? String(requested) : '';
-				if (!key || !results.has(key)) return;
-				const arr = results.get(key);
-				if (arr && arr.length < maxPerTitle) arr.push(track);
-			});
+		// Fill Map<title, tracks[]> with maxPerTitle cap.
+		tl.forEach((track) => {
+			if (!track) return;
+			// Use the requested title from the CTE to ensure we bucket matches correctly
+			const requested = track.RequestedTitle || track.requestedTitle || track.title;
+			const key = requested ? String(requested) : '';
+			if (!key || !results.has(key)) return;
+			const arr = results.get(key);
+			if (arr && arr.length < maxPerTitle) arr.push(track);
+		});
 
-			tl.autoUpdateDisabled = false;
-			tl.dontNotify = false;
+		tl.autoUpdateDisabled = false;
+		tl.dontNotify = false;
 
-			return results;
+		return results;
 
-		} catch (e) {
-			console.error('Similar Artists: findLibraryTracksBatch error: ' + e.toString());
-			updateProgress(`Database lookup error: ${e.toString()}`);
-			return new Map();
-		}
+	} catch (e) {
+		console.error('Similar Artists: findLibraryTracksBatch error: ' + e.toString());
+		updateProgress(`Database lookup error: ${e.toString()}`);
+		return new Map();
+	}
+}
+
+/**
+ * Backward-compatible single-title lookup wrapper.
+ * @param {string} artistName Artist to match.
+ * @param {string} title Track title to search for.
+ * @param {number} limit Max matches to return.
+ * @param {{rank?: boolean, best?: boolean}} opts Controls ordering.
+ * @returns {Promise<object[]>} Array of matched tracks.
+ */
+async function findLibraryTracks(artistName, title, limit = 1, opts = {}) {
+	try {
+		const t = String(title || '');
+		if (!t) return [];
+		const max = Number.isFinite(Number(limit)) ? Math.max(0, Number(limit)) : 1;
+		const map = await findLibraryTracksBatch(artistName, [t], max, opts);
+		return map.get(t) || [];
+	} catch (e) {
+		console.error('Similar Artists: findLibraryTracks error: ' + e.toString());
+		return [];
+	}
+}
+
+/**
+ * Add tracks to a playlist or Now Playing queue using MM5 best practices.
+ * This helper consolidates the track-adding logic following patterns from actions.js.
+ * @param {object} target Playlist or Now Playing queue object.
+ * @param {object[]} tracks Array of track objects to add.
+ * @param {object} options Options for adding tracks.
+ * @param {boolean} options.ignoreDupes Skip tracks already present.
+ * @param {boolean} options.clearFirst Clear target before adding.
+ * @returns {Promise<number>} Number of tracks added.
+ */
+async function addTracksToTarget(target, tracks, options = {}) {
+	const { ignoreDupes = false, clearFirst = false } = options;
+
+	if (!target) {
+		console.log('Similar Artists: addTracksToTarget: No target provided');
+		return 0;
 	}
 
-	/**
-	 * Backward-compatible single-title lookup wrapper.
-	 * @param {string} artistName Artist to match.
-	 * @param {string} title Track title to search for.
-	 * @param {number} limit Max matches to return.
-	 * @param {{rank?: boolean, best?: boolean}} opts Controls ordering.
-	 * @returns {Promise<object[]>} Array of matched tracks.
-	 */
-	async function findLibraryTracks(artistName, title, limit = 1, opts = {}) {
+	// Clear target if requested
+	if (clearFirst) {
 		try {
-			const t = String(title || '');
-			if (!t) return [];
-			const max = Number.isFinite(Number(limit)) ? Math.max(0, Number(limit)) : 1;
-			const map = await findLibraryTracksBatch(artistName, [t], max, opts);
-			return map.get(t) || [];
+			if (target.clearTracksAsync && typeof target.clearTracksAsync === 'function') {
+				await target.clearTracksAsync();
+				console.log('Similar Artists: addTracksToTarget: Cleared target');
+			} else {
+				console.log('Similar Artists: addTracksToTarget: clearTracksAsync not available');
+			}
 		} catch (e) {
-			console.error('Similar Artists: findLibraryTracks error: ' + e.toString());
-			return [];
+			console.error(`addTracksToTarget: Error clearing target: ${e.toString()}`);
 		}
 	}
 
-	/**
-	 * Add tracks to a playlist or Now Playing queue using MM5 best practices.
-	 * This helper consolidates the track-adding logic following patterns from actions.js.
-	 * @param {object} target Playlist or Now Playing queue object.
-	 * @param {object[]} tracks Array of track objects to add.
-	 * @param {object} options Options for adding tracks.
-	 * @param {boolean} options.ignoreDupes Skip tracks already present.
-	 * @param {boolean} options.clearFirst Clear target before adding.
-	 * @returns {Promise<number>} Number of tracks added.
-	 */
-	async function addTracksToTarget(target, tracks, options = {}) {
-		const { ignoreDupes = false, clearFirst = false } = options;
+	// Build set of existing track IDs for deduplication
+	const existing = new Set();
+	if (ignoreDupes) {
+		try {
+			// For Now Playing, try toArray() (synchronous snapshot)
+			if (target.toArray && typeof target.toArray === 'function') {
+				const existingTracks = target.toArray();
+				if (existingTracks && typeof existingTracks.forEach === 'function') {
+					existingTracks.forEach((t) => {
+						if (t) existing.add(t.id || t.ID);
+					});
+				}
+			}
+			// For playlists, try getTracklist() then whenLoaded()
+			else if (target.getTracklist && typeof target.getTracklist === 'function') {
+				const tracklist = target.getTracklist();
+				await tracklist.whenLoaded();
+				tracklist.forEach((t) => {
+					if (t) existing.add(t.id || t.ID);
+				});
+			}
+		} catch (e) {
+			console.error(`addTracksToTarget: Error building existing track set: ${e.toString()}`);
+		}
+	}
 
-		if (!target) {
-			console.log('Similar Artists: addTracksToTarget: No target provided');
+	// Filter out duplicates if needed
+	const tracksToAdd = ignoreDupes
+		? tracks.filter((t) => {
+			const id = t?.id || t?.ID;
+			return !id || !existing.has(id);
+		})
+		: tracks;
+
+	if (!tracksToAdd || tracksToAdd.length === 0) {
+		console.log('Similar Artists: addTracksToTarget: No tracks to add after filtering');
+		return 0;
+	}
+
+	// Add tracks using modern MM5 pattern (from actions.js)
+	try {
+		if (!app.utils?.createTracklist) {
+			console.log('Similar Artists: addTracksToTarget: app.utils.createTracklist not available');
 			return 0;
 		}
 
-		// Clear target if requested
-		if (clearFirst) {
-			try {
-				if (target.clearTracksAsync && typeof target.clearTracksAsync === 'function') {
-					await target.clearTracksAsync();
-					console.log('Similar Artists: addTracksToTarget: Cleared target');
-				} else {
-					console.log('Similar Artists: addTracksToTarget: clearTracksAsync not available');
-				}
-			} catch (e) {
-				console.error(`addTracksToTarget: Error clearing target: ${e.toString()}`);
+		if (!target.addTracksAsync || typeof target.addTracksAsync !== 'function') {
+			console.log('Similar Artists: addTracksToTarget: target.addTracksAsync not available');
+			return 0;
+		}
+
+		// Create a mutable temporary tracklist
+		const tracklist = app.utils.createTracklist(true);
+
+		if (!tracklist) {
+			console.log('Similar Artists: addTracksToTarget: Failed to create tracklist');
+			return 0;
+		}
+
+		// Add all tracks to the temporary tracklist
+		for (const t of tracksToAdd) {
+			if (t && typeof tracklist.add === 'function') {
+				tracklist.add(t);
 			}
 		}
 
-		// Build set of existing track IDs for deduplication
-		const existing = new Set();
-		if (ignoreDupes) {
-			try {
-				// For Now Playing, try toArray() (synchronous snapshot)
-				if (target.toArray && typeof target.toArray === 'function') {
-					const existingTracks = target.toArray();
-					if (existingTracks && typeof existingTracks.forEach === 'function') {
-						existingTracks.forEach((t) => {
-							if (t) existing.add(t.id || t.ID);
-						});
-					}
-				}
-				// For playlists, try getTracklist() then whenLoaded()
-				else if (target.getTracklist && typeof target.getTracklist === 'function') {
-					const tracklist = target.getTracklist();
+		// Wait for tracklist to be ready (MM5 pattern from savePlaylistFromNowPlaying)
+		await tracklist.whenLoaded();
+
+		// Now we can safely call addTracksAsync
+		if (tracklist.count > 0) {
+			await target.addTracksAsync(tracklist);
+			console.log(`addTracksToTarget: Added ${tracklist.count} tracks (async batch)`);
+			return tracklist.count;
+		}
+
+		console.log('Similar Artists: addTracksToTarget: No tracks in tracklist to add');
+		return 0;
+
+	} catch (e) {
+		console.error(`addTracksToTarget: Error: ${e.toString()}`);
+		return 0;
+	}
+}
+
+/**
+ * Add tracks to the active playback list / queue.
+ * Uses MM5's app.player.addTracksAsync() which is the correct API for Now Playing.
+ * @param {object[]} tracks Track objects.
+ * @param {boolean} ignoreDupes Skip tracks that are already present.
+ * @param {boolean} clearFirst Clear playlist/queue before adding.
+ */
+async function enqueueTracks(tracks, ignoreDupes, clearFirst) {
+	const player = app.player;
+	if (!player) {
+		console.log('Similar Artists: enqueueTracks: Player not available');
+		return;
+	}
+
+	// MM5 uses app.player.addTracksAsync() directly for Now Playing
+	// This is the pattern used by autoDJ and other MM5 components
+	if (!player.addTracksAsync || typeof player.addTracksAsync !== 'function') {
+		console.log('Similar Artists: enqueueTracks: player.addTracksAsync not available');
+		return;
+	}
+
+	// Handle clearing Now Playing if requested
+	if (clearFirst) {
+		try {
+			// MM5 pattern: use player.clearPlaylistAsync() or similar
+			if (player.clearPlaylistAsync && typeof player.clearPlaylistAsync === 'function') {
+				await player.clearPlaylistAsync();
+				console.log('Similar Artists: enqueueTracks: Cleared Now Playing');
+			} else if (player.stop && typeof player.stop === 'function') {
+				// Fallback: stop playback which effectively clears
+				player.stop();
+				console.log('Similar Artists: enqueueTracks: Stopped playback (clearPlaylistAsync not available)');
+			}
+		} catch (e) {
+			console.error(`enqueueTracks: Error clearing Now Playing: ${e.toString()}`);
+		}
+	}
+
+	// Build set of existing track IDs for deduplication
+	const existing = new Set();
+	if (ignoreDupes) {
+		try {
+			// Get current Now Playing list via getSongList().getTracklist()
+			const songList = player.getSongList?.();
+			if (songList) {
+				const tracklist = songList.getTracklist?.();
+				if (tracklist) {
 					await tracklist.whenLoaded();
 					tracklist.forEach((t) => {
 						if (t) existing.add(t.id || t.ID);
 					});
-				}
-			} catch (e) {
-				console.error(`addTracksToTarget: Error building existing track set: ${e.toString()}`);
-			}
-		}
-
-		// Filter out duplicates if needed
-		const tracksToAdd = ignoreDupes
-			? tracks.filter((t) => {
-				const id = t?.id || t?.ID;
-				return !id || !existing.has(id);
-			})
-			: tracks;
-
-		if (!tracksToAdd || tracksToAdd.length === 0) {
-			console.log('Similar Artists: addTracksToTarget: No tracks to add after filtering');
-			return 0;
-		}
-
-		// Add tracks using modern MM5 pattern (from actions.js)
-		try {
-			if (!app.utils?.createTracklist) {
-				console.log('Similar Artists: addTracksToTarget: app.utils.createTracklist not available');
-				return 0;
-			}
-
-			if (!target.addTracksAsync || typeof target.addTracksAsync !== 'function') {
-				console.log('Similar Artists: addTracksToTarget: target.addTracksAsync not available');
-				return 0;
-			}
-
-			// Create a mutable temporary tracklist
-			const tracklist = app.utils.createTracklist(true);
-
-			if (!tracklist) {
-				console.log('Similar Artists: addTracksToTarget: Failed to create tracklist');
-				return 0;
-			}
-
-			// Add all tracks to the temporary tracklist
-			for (const t of tracksToAdd) {
-				if (t && typeof tracklist.add === 'function') {
-					tracklist.add(t);
+					console.log(`enqueueTracks: Found ${existing.size} existing tracks in Now Playing`);
 				}
 			}
-
-			// Wait for tracklist to be ready (MM5 pattern from savePlaylistFromNowPlaying)
-			await tracklist.whenLoaded();
-
-			// Now we can safely call addTracksAsync
-			if (tracklist.count > 0) {
-				await target.addTracksAsync(tracklist);
-				console.log(`addTracksToTarget: Added ${tracklist.count} tracks (async batch)`);
-				return tracklist.count;
-			}
-
-			console.log('Similar Artists: addTracksToTarget: No tracks in tracklist to add');
-			return 0;
-
 		} catch (e) {
-			console.error(`addTracksToTarget: Error: ${e.toString()}`);
-			return 0;
+			console.error(`enqueueTracks: Error building existing track set: ${e.toString()}`);
 		}
 	}
 
-	/**
-	 * Add tracks to the active playback list / queue.
-	 * Uses MM5's app.player.addTracksAsync() which is the correct API for Now Playing.
-	 * @param {object[]} tracks Track objects.
-	 * @param {boolean} ignoreDupes Skip tracks that are already present.
-	 * @param {boolean} clearFirst Clear playlist/queue before adding.
-	 */
-	async function enqueueTracks(tracks, ignoreDupes, clearFirst) {
-		const player = app.player;
-		if (!player) {
-			console.log('Similar Artists: enqueueTracks: Player not available');
-			return;
-		}
+	// Filter out duplicates if needed
+	const tracksToAdd = ignoreDupes
+		? tracks.filter((t) => {
+			const id = t?.id || t?.ID;
+			return !id || !existing.has(id);
+		})
+		: tracks;
 
-		// MM5 uses app.player.addTracksAsync() directly for Now Playing
-		// This is the pattern used by autoDJ and other MM5 components
-		if (!player.addTracksAsync || typeof player.addTracksAsync !== 'function') {
-			console.log('Similar Artists: enqueueTracks: player.addTracksAsync not available');
-			return;
-		}
-
-		// Handle clearing Now Playing if requested
-		if (clearFirst) {
-			try {
-				// MM5 pattern: use player.clearPlaylistAsync() or similar
-				if (player.clearPlaylistAsync && typeof player.clearPlaylistAsync === 'function') {
-					await player.clearPlaylistAsync();
-					console.log('Similar Artists: enqueueTracks: Cleared Now Playing');
-				} else if (player.stop && typeof player.stop === 'function') {
-					// Fallback: stop playback which effectively clears
-					player.stop();
-					console.log('Similar Artists: enqueueTracks: Stopped playback (clearPlaylistAsync not available)');
-				}
-			} catch (e) {
-				console.error(`enqueueTracks: Error clearing Now Playing: ${e.toString()}`);
-			}
-		}
-
-		// Build set of existing track IDs for deduplication
-		const existing = new Set();
-		if (ignoreDupes) {
-			try {
-				// Get current Now Playing list via getSongList().getTracklist()
-				const songList = player.getSongList?.();
-				if (songList) {
-					const tracklist = songList.getTracklist?.();
-					if (tracklist) {
-						await tracklist.whenLoaded();
-						tracklist.forEach((t) => {
-							if (t) existing.add(t.id || t.ID);
-						});
-						console.log(`enqueueTracks: Found ${existing.size} existing tracks in Now Playing`);
-					}
-				}
-			} catch (e) {
-				console.error(`enqueueTracks: Error building existing track set: ${e.toString()}`);
-			}
-		}
-
-		// Filter out duplicates if needed
-		const tracksToAdd = ignoreDupes
-			? tracks.filter((t) => {
-				const id = t?.id || t?.ID;
-				return !id || !existing.has(id);
-			})
-			: tracks;
-
-		if (!tracksToAdd || tracksToAdd.length === 0) {
-			console.log('Similar Artists: enqueueTracks: No tracks to add after filtering');
-			return;
-		}
-
-		// Create a tracklist and add tracks to it
-		try {
-			if (!app.utils?.createTracklist) {
-				console.log('Similar Artists: enqueueTracks: app.utils.createTracklist not available');
-				return;
-			}
-
-			// Create a mutable temporary tracklist
-			const tracklist = app.utils.createTracklist(true);
-
-			if (!tracklist) {
-				console.log('Similar Artists: enqueueTracks: Failed to create tracklist');
-				return;
-			}
-
-			// Add all tracks to the temporary tracklist
-			for (const t of tracksToAdd) {
-				if (t && typeof tracklist.add === 'function') {
-					tracklist.add(t);
-				}
-			}
-
-			// Wait for tracklist to be ready
-			await tracklist.whenLoaded();
-
-			if (tracklist.count > 0) {
-				// Use app.player.addTracksAsync - the correct MM5 API for Now Playing
-				await player.addTracksAsync(tracklist);
-				console.log(`enqueueTracks: Successfully added ${tracklist.count} track(s) to Now Playing`);
-			} else {
-				console.log('Similar Artists: enqueueTracks: No tracks in tracklist to add');
-			}
-
-		} catch (e) {
-			console.error(`enqueueTracks: Error adding tracks: ${e.toString()}`);
-		}
+	if (!tracksToAdd || tracksToAdd.length === 0) {
+		console.log('Similar Artists: enqueueTracks: No tracks to add after filtering');
+		return;
 	}
 
-	/**
-	 * Create or locate a playlist, optionally overwrite its content, then add tracks.
-	 * Uses modern MM5 API patterns for playlist creation.
-	 * @param {object[]} tracks Tracks to add.
-	 * @param {string} seedName Seed artist name used for playlist naming.
-	 * @param {*} overwriteMode Playlist creation mode (Create/Overwrite/Do not create).
-	 * @param {object|null} selectedPlaylist Pre-selected playlist from dialog (if provided), or { autoCreate: true } to create new.
-	 * @returns {Promise<object|null>} Playlist object.
-	 */
-	async function createPlaylist(tracks, seedName, overwriteMode, selectedPlaylist, ignoreDupes = false) {
-		const titleTemplate = stringSetting('Name');
-		const baseName = titleTemplate.indexOf('%') >= 0 ? titleTemplate.replace('%', seedName || '') : `${titleTemplate} ${seedName || ''}`;
-		const overwriteText = String(overwriteMode || '');
-
-		let playlist = null;
-		let shouldClear = false;
-
-		// Scenario 1: User selected an existing playlist from dialog
-		if (selectedPlaylist && !selectedPlaylist.autoCreate) {
-			// User explicitly selected a playlist - use it as-is
-			playlist = selectedPlaylist;
-			// Check if overwrite is enabled
-			shouldClear = overwriteText.toLowerCase().indexOf('overwrite') > -1;
-			console.log(`createPlaylist: Using user-selected playlist '${playlist.name}' (ID: ${playlist.id || playlist.ID}), shouldClear=${shouldClear}`);
+	// Create a tracklist and add tracks to it
+	try {
+		if (!app.utils?.createTracklist) {
+			console.log('Similar Artists: enqueueTracks: app.utils.createTracklist not available');
+			return;
 		}
-		// Scenario 2: Auto-create new playlist (OK clicked without selection, or confirm disabled)
-		else if (selectedPlaylist?.autoCreate || !selectedPlaylist) {
-			// Determine playlist name
-			let name = baseName;
 
-			// Check if "Create new playlist" mode - always generate unique name
-			if (overwriteText.toLowerCase().indexOf('create') > -1) {
-				// Find unique name by appending index
-				let idx = 1;
-				let testPlaylist = findPlaylist(name);
-				while (testPlaylist) {
-					idx += 1;
-					name = `${baseName}_${idx}`;
-					testPlaylist = findPlaylist(name);
-				}
-				console.log(`createPlaylist: Create mode - using unique name: ${name}`);
-			} else {
-				// Overwrite or default mode - try to find existing playlist with base name
-				playlist = findPlaylist(name);
-				if (playlist) {
-					// Found existing playlist - check if we should overwrite
-					shouldClear = overwriteText.toLowerCase().indexOf('overwrite') > -1;
-					console.log(`createPlaylist: Found existing playlist '${name}', shouldClear=${shouldClear}`);
-				}
+		// Create a mutable temporary tracklist
+		const tracklist = app.utils.createTracklist(true);
+
+		if (!tracklist) {
+			console.log('Similar Artists: enqueueTracks: Failed to create tracklist');
+			return;
+		}
+
+		// Add all tracks to the temporary tracklist
+		for (const t of tracksToAdd) {
+			if (t && typeof tracklist.add === 'function') {
+				tracklist.add(t);
 			}
+		}
 
-			// Create new playlist if not found
-			if (!playlist) {
-				try {
-					const parentName = stringSetting('Parent');
-					let parentPlaylist = null;
+		// Wait for tracklist to be ready
+		await tracklist.whenLoaded();
 
-					// Find parent playlist if specified (and not empty)
-					if (parentName && parentName.trim() !== '') {
-						parentPlaylist = findPlaylist(parentName);
-						if (parentPlaylist) {
-							console.log(`createPlaylist: Found parent playlist '${parentName}' (ID: ${parentPlaylist.id || parentPlaylist.ID})`);
-						} else {
-							console.log(`createPlaylist: Parent playlist '${parentName}' not found, will create at root`);
-						}
-					}
+		if (tracklist.count > 0) {
+			// Use app.player.addTracksAsync - the correct MM5 API for Now Playing
+			await player.addTracksAsync(tracklist);
+			console.log(`enqueueTracks: Successfully added ${tracklist.count} track(s) to Now Playing`);
+		} else {
+			console.log('Similar Artists: enqueueTracks: No tracks in tracklist to add');
+		}
 
-					// Create new playlist as child of parent (or root if no parent)
-					if (parentPlaylist && typeof parentPlaylist.newPlaylist === 'function') {
-						playlist = parentPlaylist.newPlaylist();
-						console.log(`createPlaylist: Created new playlist under parent '${parentName}'`);
+	} catch (e) {
+		console.error(`enqueueTracks: Error adding tracks: ${e.toString()}`);
+	}
+}
+
+/**
+ * Create or locate a playlist, optionally overwrite its content, then add tracks.
+ * Uses modern MM5 API patterns for playlist creation.
+ * @param {object[]} tracks Tracks to add.
+ * @param {string} seedName Seed artist name used for playlist naming.
+ * @param {*} overwriteMode Playlist creation mode (Create/Overwrite/Do not create).
+ * @param {object|null} selectedPlaylist Pre-selected playlist from dialog (if provided), or { autoCreate: true } to create new.
+ * @returns {Promise<object|null>} Playlist object.
+ */
+async function createPlaylist(tracks, seedName, overwriteMode, selectedPlaylist, ignoreDupes = false) {
+	const titleTemplate = stringSetting('Name');
+	const baseName = titleTemplate.indexOf('%') >= 0 ? titleTemplate.replace('%', seedName || '') : `${titleTemplate} ${seedName || ''}`;
+	const overwriteText = String(overwriteMode || '');
+
+	let playlist = null;
+	let shouldClear = false;
+
+	// Scenario 1: User selected an existing playlist from dialog
+	if (selectedPlaylist && !selectedPlaylist.autoCreate) {
+		// User explicitly selected a playlist - use it as-is
+		playlist = selectedPlaylist;
+		// Check if overwrite is enabled
+		shouldClear = overwriteText.toLowerCase().indexOf('overwrite') > -1;
+		console.log(`createPlaylist: Using user-selected playlist '${playlist.name}' (ID: ${playlist.id || playlist.ID}), shouldClear=${shouldClear}`);
+	}
+	// Scenario 2: Auto-create new playlist (OK clicked without selection, or confirm disabled)
+	else if (selectedPlaylist?.autoCreate || !selectedPlaylist) {
+		// Determine playlist name
+		let name = baseName;
+
+		// Check if "Create new playlist" mode - always generate unique name
+		if (overwriteText.toLowerCase().indexOf('create') > -1) {
+			// Find unique name by appending index
+			let idx = 1;
+			let testPlaylist = findPlaylist(name);
+			while (testPlaylist) {
+				idx += 1;
+				name = `${baseName}_${idx}`;
+				testPlaylist = findPlaylist(name);
+			}
+			console.log(`createPlaylist: Create mode - using unique name: ${name}`);
+		} else {
+			// Overwrite or default mode - try to find existing playlist with base name
+			playlist = findPlaylist(name);
+			if (playlist) {
+				// Found existing playlist - check if we should overwrite
+				shouldClear = overwriteText.toLowerCase().indexOf('overwrite') > -1;
+				console.log(`createPlaylist: Found existing playlist '${name}', shouldClear=${shouldClear}`);
+			}
+		}
+
+		// Create new playlist if not found
+		if (!playlist) {
+			try {
+				const parentName = stringSetting('Parent');
+				let parentPlaylist = null;
+
+				// Find parent playlist if specified (and not empty)
+				if (parentName && parentName.trim() !== '') {
+					parentPlaylist = findPlaylist(parentName);
+					if (parentPlaylist) {
+						console.log(`createPlaylist: Found parent playlist '${parentName}' (ID: ${parentPlaylist.id || parentPlaylist.ID})`);
 					} else {
-						playlist = app.playlists.root.newPlaylist();
-						console.log('Similar Artists: createPlaylist: Created new playlist at root level');
+						console.log(`createPlaylist: Parent playlist '${parentName}' not found, will create at root`);
 					}
+				}
 
-					if (!playlist) {
-						console.log('Similar Artists: createPlaylist: Failed to create new playlist object');
-						return null;
-					}
+				// Create new playlist as child of parent (or root if no parent)
+				if (parentPlaylist && typeof parentPlaylist.newPlaylist === 'function') {
+					playlist = parentPlaylist.newPlaylist();
+					console.log(`createPlaylist: Created new playlist under parent '${parentName}'`);
+				} else {
+					playlist = app.playlists.root.newPlaylist();
+					console.log('Similar Artists: createPlaylist: Created new playlist at root level');
+				}
 
-					// Set name
-					playlist.name = name;
-					console.log(`createPlaylist: Set playlist name to '${name}'`);
-
-					// Persist the playlist (this commits it to the database with parent relationship intact)
-					await playlist.commitAsync();
-					console.log(`createPlaylist: Committed playlist to database (ID: ${playlist.id || playlist.ID})`);
-
-					// Mark as new for potential UI handling
-					playlist.isNew = true;
-
-				} catch (e) {
-					console.error(`createPlaylist: Error creating playlist: ${e.toString()}`);
+				if (!playlist) {
+					console.log('Similar Artists: createPlaylist: Failed to create new playlist object');
 					return null;
 				}
+
+				// Set name
+				playlist.name = name;
+				console.log(`createPlaylist: Set playlist name to '${name}'`);
+
+				// Persist the playlist (this commits it to the database with parent relationship intact)
+				await playlist.commitAsync();
+				console.log(`createPlaylist: Committed playlist to database (ID: ${playlist.id || playlist.ID})`);
+
+				// Mark as new for potential UI handling
+				playlist.isNew = true;
+
+			} catch (e) {
+				console.error(`createPlaylist: Error creating playlist: ${e.toString()}`);
+				return null;
 			}
 		}
-
-		if (!playlist) {
-			console.log('Similar Artists: createPlaylist: Failed to create or find playlist');
-			return null;
-		}
-
-		console.log(`createPlaylist: Using playlist '${playlist.name}' (ID: ${playlist.id || playlist.ID}), shouldClear=${shouldClear}`);
-
-		// Add tracks to playlist using unified helper
-		if (tracks && tracks.length > 0) {
-			const added = await addTracksToTarget(playlist, tracks, {
-				ignoreDupes: ignoreDupes,
-				clearFirst: shouldClear
-			});
-			console.log(`createPlaylist: Added ${added} track(s) to playlist`);
-		} else {
-			console.log('Similar Artists: createPlaylist: No tracks to add to playlist');
-		}
-
-		// Handle navigation based on user settings
-		try {
-			const nav = getSetting('Navigate');
-			if (typeof window !== 'undefined' && window.navigationHandlers) {
-				const navStr = String(nav || '').toLowerCase();
-				if (navStr.indexOf('new') > -1 && (playlist.id || playlist.ID)) {
-					// Navigate to the newly created playlist
-					console.log(`createPlaylist: Navigating to playlist ID: ${playlist.id || playlist.ID}`);
-					if (window.navigationHandlers.playlist?.navigate) {
-						window.navigationHandlers.playlist.navigate(playlist);
-					}
-				} else if (navStr.indexOf('now') > -1) {
-					// Navigate to Now Playing
-					console.log('Similar Artists: createPlaylist: Navigating to Now Playing');
-					if (window.navigationHandlers.nowPlaying?.navigate) {
-						window.navigationHandlers.nowPlaying.navigate();
-					}
-				}
-			}
-		} catch (e) {
-			console.error(`createPlaylist: Navigation error: ${e.toString()}`);
-		}
-
-		return playlist;
 	}
 
-	/**
-	 * Find an existing playlist by title (case-insensitive).
-	 * @param {string} name Playlist title to search for.
-	 * @returns {object|null} Playlist object if found, null otherwise.
-	 */
-	function findPlaylist(name) {
-		if (!name || typeof app === 'undefined' || !app.playlists) {
-			return null;
-		}
-
-		try {
-			// Use findByTitle (MM5 API)
-			if (app.playlists?.findByTitle && typeof app.playlists.findByTitle === 'function') {
-				const playlist = app.playlists.findByTitle(name);
-				if (playlist) {
-					console.log(`findPlaylist: Found playlist by title: "${name}"`);
-					return playlist;
-				}
-			}
-		} catch (e) {
-			console.error(`findPlaylist: Error: ${e.toString()}`);
-		}
-
-		console.log(`findPlaylist: Playlist not found: "${name}"`);
+	if (!playlist) {
+		console.log('Similar Artists: createPlaylist: Failed to create or find playlist');
 		return null;
 	}
 
-	/**
-	 * Add-on initialization.
-	 * Ensures the app API is available and optionally attaches auto-mode.
-	 */
-	function start() {
+	console.log(`createPlaylist: Using playlist '${playlist.name}' (ID: ${playlist.id || playlist.ID}), shouldClear=${shouldClear}`);
 
-		if (state.started)
-			return;
-		state.started = true;
-		console.log('Similar Artists: Starting SimilarArtists addon...');
-
-		// Check for MM5 environment
-		if (typeof app === 'undefined') {
-			console.log('Similar Artists: MediaMonkey 5 app API not found.');
-			return;
-		}
-
-		// Ensure listener state matches setting
-		applyAutoModeFromSettings();
-		console.log('Similar Artists: addon started successfully.');
+	// Add tracks to playlist using unified helper
+	if (tracks && tracks.length > 0) {
+		const added = await addTracksToTarget(playlist, tracks, {
+			ignoreDupes: ignoreDupes,
+			clearFirst: shouldClear
+		});
+		console.log(`createPlaylist: Added ${added} track(s) to playlist`);
+	} else {
+		console.log('Similar Artists: createPlaylist: No tracks to add to playlist');
 	}
+
+	// Handle navigation based on user settings
+	try {
+		const nav = getSetting('Navigate');
+		if (typeof window !== 'undefined' && window.navigationHandlers) {
+			const navStr = String(nav || '').toLowerCase();
+			if (navStr.indexOf('new') > -1 && (playlist.id || playlist.ID)) {
+				// Navigate to the newly created playlist
+				console.log(`createPlaylist: Navigating to playlist ID: ${playlist.id || playlist.ID}`);
+				if (window.navigationHandlers.playlist?.navigate) {
+					window.navigationHandlers.playlist.navigate(playlist);
+				}
+			} else if (navStr.indexOf('now') > -1) {
+				// Navigate to Now Playing
+				console.log('Similar Artists: createPlaylist: Navigating to Now Playing');
+				if (window.navigationHandlers.nowPlaying?.navigate) {
+					window.navigationHandlers.nowPlaying.navigate();
+				}
+			}
+		}
+	} catch (e) {
+		console.error(`createPlaylist: Navigation error: ${e.toString()}`);
+	}
+
+	return playlist;
+}
+
+/**
+ * Find an existing playlist by title (case-insensitive).
+ * @param {string} name Playlist title to search for.
+ * @returns {object|null} Playlist object if found, null otherwise.
+ */
+function findPlaylist(name) {
+	if (!name || typeof app === 'undefined' || !app.playlists) {
+		return null;
+	}
+
+	try {
+		// Use findByTitle (MM5 API)
+		if (app.playlists?.findByTitle && typeof app.playlists.findByTitle === 'function') {
+			const playlist = app.playlists.findByTitle(name);
+			if (playlist) {
+				console.log(`findPlaylist: Found playlist by title: "${name}"`);
+				return playlist;
+			}
+		}
+	} catch (e) {
+		console.error(`findPlaylist: Error: ${e.toString()}`);
+	}
+
+	console.log(`findPlaylist: Playlist not found: "${name}"`);
+	return null;
+}
+
+/**
+ * Add-on initialization.
+ * Ensures the app API is available and optionally attaches auto-mode.
+ */
+function start() {
+
+	if (state.started)
+		return;
+	state.started = true;
+	console.log('Similar Artists: Starting SimilarArtists addon...');
+
+	// Check for MM5 environment
+	if (typeof app === 'undefined') {
+		console.log('Similar Artists: MediaMonkey 5 app API not found.');
+		return;
+	}
+
+	// Ensure listener state matches setting
+	applyAutoModeFromSettings();
+	console.log('Similar Artists: addon started successfully.');
+}
 
 	/**
 	 * Returns whether auto-mode is enabled.
