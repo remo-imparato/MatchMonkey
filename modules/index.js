@@ -30,6 +30,10 @@ const lastfmApi = require('./api/lastfm');
 // Database
 const db = require('./db');
 
+// Core Orchestration & Auto-Mode
+const orchestration = require('./core/orchestration');
+const autoMode = require('./core/autoMode');
+
 module.exports = {
 	config,
 	utils: {
@@ -50,4 +54,8 @@ module.exports = {
 		lastfmApi,
 	},
 	db,
+	core: {
+		orchestration,
+		autoMode,
+	},
 };
