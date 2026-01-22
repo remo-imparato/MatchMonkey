@@ -161,11 +161,16 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
 
+          # Capture the generated file before switching branches (orphan checkout clears the working tree)
+          UPDATE_JSON_CONTENT=$(cat update.json)
+
           # Create/checkout updates branch without carrying repo history
           git checkout --orphan updates
           git rm -rf . >/dev/null 2>&1 || true
 
-          mv update.json update.json
+          # Recreate the file in the now-empty working tree
+          printf '%s\n' "$UPDATE_JSON_CONTENT" > update.json
+
           git add update.json
           git commit -m "Update update.json for ${{ github.ref_name }}"
 
