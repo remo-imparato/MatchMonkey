@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SimilarArtists Add-on for MediaMonkey 5
  * 
  * @author Remo Imparato
@@ -738,9 +738,9 @@ try {
 			return `meta:${String(t.title || t.SongTitle || '')}:${String(t.album || '')}:${String(t.artist || '')}`;
 		}
 
-		// ???????????????????????????????????????????????????????????????????????????
+		// ═══════════════════════════════════════════════════════════════════════════
 		// NEW: Track-based discovery mode (when UseTrackSimilar is enabled)
-		// ???????????????????????????????????????????????????????????????????????????
+		// ═══════════════════════════════════════════════════════════════════════════
 		if (useTrackSimilar && seeds.length > 0 && seeds[0].track) {
 			console.log('Similar Artists: Using track.getSimilar for direct track matching');
 			updateProgress(`Using track-based discovery (track.getSimilar)...`, 0.1);
@@ -802,10 +802,14 @@ try {
 			}
 		}
 
-		// ???????????????????????????????????????????????????????????????????????????
+		// ═══════════════════════════════════════════════════════════════════════════
 		// DEFAULT: Artist-based discovery mode (original logic)
-		// ???????????????????????????????????????????????????????????????????????????
+		// ═══════════════════════════════════════════════════════════════════════════
 		console.log('Similar Artists: Using artist.getSimilar for artist-based matching');
+
+		// Track consecutive artists that yield no new tracks to detect exhaustion
+		let consecutiveEmptyArtists = 0;
+		const MAX_CONSECUTIVE_EMPTY = 5; // Stop if 5 consecutive artists yield nothing
 
 		// Process each seed artist up to configured limit.
 		const seedSlice = seeds.slice(0, seedLimit || seeds.length);
@@ -814,6 +818,12 @@ try {
 
 			// Early exit if we've already reached the total limit
 			if (allTracks.length >= totalLimit) break;
+
+			// Early exit if library appears exhausted
+			if (consecutiveEmptyArtists >= MAX_CONSECUTIVE_EMPTY) {
+				console.log(`Similar Artists: Stopping - library exhausted (${consecutiveEmptyArtists} consecutive artists yielded no tracks)`);
+				break;
+			}
 
 			// Update progress: Fetching similar artists
 			const seedProgress = (i + 1) / seedSlice.length;
@@ -855,6 +865,8 @@ try {
 
 			// Process each artist in the deduped pool with limited concurrency
 			let stop = false;
+			let tracksAddedThisSeed = 0;
+
 			await runWithConcurrency(artistPool, LASTFM_CONCURRENCY, async (artName) => {
 				if (stop) return;
 				if (allTracks.length >= totalLimit) {
@@ -938,6 +950,7 @@ try {
 								seenTrackKeys.add(key);
 								allTracks.push(track);
 								addedFromArtist++;
+								tracksAddedThisSeed++;
 							}
 						}
 
@@ -948,6 +961,14 @@ try {
 					console.error(`Similar Artists: Error processing artist "${artName}": ${e.toString()}`);
 				}
 			});
+
+			// Update consecutive empty counter
+			if (tracksAddedThisSeed === 0) {
+				consecutiveEmptyArtists++;
+				console.log(`Similar Artists: No tracks added from seed "${seed.name}" (consecutive empty: ${consecutiveEmptyArtists})`);
+			} else {
+				consecutiveEmptyArtists = 0; // Reset on success
+			}
 		}
 
 		// Post-filter to ensure no duplicates remain and enforce totalLimit
@@ -963,9 +984,9 @@ try {
 				if (filtered.length >= totalLimit) break;
 			}
 
-			// ???????????????????????????????????????????????????????????????????????????
+			// ═══════════════════════════════════════════════════════════════════════════
 			// NEW: Tag-based discovery (when UseTagDiscovery is enabled and we have room)
-			// ???????????????????????????????????????????????????????????????????????????
+			// ═══════════════════════════════════════════════════════════════════════════
 			if (useTagDiscovery && filtered.length < totalLimit && seeds.length > 0 && seeds[0].track?.genre) {
 				const genre = seeds[0].track.genre;
 				const remaining = totalLimit - filtered.length;
@@ -1011,9 +1032,9 @@ try {
 				}
 			}
 
-			// ???????????????????????????????????????????????????????????????????????????
+			// ═══════════════════════════════════════════════════════════════════════════
 			// NEW: Artist info enrichment (when UseArtistInfo is enabled)
-			// ???????????????????????????????????????????????????????????????????????????
+			// ═══════════════════════════════════════════════════════════════════════════
 			if (useArtistInfo && rankEnabled && trackRankMap && filtered.length > 0) {
 				console.log('Artist info enrichment: Fetching metadata for ranking boost');
 				updateProgress(`Fetching artist popularity data for ranking...`, 0.9);
@@ -1051,13 +1072,17 @@ try {
 				}
 			}
 
+			// Log final count vs requested to help diagnose exhaustion
+			if (filtered.length < totalLimit) {
+				console.log(`Similar Artists: Library exhausted - found ${filtered.length} tracks (requested ${totalLimit})`);
+			}
+
 			return filtered;
 		} catch (e) {
 			console.error('Similar Artists: Error deduplicating final track list: ' + e.toString());
 			return allTracks.slice(0, totalLimit);
 		}
 	}
-
 	/**
 	 * Main entry point for generating similar-artist tracks.
 	 * Steps:
@@ -1836,7 +1861,7 @@ try {
 	}
 
 	/**
-	 * In-place Fisher�Yates shuffle.
+	 * In-place Fisher–Yates shuffle.
 	 * @param {any[]} arr Array to shuffle.
 	 */
 	function shuffle(arr) {
@@ -1899,7 +1924,7 @@ try {
 		for (let i = 1; i < names.length; i++) {
 			const candidate = `${label}, ${names[i]}`;
 			if (candidate.length > maxLabelLen) {
-				label += '�';
+				label += '…';
 				break;
 			}
 			label = candidate;
