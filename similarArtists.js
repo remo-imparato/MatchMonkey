@@ -487,6 +487,13 @@ try {
 		return (name || '').trim();
 	}
 
+	function splitArtists(artistField) {
+		return String(artistField || '')
+			.split(';')
+			.map((a) => normalizeName(a))
+			.filter((a) => a.length > 0);
+	}
+
 	/**
 	 * Collect seed tracks either from current UI selection (any pane) or current playing track.
 	 * Supports multiple selected tracks, each contributing their artist as a seed.
@@ -507,12 +514,6 @@ try {
 				// Most common helper
 				if (uitools?.getSelectedTracklist) {
 					const tl = uitools.getSelectedTracklist();
-					if (tl) return tl;
-				}
-
-				// Older / alternative helper used in some contexts
-				if (uitools?.getSelectedTrackList) {
-					const tl = uitools.getSelectedTrackList();
 					if (tl) return tl;
 				}
 
@@ -540,7 +541,9 @@ try {
 				if (typeof selectedList.forEach === 'function') {
 					selectedList.forEach((t) => {
 						if (t && t.artist) {
-							seeds.push({ name: normalizeName(t.artist), track: t });
+							for (const a of splitArtists(t.artist)) {
+								seeds.push({ name: a, track: t });
+							}
 						}
 					});
 				} else if (typeof selectedList.getFastObject === 'function' && typeof selectedList.count === 'number') {
@@ -548,7 +551,9 @@ try {
 					for (let i = 0; i < selectedList.count; i++) {
 						tmp = selectedList.getFastObject(i, tmp);
 						if (tmp && tmp.artist) {
-							seeds.push({ name: normalizeName(tmp.artist), track: tmp });
+							for (const a of splitArtists(tmp.artist)) {
+								seeds.push({ name: a, track: tmp });
+							}
 						}
 					}
 				}
@@ -568,7 +573,9 @@ try {
 		const currentTrack = app.player?.getCurrentTrack?.();
 		if (currentTrack && currentTrack.artist) {
 			console.log(`collectSeedTracks: Current playing track artist = ${currentTrack.artist}`);
-			seeds.push({ name: normalizeName(currentTrack.artist), track: currentTrack });
+			for (const a of splitArtists(currentTrack.artist)) {
+				seeds.push({ name: a, track: currentTrack });
+			}
 			return seeds;
 		}
 
