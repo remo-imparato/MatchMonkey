@@ -83,6 +83,11 @@ const defaults = {
 	Black: '',
 	Exclude: '',
 	Genre: '',
+	// New feature flags for enhanced Last.fm API functionality
+	UseTrackSimilar: false,     // Use track.getSimilar for direct track matching
+	UseTagDiscovery: false,      // Use tag.getTopArtists for genre-based discovery
+	UseRequestDedup: true,       // Enable request deduplication (performance optimization)
+	UseArtistInfo: false,        // Fetch artist.getInfo for enhanced metadata/ranking
 };
 
 optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (sett, pnl, wndParams) {
@@ -169,6 +174,12 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 		UI.SABlack.controlClass.value = this.config.Black;
 		UI.SAGenre.controlClass.value = this.config.Genre;
 
+		// Load feature flags (new Last.fm API enhancements)
+		UI.SAUseTrackSimilar.controlClass.checked = Boolean(this.config.UseTrackSimilar);
+		UI.SAUseTagDiscovery.controlClass.checked = Boolean(this.config.UseTagDiscovery);
+		UI.SAUseRequestDedup.controlClass.checked = Boolean(this.config.UseRequestDedup);
+		UI.SAUseArtistInfo.controlClass.checked = Boolean(this.config.UseArtistInfo);
+
 	} catch (e) {
 		console.error('Similar Artists: load error: ' + e.toString());
 	}
@@ -220,6 +231,12 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function (sett) {
 		this.config.Exclude = UI.SAExclude.controlClass.value;
 		this.config.Black = UI.SABlack.controlClass.value;
 		this.config.Genre = UI.SAGenre.controlClass.value;
+
+		// Save feature flags (new Last.fm API enhancements)
+		this.config.UseTrackSimilar = Boolean(UI.SAUseTrackSimilar.controlClass.checked);
+		this.config.UseTagDiscovery = Boolean(UI.SAUseTagDiscovery.controlClass.checked);
+		this.config.UseRequestDedup = Boolean(UI.SAUseRequestDedup.controlClass.checked);
+		this.config.UseArtistInfo = Boolean(UI.SAUseArtistInfo.controlClass.checked);
 
 		// Update settings
 		try {

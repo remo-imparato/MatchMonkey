@@ -137,4 +137,31 @@
 		</div>
 	</fieldset>
 
+	<!-- Advanced Last.fm API Settings -->
+	<fieldset>
+		<legend>Advanced Last.fm API Options</legend>
+		<div class="uiRows">
+			<div class="uiRow">
+				<div data-id="SAUseTrackSimilar" data-control-class="Checkbox">
+					Use track.getSimilar API for direct track matching (higher accuracy, uses TPL limit)
+				</div>
+			</div>
+			<div class="uiRow">
+				<div data-id="SAUseTagDiscovery" data-control-class="Checkbox">
+					Use tag-based discovery to expand recommendations by genre
+				</div>
+			</div>
+			<div class="uiRow">
+				<div data-id="SAUseRequestDedup" data-control-class="Checkbox">
+					Enable request deduplication to prevent duplicate API calls (recommended)
+				</div>
+			</div>
+			<div class="uiRow">
+				<div data-id="SAUseArtistInfo" data-control-class="Checkbox">
+					Fetch artist.getInfo for enhanced metadata and ranking (slower but more accurate)
+				</div>
+			</div>
+		</div>
+	</fieldset>
+
 </div>
