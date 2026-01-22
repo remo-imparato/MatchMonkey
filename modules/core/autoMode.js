@@ -1,17 +1,14 @@
 /**
  * SimilarArtists Auto-Mode Implementation
  * 
- * Phase 6: Auto-Queue Listener & Trigger System
- * 
  * Handles automatic queuing of similar artist tracks when the Now Playing
- * playlist is approaching its end. Integrates with Phase 5 orchestration.
+ * playlist is approaching its end.
  * 
  * Key Features:
  * - Playback event listener attachment/detachment
  * - Remaining entries detection (multiple fallback methods)
  * - Threshold-based auto-triggering (2 or fewer entries remaining)
  * - Rate limiting (prevent multiple simultaneous runs)
- * - Conservative limits for auto-mode (small, focused playlists)
  * - Error recovery and logging
  * 
  * @author Remo Imparato

@@ -1,14 +1,14 @@
 /**
  * SimilarArtists Core Orchestration Logic
  * 
- * Phase 5: Core Logic - Main orchestration layer that ties together:
+ * Main orchestration layer that ties together:
  * - Input collection (seed tracks)
  * - API processing (similar artists from Last.fm)
  * - Track matching (multi-pass fuzzy matching against library)
  * - Output generation (playlist creation or queue management)
  * - Auto-mode handling (auto-queue near end of playlist)
  * 
- * This module provides the high-level orchestration functions:
+ * Provides the high-level orchestration functions:
  * - generateSimilarPlaylist() - Main entry point
  * - runSimilarArtists() - Full workflow orchestration
  * - buildResultsPlaylist() - Playlist creation workflow

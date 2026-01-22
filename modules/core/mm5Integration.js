@@ -1,9 +1,7 @@
 /**
  * SimilarArtists MM5 Integration Layer
  * 
- * Phase 7: MM5 Integration - Action handlers, toolbar buttons, and menu integration
- * 
- * Bridges the refactored modules (Phases 1-6) with MediaMonkey 5 UI and action systems.
+ * Bridges the refactored modules with MediaMonkey 5 UI and action systems.
  * Provides:
  * - Action handler definitions for toolbar/menu
  * - Settings change listeners
@@ -345,8 +343,6 @@ module.exports = {
 	 * 3. Set up settings change listener
 	 * 4. Update initial toolbar icon state
 	 * 
-	 * Called once during add-on startup.
-	 * 
 	 * @param {object} config - Configuration object
 	 * @param {Function} config.onRunSimilarArtists - Run action callback
 	 * @param {Function} config.onToggleAuto - Toggle action callback
@@ -416,7 +412,6 @@ module.exports = {
 	 * Shutdown MM5 integration.
 	 * 
 	 * Cleans up listeners and state.
-	 * Called during add-on shutdown.
 	 * 
 	 * @param {object} state - Integration state (from initializeIntegration)
 	 * @param {Function} logger - Optional logging function

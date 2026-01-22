@@ -1,5 +1,5 @@
 /**
- * Library Search Module - Phase 4: Database Layer
+ * Library Search Module
  *
  * Handles searching for tracks in the MediaMonkey library by matching
  * artist names and track titles. Supports both single and batch lookups
