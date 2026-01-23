@@ -11,9 +11,12 @@
  * @requires ../settings/prefixes - Artist name prefix handling
  */
 
-const { escapeSql, quoteSqlString } = require('../utils/sql');
-const { escapeSqlUtil } = require('../utils/helpers');
-const { fixPrefixes } = require('../settings/prefixes');
+'use strict';
+
+// Load dependencies (they export to window)
+localRequirejs('../utils/sql');
+localRequirejs('../utils/helpers');
+localRequirejs('../settings/prefixes');
 
 /**
  * Find tracks in the library matching a single artist name and optional track titles.
@@ -64,21 +67,21 @@ async function findLibraryTracks(artistName, trackTitles, limit = 100, options =
 	try {
 		const { rank = true, best = false, minRating = 0 } = options;
 
-		// Normalize artist name
-		const normalizedArtist = fixPrefixes(artistName);
+		// Normalize artist name (using window.fixPrefixes from prefixes.js)
+		const normalizedArtist = window.fixPrefixes(artistName);
 		if (!normalizedArtist) {
 			console.warn('findLibraryTracks: Invalid artist name');
 			return [];
 		}
 
-		// Build WHERE clause
-		let whereClause = `WHERE Songs.SongArtist LIKE ${quoteSqlString('%' + escapeSql(normalizedArtist) + '%')}`;
+		// Build WHERE clause (using window.quoteSqlString and window.escapeSql from sql.js)
+		let whereClause = `WHERE Songs.SongArtist LIKE ${window.quoteSqlString('%' + window.escapeSql(normalizedArtist) + '%')}`;
 
 		// Add track title filter if provided
 		if (trackTitles && (Array.isArray(trackTitles) && trackTitles.length > 0)) {
 			const titles = Array.isArray(trackTitles) ? trackTitles : [trackTitles];
 			const titleConditions = titles.map(t =>
-				`Songs.SongTitle LIKE ${quoteSqlString('%' + escapeSql(t) + '%')}`
+				`Songs.SongTitle LIKE ${window.quoteSqlString('%' + window.escapeSql(t) + '%')}`
 			).join(' OR ');
 			whereClause += ` AND (${titleConditions})`;
 		}
@@ -163,10 +166,10 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 
 	// Use batch query for efficiency
 	try {
-		const normalizedArtist = fixPrefixes(artistName);
+		const normalizedArtist = window.fixPrefixes(artistName);
 		const titleList = trackTitles
 			.filter(t => t && String(t).trim().length > 0)
-			.map(t => quoteSqlString('%' + escapeSql(String(t).trim()) + '%'))
+			.map(t => window.quoteSqlString('%' + window.escapeSql(String(t).trim()) + '%'))
 			.join(',');
 
 		if (!titleList) {
@@ -176,9 +179,9 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 		const { best = false, minRating = 0 } = options;
 
 		// Build comprehensive query for all titles at once
-		let whereClause = `WHERE Songs.SongArtist LIKE ${quoteSqlString('%' + escapeSql(normalizedArtist) + '%')}
+		let whereClause = `WHERE Songs.SongArtist LIKE ${window.quoteSqlString('%' + window.escapeSql(normalizedArtist) + '%')}
 		AND (Songs.SongTitle LIKE ${trackTitles
-			.map(t => quoteSqlString('%' + escapeSql(String(t).trim()) + '%'))
+			.map(t => window.quoteSqlString('%' + window.escapeSql(String(t).trim()) + '%'))
 			.join(' OR Songs.SongTitle LIKE ')})`;
 
 		if (best || minRating > 0) {
@@ -235,7 +238,8 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 	return resultMap;
 }
 
-module.exports = {
+// Export to window namespace for MM5
+window.dbLibrary = {
 	findLibraryTracks,
 	findLibraryTracksBatch,
 };

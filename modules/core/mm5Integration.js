@@ -16,7 +16,7 @@
 
 'use strict';
 
-module.exports = {
+window.similarArtistsMM5Integration = {
 	/**
 	 * Create MM5 action handlers for Similar Artists.
 	 * 

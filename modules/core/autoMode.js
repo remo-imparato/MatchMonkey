@@ -17,7 +17,8 @@
 
 'use strict';
 
-module.exports = {
+// Export to window namespace for MM5
+window.similarArtistsAutoMode = {
 	/**
 	 * Auto-mode state container
 	 * Tracks listener subscriptions and prevents concurrent runs

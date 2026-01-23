@@ -13,22 +13,26 @@
  * @exports {object} Database operations grouped by category
  */
 
-const library = require('./library');
-const playlist = require('./playlist');
-const queue = require('./queue');
+'use strict';
 
-module.exports = {
-	// Library search operations
-	findLibraryTracks: library.findLibraryTracks,
-	findLibraryTracksBatch: library.findLibraryTracksBatch,
+// Load sub-modules into global scope (they export to window.dbLibrary, window.dbPlaylist, window.dbQueue)
+localRequirejs('./library');
+localRequirejs('./playlist');
+localRequirejs('./queue');
 
-	// Playlist management operations
-	createPlaylist: playlist.createPlaylist,
-	findPlaylist: playlist.findPlaylist,
-	getOrCreatePlaylist: playlist.getOrCreatePlaylist,
+// Export unified interface to window namespace for MM5
+window.similarArtistsDB = {
+	// Library search operations (from window.dbLibrary)
+	findLibraryTracks: window.dbLibrary.findLibraryTracks,
+	findLibraryTracksBatch: window.dbLibrary.findLibraryTracksBatch,
 
-	// Queue/enqueue operations
-	queueTrack: queue.queueTrack,
-	queueTracks: queue.queueTracks,
-	addTracksToPlaylist: queue.addTracksToPlaylist,
+	// Playlist management operations (from window.dbPlaylist)
+	createPlaylist: window.dbPlaylist.createPlaylist,
+	findPlaylist: window.dbPlaylist.findPlaylist,
+	getOrCreatePlaylist: window.dbPlaylist.getOrCreatePlaylist,
+
+	// Queue/enqueue operations (from window.dbQueue)
+	queueTrack: window.dbQueue.queueTrack,
+	queueTracks: window.dbQueue.queueTracks,
+	addTracksToPlaylist: window.dbQueue.addTracksToPlaylist,
 };

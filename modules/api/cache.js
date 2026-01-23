@@ -7,7 +7,8 @@
 
 'use strict';
 
-const { cacheKeyArtist, cacheKeyTopTracks } = require('../utils/normalization');
+// Load normalization utilities into global scope
+localRequirejs('../utils/normalization');
 
 /**
  * Per-run cache structure containing:
@@ -41,7 +42,7 @@ function clearLastfmRunCache() {
  * @returns {object[]|null} Cached artists array, or null if not cached.
  */
 function getCachedSimilarArtists(artistName) {
-	const cacheKey = cacheKeyArtist(artistName);
+	const cacheKey = window.cacheKeyArtist(artistName);
 	if (lastfmRunCache?.similarArtists?.has(cacheKey)) {
 		return lastfmRunCache.similarArtists.get(cacheKey) || [];
 	}
@@ -54,7 +55,7 @@ function getCachedSimilarArtists(artistName) {
  * @param {object[]} artists Array of similar artist objects.
  */
 function cacheSimilarArtists(artistName, artists) {
-	const cacheKey = cacheKeyArtist(artistName);
+	const cacheKey = window.cacheKeyArtist(artistName);
 	if (lastfmRunCache?.similarArtists) {
 		lastfmRunCache.similarArtists.set(cacheKey, artists || []);
 	}
@@ -68,7 +69,7 @@ function cacheSimilarArtists(artistName, artists) {
  * @returns {(string|object)[]|null} Cached tracks array, or null if not cached.
  */
 function getCachedTopTracks(artistName, limit, withPlaycount = false) {
-	const cacheKey = cacheKeyTopTracks(artistName, limit, withPlaycount);
+	const cacheKey = window.cacheKeyTopTracks(artistName, limit, withPlaycount);
 	if (lastfmRunCache?.topTracks?.has(cacheKey)) {
 		return lastfmRunCache.topTracks.get(cacheKey) || [];
 	}
@@ -83,7 +84,7 @@ function getCachedTopTracks(artistName, limit, withPlaycount = false) {
  * @param {(string|object)[]} tracks Array of track titles or objects.
  */
 function cacheTopTracks(artistName, limit, withPlaycount, tracks) {
-	const cacheKey = cacheKeyTopTracks(artistName, limit, withPlaycount);
+	const cacheKey = window.cacheKeyTopTracks(artistName, limit, withPlaycount);
 	if (lastfmRunCache?.topTracks) {
 		lastfmRunCache.topTracks.set(cacheKey, tracks || []);
 	}
@@ -97,14 +98,13 @@ function isCacheActive() {
 	return lastfmRunCache !== null;
 }
 
-module.exports = {
-	initLastfmRunCache,
-	clearLastfmRunCache,
-	getCachedSimilarArtists,
-	cacheSimilarArtists,
-	getCachedTopTracks,
-	cacheTopTracks,
-	isCacheActive,
-	cacheKeyArtist,
-	cacheKeyTopTracks,
+// Export to window namespace for MM5
+window.lastfmCache = {
+	init: initLastfmRunCache,
+	clear: clearLastfmRunCache,
+	getSimilarArtists: getCachedSimilarArtists,
+	cacheSimilarArtists: cacheSimilarArtists,
+	getTopTracks: getCachedTopTracks,
+	cacheTopTracks: cacheTopTracks,
+	isActive: isCacheActive
 };

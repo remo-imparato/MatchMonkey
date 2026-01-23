@@ -2,62 +2,66 @@
  * SimilarArtists Modules Index
  * 
  * Central export point for all refactored modules.
- * Allows importing with: const { storage, normalization, db, ... } = require('./modules');
+ * Allows importing with: const { storage, normalization, db, ... } = localRequirejs('modules');
  */
 
 'use strict';
 
 // Configuration
-const config = require('./config');
+localRequirejs('config');
 
 // Utilities
-const normalization = require('./utils/normalization');
-const helpers = require('./utils/helpers');
-const sql = require('./utils/sql');
+localRequirejs('utils/normalization');
+localRequirejs('utils/helpers');
+localRequirejs('utils/sql');
 
 // Settings
-const storage = require('./settings/storage');
-const prefixes = require('./settings/prefixes');
-const lastfm = require('./settings/lastfm');
+localRequirejs('settings/storage');
+localRequirejs('settings/prefixes');
+localRequirejs('settings/lastfm');
 
 // UI
-const notifications = require('./ui/notifications');
+localRequirejs('ui/notifications');
 
 // API
-const cache = require('./api/cache');
-const lastfmApi = require('./api/lastfm');
+localRequirejs('api/cache');
+localRequirejs('api/lastfm');
 
 // Database
-const db = require('./db');
+localRequirejs('db/index');
 
 // Core: Orchestration, Auto-Mode, and MM5 Integration
-const orchestration = require('./core/orchestration');
-const autoMode = require('./core/autoMode');
-const mm5Integration = require('./core/mm5Integration');
+localRequirejs('core/orchestration');
+localRequirejs('core/autoMode');
+localRequirejs('core/mm5Integration');
 
-module.exports = {
-	config,
+// Export to window namespace
+window.similarArtistsModules = {
+	config: window.similarArtistsConfig,
 	utils: {
-		normalization,
-		helpers,
-		sql,
+		normalization: {
+			normalizeArtistName: window.normalizeArtistName,
+			normalizeTrackTitle: window.normalizeTrackTitle,
+		},
+		helpers: window.similarArtistsHelpers,
+		sql: window.similarArtistsSQL,
 	},
 	settings: {
-		storage,
-		prefixes,
-		lastfm,
+		storage: window.similarArtistsStorage,
+		prefixes: window.similarArtistsPrefixes,
+		lastfm: window.similarArtistsLastfm,
 	},
 	ui: {
-		notifications,
+		notifications: window.similarArtistsNotifications,
 	},
 	api: {
-		cache,
-		lastfmApi,
+		cache: window.lastfmCache,
+		lastfmApi: window.similarArtistsLastfmAPI,
 	},
-	db,
+	db: window.similarArtistsDB,
 	core: {
-		orchestration,
-		autoMode,
-		mm5Integration,
+		orchestration: window.similarArtistsOrchestration,
+		autoMode: window.similarArtistsAutoMode,
+		mm5Integration: window.similarArtistsMM5Integration,
 	},
 };

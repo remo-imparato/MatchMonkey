@@ -10,7 +10,10 @@
  * @requires ../ui/notifications - Progress and toast notifications
  */
 
-const { updateProgress, showToast } = require('../ui/notifications');
+'use strict';
+
+// Load dependencies (they export to window)
+localRequirejs('../ui/notifications');
 
 /**
  * Add a single track to the Now Playing queue.
@@ -145,7 +148,7 @@ async function queueTracks(tracks, playNow = false, showProgress = false) {
 				// Show progress if requested
 				if (showProgress && queuedCount % 10 === 0) {
 					const progress = i / tracks.length;
-					updateProgress(`Queued ${queuedCount}/${tracks.length} tracks...`, progress);
+					window.updateProgress(`Queued ${queuedCount}/${tracks.length} tracks...`, progress);
 				}
 			} catch (e) {
 				console.warn(`queueTracks: Error queuing track ${i}: ${e.toString()}`);
@@ -232,7 +235,7 @@ async function addTracksToPlaylist(playlist, tracks, showProgress = false) {
 				// Show progress if requested
 				if (showProgress && addedCount % 10 === 0) {
 					const progress = i / tracks.length;
-					updateProgress(`Added ${addedCount}/${tracks.length} tracks to playlist...`, progress);
+					window.updateProgress(`Added ${addedCount}/${tracks.length} tracks to playlist...`, progress);
 				}
 			} catch (e) {
 				console.warn(`addTracksToPlaylist: Error adding track ${i}: ${e.toString()}`);
@@ -253,7 +256,8 @@ async function addTracksToPlaylist(playlist, tracks, showProgress = false) {
 	}
 }
 
-module.exports = {
+// Export to window namespace for MM5
+window.dbQueue = {
 	queueTrack,
 	queueTracks,
 	addTracksToPlaylist,

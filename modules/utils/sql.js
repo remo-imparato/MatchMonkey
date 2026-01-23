@@ -6,7 +6,8 @@
 
 'use strict';
 
-const { escapeSql } = require('./helpers');
+// Load dependencies from window namespace
+const escapeSql = () => window.similarArtistsHelpers.escapeSql;
 
 /**
  * Quote a string literal for SQL safely.
@@ -17,7 +18,7 @@ function quoteSqlString(s) {
 	if (s === undefined || s === null) return "''";
 	// Remove control chars that may break SQL/logging
 	const cleaned = String(s).replace(/[\u0000-\u001F]/g, '');
-	return `'${escapeSql(cleaned)}'`;
+	return `'${escapeSql()(cleaned)}'`;
 }
 
 /**
@@ -35,8 +36,9 @@ function getTrackKey(track) {
 	return `meta:${String(track.title || track.SongTitle || '')}:${String(track.album || '')}:${String(track.artist || '')}`;
 }
 
-module.exports = {
+// Export to window namespace for MM5
+window.similarArtistsSQL = {
 	quoteSqlString,
 	getTrackKey,
-	escapeSql,
+	escapeSql: escapeSql(),
 };

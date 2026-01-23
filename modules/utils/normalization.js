@@ -75,10 +75,9 @@ function cacheKeyTopTracks(artistName, limit, withPlaycount = false) {
 	return `${cacheKeyArtist(artistName)}|${Number(limit) || ''}|pc:${withPlaycount ? 1 : 0}`;
 }
 
-module.exports = {
-	normalizeName,
-	splitArtists,
-	stripName,
-	cacheKeyArtist,
-	cacheKeyTopTracks,
-};
+// Export to window namespace for MM5
+window.normalizeName = normalizeName;
+window.splitArtists = splitArtists;
+window.stripName = stripName;
+window.cacheKeyArtist = cacheKeyArtist;
+window.cacheKeyTopTracks = cacheKeyTopTracks;

@@ -7,8 +7,6 @@
 
 'use strict';
 
-const { listSetting } = require('./storage');
-
 /**
  * Get the list of prefix strings to ignore (e.g., "The", "A")
  * Reads from MediaMonkey's Options settings.
@@ -83,7 +81,8 @@ function fixPrefixes(name) {
 	return result;
 }
 
-module.exports = {
+// Export to window namespace for MM5
+window.similarArtistsPrefixes = {
 	getIgnorePrefixes,
 	fixPrefixes,
 };

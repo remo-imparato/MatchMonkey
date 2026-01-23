@@ -30,7 +30,8 @@ const DEFAULTS = {
 	Name: '- Similar to %',
 };
 
-module.exports = {
+// Export to window namespace for MM5
+window.similarArtistsConfig = {
 	SCRIPT_ID,
 	MENU_RUN_ID,
 	MENU_AUTO_ID,

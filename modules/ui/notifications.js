@@ -100,7 +100,8 @@ function getProgressTask() {
 	return globalProgressTask;
 }
 
-module.exports = {
+// Export to window namespace for MM5
+window.similarArtistsNotifications = {
 	showToast,
 	updateProgress,
 	createProgressTask,

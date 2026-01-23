@@ -20,7 +20,7 @@
 
 'use strict';
 
-module.exports = {
+window.similarArtistsOrchestration = {
 	/**
 	 * Main orchestration function that runs the complete SimilarArtists workflow.
 	 * 

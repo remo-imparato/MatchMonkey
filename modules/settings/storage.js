@@ -7,8 +7,10 @@
 
 'use strict';
 
-const { SCRIPT_ID, DEFAULTS } = require('../config');
-const { parseListSetting } = require('../utils/helpers');
+// Load dependencies from window namespace
+const SCRIPT_ID = () => window.similarArtistsConfig.SCRIPT_ID;
+const DEFAULTS = () => window.similarArtistsConfig.DEFAULTS;
+const parseListSetting = () => window.similarArtistsHelpers.parseListSetting;
 
 /**
  * Read a setting stored under this script's namespace.
@@ -20,7 +22,7 @@ function getSetting(key, fallback) {
 	if (typeof app === 'undefined' || !app.getValue)
 		return fallback;
 
-	let val = app.getValue(SCRIPT_ID, {});
+	let val = app.getValue(SCRIPT_ID(), {});
 	val = val[key];
 	switch (val) {
 		case undefined:
@@ -44,9 +46,9 @@ function setSetting(key, value) {
 	// 1. Get the current config object
 	// 2. Update the specific key
 	// 3. Save the entire object back
-	const config = app.getValue(SCRIPT_ID, {});
+	const config = app.getValue(SCRIPT_ID(), {});
 	config[key] = value;
-	app.setValue(SCRIPT_ID, config);
+	app.setValue(SCRIPT_ID(), config);
 }
 
 /**
@@ -55,7 +57,7 @@ function setSetting(key, value) {
  * @returns {number} Integer value.
  */
 function intSetting(key) {
-	const v = getSetting(key, DEFAULTS[key]);
+	const v = getSetting(key, DEFAULTS()[key]);
 	// Rating and other numeric settings can come in as strings or as objects; be defensive
 	if (v === undefined || v === null) return 0;
 	if (typeof v === 'number') return v;
@@ -69,7 +71,7 @@ function intSetting(key) {
  * @returns {string} String value.
  */
 function stringSetting(key) {
-	return String(getSetting(key, DEFAULTS[key] || ''));
+	return String(getSetting(key, DEFAULTS()[key] || ''));
 }
 
 /**
@@ -78,7 +80,7 @@ function stringSetting(key) {
  * @returns {boolean} Boolean value.
  */
 function boolSetting(key) {
-	const val = getSetting(key, DEFAULTS[key]);
+	const val = getSetting(key, DEFAULTS()[key]);
 	if (val === true || val === false) return val;
 	if (typeof val === 'string') {
 		const v = val.trim().toLowerCase();
@@ -95,11 +97,12 @@ function boolSetting(key) {
  * @returns {string[]} Array of values.
  */
 function listSetting(key) {
-	const raw = getSetting(key, DEFAULTS[key]);
-	return parseListSetting(raw);
+	const raw = getSetting(key, DEFAULTS()[key]);
+	return parseListSetting()(raw);
 }
 
-module.exports = {
+// Export to window namespace for MM5
+window.similarArtistsStorage = {
 	getSetting,
 	setSetting,
 	intSetting,

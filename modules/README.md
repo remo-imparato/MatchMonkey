@@ -52,14 +52,14 @@ config
 
 ### Configuration
 ```javascript
-const { config } = require('./modules');
+const { config } = localRequirejs('./modules');
 console.log(config.SCRIPT_ID);        // 'SimilarArtists'
 console.log(config.API_BASE);          // 'https://ws.audioscrobbler.com/2.0/'
 ```
 
 ### Utilities
 ```javascript
-const { utils } = require('./modules');
+const { utils } = localRequirejs('./modules');
 
 // Normalization
 utils.normalization.stripName('The Beatles');           // 'THEBEATLES'
@@ -77,7 +77,7 @@ utils.sql.getTrackKey(track);                           // Track dedup key
 
 ### Settings
 ```javascript
-const { settings } = require('./modules');
+const { settings } = localRequirejs('./modules');
 
 // Storage
 settings.storage.getSetting('Limit', 50);
@@ -95,7 +95,7 @@ const apiKey = settings.lastfm.getApiKey();
 
 ### UI
 ```javascript
-const { ui } = require('./modules');
+const { ui } = localRequirejs('./modules');
 
 // Notifications
 ui.notifications.showToast('Processing playlist...');
@@ -106,7 +106,7 @@ ui.notifications.terminateProgressTask();
 
 ### API Caching
 ```javascript
-const { api } = require('./modules');
+const { api } = localRequirejs('./modules');
 
 api.cache.initLastfmRunCache();
 api.cache.cacheSimilarArtists('Pink Floyd', artists);
@@ -116,7 +116,7 @@ api.cache.clearLastfmRunCache();
 
 ### Last.fm API
 ```javascript
-const { api } = require('./modules');
+const { api } = localRequirejs('./modules');
 
 // Fetch similar artists from Last.fm
 const similar = await api.lastfmApi.fetchSimilarArtists('Pink Floyd', 10);
@@ -133,7 +133,7 @@ const rankedTracks = await api.lastfmApi.fetchTopTracks('Pink Floyd', 100, true)
 
 ### Database
 ```javascript
-const { db } = require('./modules');
+const { db } = localRequirejs('./modules');
 
 // Find library tracks by artist
 const tracks = await db.findLibraryTracks('Pink Floyd', ['Time', 'Money'], 20);
@@ -179,7 +179,7 @@ Once modules are complete, each can be unit-tested independently:
 
 ```javascript
 // Example test
-const { utils } = require('./modules');
+const { utils } = localRequirejs('./modules');
 
 describe('normalization', () => {
   it('should strip punctuation', () => {

@@ -8,7 +8,10 @@
  * @requires ../ui/notifications - Progress and toast notifications
  */
 
-const { updateProgress } = require('../ui/notifications');
+'use strict';
+
+// Load dependencies (they export to window)
+localRequirejs('../ui/notifications');
 
 /**
  * Create a new playlist in MediaMonkey.
@@ -81,7 +84,7 @@ async function createPlaylist(playlistName, autoOverwrite = false) {
 		await newPlaylist.commitAsync();
 
 		console.log(`createPlaylist: Created playlist "${name}"`);
-		updateProgress(`Created playlist "${name}"`);
+		window.updateProgress(`Created playlist "${name}"`);
 
 		return newPlaylist;
 	} catch (e) {
@@ -189,7 +192,8 @@ async function getOrCreatePlaylist(playlistName) {
 	}
 }
 
-module.exports = {
+// Export to window namespace for MM5
+window.dbPlaylist = {
 	createPlaylist,
 	findPlaylist,
 	getOrCreatePlaylist,

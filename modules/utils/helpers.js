@@ -95,7 +95,8 @@ function escapeSql(str) {
 	return (str || '').replace(/'/g, "''");
 }
 
-module.exports = {
+// Export to window namespace for MM5
+window.similarArtistsHelpers = {
 	formatError,
 	shuffle,
 	parseListSetting,
