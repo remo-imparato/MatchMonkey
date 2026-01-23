@@ -8,7 +8,7 @@
 'use strict';
 
 // Configuration
-localRequirejs('config');
+localRequirejs('./config');
 
 // Utilities
 localRequirejs('utils/normalization');
