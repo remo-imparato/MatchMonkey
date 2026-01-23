@@ -162,6 +162,47 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 		// Set checkbox now that we've attempted to ensure module is loaded
 		setOnPlayCheckbox();
 
+		// Add change listener to the checkbox to trigger the actual toggle function
+		const onPlayCheckboxChanged = () => {
+			try {
+				// When checkbox is toggled in settings, trigger the actual toggle function
+				// to ensure auto-mode listener is properly enabled/disabled
+				if (window.SimilarArtists?.toggleAuto) {
+					// Get current module state
+					const currentModuleState = Boolean(window.SimilarArtists.isAutoEnabled?.());
+					// Get checkbox state
+					const checkboxState = Boolean(UI.SAOnPlay.controlClass.checked);
+					
+					// Only toggle if they differ (to avoid infinite loop)
+					if (currentModuleState !== checkboxState) {
+						window.SimilarArtists.toggleAuto();
+					}
+				}
+			} catch (e) {
+				console.error('Similar Artists: OnPlay checkbox change error:', e);
+			}
+		};
+		
+		// Listen for checkbox changes
+		if (UI.SAOnPlay?.controlClass?.container) {
+			app.listen(UI.SAOnPlay.controlClass.container, 'change', onPlayCheckboxChanged);
+		}
+		
+		// Listen for auto-mode changes from other sources (menu action, etc)
+		const onAutoModeChanged = (event) => {
+			try {
+				if (event.detail && event.detail.enabled !== undefined) {
+					UI.SAOnPlay.controlClass.checked = Boolean(event.detail.enabled);
+				}
+			} catch (e) {
+				console.error('Similar Artists: Auto-mode event handler error:', e);
+			}
+		};
+		
+		// Store listener reference for cleanup
+		this._autoModeListener = onAutoModeChanged;
+		window.addEventListener('similarartists:automodechanged', onAutoModeChanged);
+
 		UI.SAClearNP.controlClass.checked = this.config.ClearNP;
 		UI.SAIgnore.controlClass.checked = this.config.Ignore;
 		UI.SAParent.controlClass.value = this.config.Parent;
@@ -176,6 +217,12 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 
 optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function (sett) {
 	try {
+		// Clean up event listener
+		if (this._autoModeListener) {
+			window.removeEventListener('similarartists:automodechanged', this._autoModeListener);
+			this._autoModeListener = null;
+		}
+		
 		var UI = getAllUIElements();
 
 		this.config.ApiKey = UI.SAApiKey.controlClass.value;
@@ -203,16 +250,23 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function (sett) {
 		this.config.Overwrite = UI.SAOverwrite.controlClass.value;
 		this.config.Enqueue = UI.SAEnqueue.controlClass.checked;
 		this.config.Navigate = UI.SANavigate.controlClass.value;
-		// Detect real Auto OnPlay state: prefer module API when available, otherwise use checkbox
-		let isAutoEnabled = Boolean(UI.SAOnPlay.controlClass.checked);
+		
+		// For OnPlay/Auto mode: always prefer the module's actual state
+		// The module manages the actual listener, so it's the source of truth
+		let actualAutoState = false;
 		try {
 			if (typeof window.SimilarArtists?.isAutoEnabled === 'function') {
-				isAutoEnabled = Boolean(window.SimilarArtists.isAutoEnabled());
+				actualAutoState = Boolean(window.SimilarArtists.isAutoEnabled());
+			} else {
+				// Fallback: use checkbox state if module not available
+				actualAutoState = Boolean(UI.SAOnPlay.controlClass.checked);
 			}
 		} catch (e) {
-			// ignore and fall back to checkbox
+			console.error('Similar Artists: Error reading auto state:', e);
+			actualAutoState = Boolean(UI.SAOnPlay.controlClass.checked);
 		}
-		this.config.OnPlay = isAutoEnabled;
+		
+		this.config.OnPlay = actualAutoState;
 
 		this.config.ClearNP = UI.SAClearNP.controlClass.checked;
 		this.config.Ignore = UI.SAIgnore.controlClass.checked;

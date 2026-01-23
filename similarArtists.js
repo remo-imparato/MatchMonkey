@@ -49,65 +49,258 @@
 		core: {
 			orchestration: {
 				generateSimilarPlaylist: async function(modules, autoModeFlag) {
-					// Placeholder - implement actual logic
-					console.log('SimilarArtists: generateSimilarPlaylist called');
-					return { success: false, error: 'Not implemented yet', tracksAdded: 0 };
+					// TODO: Implement the actual similar artists logic here
+					// This should:
+					// 1. Get current/selected track(s)
+					// 2. Query Last.fm for similar artists
+					// 3. Match tracks in local library
+					// 4. Create playlist or enqueue tracks
+					
+					console.log('SimilarArtists: generateSimilarPlaylist called (autoMode=' + autoModeFlag + ')');
+					
+					try {
+						// Get the currently playing or selected track
+						let seedTrack = null;
+						
+						if (autoModeFlag) {
+							// In auto-mode, use currently playing track
+							seedTrack = app.player.getCurrentTrack();
+						} else {
+							// Otherwise try to get selected tracks
+							const tracks = window.uitools?.getSelectedTracklist?.();
+							if (tracks && tracks.count > 0) {
+								await tracks.whenLoaded();
+								tracks.locked(() => {
+									seedTrack = tracks.getValue(0);
+								});
+							} else {
+								// Fall back to currently playing
+								seedTrack = app.player.getCurrentTrack();
+							}
+						}
+						
+						if (!seedTrack || !seedTrack.artist) {
+							console.error('SimilarArtists: No track selected or playing');
+							return { 
+								success: false, 
+								error: 'No track selected or playing', 
+								tracksAdded: 0 
+							};
+						}
+						
+						console.log('SimilarArtists: Seed artist: ' + seedTrack.artist);
+						
+						// TODO: Query Last.fm API for similar artists
+						// TODO: Search local library for matching tracks
+						// TODO: Add tracks to Now Playing or create playlist
+						
+						// Placeholder response for now
+						return { 
+							success: true, 
+							error: null, 
+							tracksAdded: 0,
+							message: 'Feature not fully implemented yet - seed artist: ' + seedTrack.artist
+						};
+						
+					} catch (error) {
+						console.error('SimilarArtists: Error in generateSimilarPlaylist:', error);
+						return { 
+							success: false, 
+							error: error.toString(), 
+							tracksAdded: 0 
+						};
+					}
 				}
 			},
 			autoMode: {
 				isAutoModeEnabled: function(getSetting) {
-					return getSetting('autoModeEnabled', false);
+					// First check the dedicated auto-mode setting
+					const autoEnabled = getSetting('autoModeEnabled', false);
+					
+					// Also check the config that the settings dialog uses
+					try {
+						const config = app.getValue('SimilarArtists', {});
+						// If config.OnPlay is explicitly set, it takes precedence
+						if (config.OnPlay !== undefined && config.OnPlay !== null) {
+							return Boolean(config.OnPlay);
+						}
+					} catch (e) {
+						// Ignore and use autoEnabled
+					}
+					
+					return Boolean(autoEnabled);
 				},
+				
 				toggleAutoMode: function(state, getSetting, setSetting, handler, callback) {
 					const current = getSetting('autoModeEnabled', false);
 					const newState = !current;
 					setSetting('autoModeEnabled', newState);
+					
+					// Also save to the config that settings dialog uses
+					try {
+						const config = app.getValue('SimilarArtists', {});
+						config.OnPlay = newState;
+						app.setValue('SimilarArtists', config);
+					} catch (e) {
+						console.error('Failed to persist OnPlay setting:', e);
+					}
+					
+					// Actually attach/detach the listener
+					if (state && state.playerListener) {
+						if (newState) {
+							// Attach listener
+							if (!state.listenerAttached) {
+								console.log('SimilarArtists: Attaching auto-mode listener');
+								app.listen(app.player, 'onStateChange', state.playerListener);
+								state.listenerAttached = true;
+							}
+						} else {
+							// Detach listener
+							if (state.listenerAttached) {
+								console.log('SimilarArtists: Detaching auto-mode listener');
+								app.unlisten(app.player, 'onStateChange', state.playerListener);
+								state.listenerAttached = false;
+							}
+						}
+					}
+					
 					if (callback) callback(newState);
 					return newState;
 				},
+				
 				createAutoTriggerHandler: function(options) {
-					return function() {
-						console.log('SimilarArtists: Auto-trigger handler called');
+					const { getSetting, generateSimilarPlaylist, isAutoModeEnabled, threshold = 2 } = options;
+					
+					let lastTriggeredTrackId = null;
+					let isProcessing = false;
+					
+					return function onPlayerStateChange() {
+						try {
+							// Check if auto-mode is enabled
+							if (!isAutoModeEnabled(getSetting)) {
+								return;
+							}
+							
+							// Don't trigger if already processing
+							if (isProcessing) {
+								return;
+							}
+							
+							// Check player state
+							if (!app.player || !app.player.isPlaying) {
+								return;
+							}
+							
+							const currentTrack = app.player.currentTrack;
+							if (!currentTrack) {
+								return;
+							}
+							
+							// Don't trigger multiple times for same track
+							if (lastTriggeredTrackId === currentTrack.id) {
+								return;
+							}
+							
+							// Get now playing list
+							const nowPlayingList = app.player.nowPlayingList;
+							if (!nowPlayingList || nowPlayingList.count === 0) {
+								return;
+							}
+							
+							// Check if we're near the end (within threshold tracks)
+							const currentIndex = nowPlayingList.focusedIndex;
+							const tracksRemaining = nowPlayingList.count - currentIndex - 1;
+							
+							if (tracksRemaining <= threshold && tracksRemaining >= 0) {
+								console.log(`SimilarArtists: Auto-trigger activated (${tracksRemaining} tracks remaining)`);
+								
+								isProcessing = true;
+								lastTriggeredTrackId = currentTrack.id;
+								
+								// Run similar artists in auto-mode
+								generateSimilarPlaylist(true).then((result) => {
+									if (result.success) {
+										console.log(`SimilarArtists: Auto-queued ${result.tracksAdded} tracks`);
+					
+										// Show notification
+										if (options.showToast) {
+											options.showToast(`Auto-queued ${result.tracksAdded} similar tracks`);
+										}
+									}
+								}).catch((error) => {
+									console.error('SimilarArtists: Auto-trigger error:', error);
+								}).finally(() => {
+									isProcessing = false;
+								});
+							}
+						} catch (e) {
+							console.error('SimilarArtists: Player state change handler error:', e);
+							isProcessing = false;
+						}
 					};
 				},
+				
 				initializeAutoMode: function(getSetting, handler, logger) {
 					logger('Initializing auto-mode state');
-					return {
-						enabled: getSetting('autoModeEnabled', false),
-						handler: handler
+					
+					const enabled = getSetting('autoModeEnabled', false);
+					const state = {
+						enabled: enabled,
+						handler: handler,
+						playerListener: handler,
+						listenerAttached: false
 					};
+					
+					// If enabled, attach listener immediately
+					if (enabled && app.player) {
+						logger('Auto-mode enabled, attaching listener');
+						app.listen(app.player, 'onStateChange', handler);
+						state.listenerAttached = true;
+					}
+					
+					return state;
 				},
+				
 				shutdownAutoMode: function(state, logger) {
 					logger('Shutting down auto-mode');
+					
+					if (state && state.playerListener && state.listenerAttached) {
+						try {
+							app.unlisten(app.player, 'onStateChange', state.playerListener);
+							state.listenerAttached = false;
+							logger('Auto-mode listener detached');
+						} catch (e) {
+							logger('Error detaching auto-mode listener:', e);
+						}
+					}
 				},
+				
 				syncAutoModeListener: function(state, getSetting, handler, logger) {
 					logger('Syncing auto-mode listener');
+					
+					if (!state) {
+						logger('No state to sync');
+						return;
+					}
+					
+					const shouldBeEnabled = getSetting('autoModeEnabled', false);
+					const isAttached = state.listenerAttached;
+					
+					if (shouldBeEnabled && !isAttached) {
+						// Should be on but isn't
+						logger('Attaching auto-mode listener');
+						app.listen(app.player, 'onStateChange', state.playerListener);
+						state.listenerAttached = true;
+					} else if (!shouldBeEnabled && isAttached) {
+						// Should be off but isn't
+						logger('Detaching auto-mode listener');
+						app.unlisten(app.player, 'onStateChange', state.playerListener);
+						state.listenerAttached = false;
+					}
+					
+					state.enabled = shouldBeEnabled;
 				}
 			},
-			mm5Integration: {
-				checkMM5Availability: function() {
-					return {
-						available: typeof app !== 'undefined',
-						missing: typeof app === 'undefined' ? ['app'] : []
-					};
-				},
-				initializeIntegration: function(options) {
-					console.log('SimilarArtists: MM5 integration initialized');
-					return {
-						options: options
-					};
-				},
-				shutdownIntegration: function(integration, logger) {
-					logger('MM5 integration shutdown');
-				},
-				updateToolbarIcon: function(toolbarId, enabled, logger) {
-					logger('Toolbar icon updated:', enabled);
-				},
-				updateActionState: function(actionId, logger) {
-					logger('Action state updated:', actionId);
-				}
-			}
-		},
 		ui: {
 			notifications: {
 				showToast: function(message) {
@@ -179,7 +372,7 @@
 			const { getSetting, setSetting } = storage;
 			const handler = createAutoTriggerHandler();
 
-			// Toggle
+			// Toggle - this now handles attaching/detaching the listener
 			const newState = autoMode.toggleAutoMode(
 				appState.autoModeState,
 				getSetting,
@@ -187,8 +380,26 @@
 				handler,
 				(enabled) => {
 					console.log(`SimilarArtists: Auto-mode toggled to ${enabled ? 'enabled' : 'disabled'}`);
+					
+					// Save to the config object that the settings dialog reads
+					try {
+						const config = app.getValue('SimilarArtists', {});
+						config.OnPlay = enabled;
+						app.setValue('SimilarArtists', config);
+					} catch (e) {
+						console.error('Failed to save OnPlay setting:', e);
+					}
+					
+					// Update the state's enabled flag
+					appState.autoModeState.enabled = enabled;
+					
 					// Update UI
 					updateAutoModeUI(enabled);
+					
+					// Notify action state changed to update checkmark
+					if (typeof window.updateActionState === 'function') {
+						window.updateActionState('SimilarArtistsToggleAuto');
+					}
 				}
 			);
 
@@ -307,6 +518,16 @@
 
 			// Update action state
 			mm5Integration.updateActionState('SimilarArtistsToggleAuto', console.log);
+			
+			// Fire a global event so other UI components (like settings dialog) can update
+			try {
+				const event = new CustomEvent('similarartists:automodechanged', {
+					detail: { enabled: enabled }
+				});
+				window.dispatchEvent(event);
+			} catch (e) {
+				console.error('Failed to dispatch automode changed event:', e);
+			}
 
 		} catch (e) {
 			console.error(`SimilarArtists: Error updating UI: ${e.toString()}`);
@@ -336,6 +557,11 @@
 			// Update UI
 			const enabled = isAutoEnabled();
 			updateAutoModeUI(enabled);
+			
+			// Notify action state to update menu checkmark
+			if (typeof window.updateActionState === 'function') {
+				window.updateActionState('SimilarArtistsToggleAuto');
+			}
 
 		} catch (e) {
 			console.error(`SimilarArtists: Error in onSettingsChanged: ${e.toString()}`);
