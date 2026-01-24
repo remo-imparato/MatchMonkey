@@ -29,7 +29,6 @@ async function fetchSimilarArtists(artistName, limit) {
 		const cache = window.lastfmCache;
 		const getApiKey = window.similarArtistsLastfm?.getApiKey;
 		const updateProgress = window.similarArtistsNotifications?.updateProgress || (() => {});
-		const cacheKeyArtist = window.cacheKeyArtist || ((name) => String(name || '').trim().toUpperCase());
 
 		// Check cache first
 		if (cache?.getCachedSimilarArtists) {
@@ -121,8 +120,6 @@ async function fetchTopTracks(artistName, limit, includePlaycount = false) {
 		const cache = window.lastfmCache;
 		const getApiKey = window.similarArtistsLastfm?.getApiKey;
 		const updateProgress = window.similarArtistsNotifications?.updateProgress || (() => {});
-		const cacheKeyTopTracks = window.cacheKeyTopTracks || ((name, lim, pc) => 
-			`${String(name || '').trim().toUpperCase()}|${Number(lim) || ''}|pc:${pc ? 1 : 0}`);
 
 		// Check cache first
 		if (cache?.getCachedTopTracks) {
@@ -213,9 +210,243 @@ async function fetchTopTracks(artistName, limit, includePlaycount = false) {
 	}
 }
 
+/**
+ * Fetch similar tracks from Last.fm API using track.getSimilar.
+ * This finds tracks that are musically similar to a given track,
+ * which can discover tracks across different artists.
+ * 
+ * @param {string} artistName Artist name of the seed track.
+ * @param {string} trackName Track title of the seed track.
+ * @param {number} [limit=30] Maximum number of similar tracks to return.
+ * @returns {Promise<object[]>} Array of similar track objects with artist and title.
+ */
+async function fetchSimilarTracks(artistName, trackName, limit = 30) {
+	try {
+		if (!artistName || !trackName) return [];
+
+		// Get dependencies
+		const cache = window.lastfmCache;
+		const getApiKey = window.similarArtistsLastfm?.getApiKey;
+		const updateProgress = window.similarArtistsNotifications?.updateProgress || (() => {});
+
+		// Build cache key
+		const cacheKey = `track:${artistName}|${trackName}|${limit}`.toUpperCase();
+
+		// Check cache first
+		if (cache?.isActive?.() && cache._similarTracks?.has?.(cacheKey)) {
+			console.log(`fetchSimilarTracks: Using cached results for "${artistName} - ${trackName}"`);
+			return cache._similarTracks.get(cacheKey) || [];
+		}
+
+		// Build API request
+		const apiKey = getApiKey ? getApiKey() : '7fd988db0c4e9d8b12aed27d0a91a932';
+		const params = new URLSearchParams({
+			method: 'track.getSimilar',
+			api_key: apiKey,
+			format: 'json',
+			artist: artistName,
+			track: trackName,
+			autocorrect: '1',
+			limit: String(limit)
+		});
+
+		const url = API_BASE + '?' + params.toString();
+		updateProgress(`Finding similar tracks to "${trackName}"...`);
+		console.log(`fetchSimilarTracks: querying ${url}`);
+
+		// Make HTTP request
+		const res = await fetch(url);
+		if (!res || !res.ok) {
+			console.log(`fetchSimilarTracks: HTTP ${res?.status} for "${artistName} - ${trackName}"`);
+			return [];
+		}
+
+		// Parse JSON response
+		let data;
+		try {
+			data = await res.json();
+		} catch (e) {
+			console.warn('fetchSimilarTracks: invalid JSON: ' + e.toString());
+			return [];
+		}
+
+		// Check for API errors
+		if (data?.error) {
+			console.warn('fetchSimilarTracks: API error: ' + (data.message || data.error));
+			return [];
+		}
+
+		// Extract results
+		let tracks = data?.similartracks?.track || [];
+		if (tracks && !Array.isArray(tracks)) tracks = [tracks];
+
+		const results = [];
+		for (const t of tracks) {
+			if (!t) continue;
+			const title = t.name || t.title;
+			const artist = t.artist?.name || t.artist;
+			if (!title || !artist) continue;
+
+			results.push({
+				title,
+				artist,
+				match: Number(t.match) || 0, // Similarity score 0-1
+				playcount: Number(t.playcount) || 0,
+				url: t.url || ''
+			});
+		}
+
+		console.log(`fetchSimilarTracks: Found ${results.length} similar tracks for "${artistName} - ${trackName}"`);
+
+		// Cache results
+		if (cache?.isActive?.()) {
+			if (!cache._similarTracks) cache._similarTracks = new Map();
+			cache._similarTracks.set(cacheKey, results);
+		}
+
+		return results;
+
+	} catch (e) {
+		console.error('fetchSimilarTracks error: ' + e.toString());
+		return [];
+	}
+}
+
+/**
+ * Fetch artist info including tags/genres from Last.fm.
+ * Useful for genre-based discovery.
+ * 
+ * @param {string} artistName Artist name to get info for.
+ * @returns {Promise<object|null>} Artist info object with tags, or null on error.
+ */
+async function fetchArtistInfo(artistName) {
+	try {
+		if (!artistName) return null;
+
+		const cache = window.lastfmCache;
+		const getApiKey = window.similarArtistsLastfm?.getApiKey;
+
+		// Build cache key
+		const cacheKey = `artistinfo:${artistName}`.toUpperCase();
+
+		// Check cache
+		if (cache?.isActive?.() && cache._artistInfo?.has?.(cacheKey)) {
+			return cache._artistInfo.get(cacheKey);
+		}
+
+		// Build API request
+		const apiKey = getApiKey ? getApiKey() : '7fd988db0c4e9d8b12aed27d0a91a932';
+		const params = new URLSearchParams({
+			method: 'artist.getInfo',
+			api_key: apiKey,
+			format: 'json',
+			artist: artistName,
+			autocorrect: '1'
+		});
+
+		const url = API_BASE + '?' + params.toString();
+		console.log(`fetchArtistInfo: querying ${url}`);
+
+		const res = await fetch(url);
+		if (!res || !res.ok) return null;
+
+		let data;
+		try {
+			data = await res.json();
+		} catch (e) {
+			return null;
+		}
+
+		if (data?.error) return null;
+
+		const artist = data?.artist;
+		if (!artist) return null;
+
+		// Extract tags (genres)
+		const tags = artist.tags?.tag || [];
+		const tagList = Array.isArray(tags) ? tags : (tags ? [tags] : []);
+
+		const result = {
+			name: artist.name || artistName,
+			tags: tagList.map(t => t.name || t).filter(Boolean),
+			listeners: Number(artist.stats?.listeners) || 0,
+			playcount: Number(artist.stats?.playcount) || 0,
+			similar: (artist.similar?.artist || []).map(a => a.name || a).filter(Boolean),
+			bio: artist.bio?.summary || ''
+		};
+
+		// Cache result
+		if (cache?.isActive?.()) {
+			if (!cache._artistInfo) cache._artistInfo = new Map();
+			cache._artistInfo.set(cacheKey, result);
+		}
+
+		return result;
+
+	} catch (e) {
+		console.error('fetchArtistInfo error: ' + e.toString());
+		return null;
+	}
+}
+
+/**
+ * Search for artists by tag/genre from Last.fm.
+ * 
+ * @param {string} tag Genre/tag to search for.
+ * @param {number} [limit=30] Maximum artists to return.
+ * @returns {Promise<object[]>} Array of artist objects.
+ */
+async function fetchArtistsByTag(tag, limit = 30) {
+	try {
+		if (!tag) return [];
+
+		const getApiKey = window.similarArtistsLastfm?.getApiKey;
+		const apiKey = getApiKey ? getApiKey() : '7fd988db0c4e9d8b12aed27d0a91a932';
+
+		const params = new URLSearchParams({
+			method: 'tag.getTopArtists',
+			api_key: apiKey,
+			format: 'json',
+			tag: tag,
+			limit: String(limit)
+		});
+
+		const url = API_BASE + '?' + params.toString();
+		console.log(`fetchArtistsByTag: querying ${url}`);
+
+		const res = await fetch(url);
+		if (!res || !res.ok) return [];
+
+		let data;
+		try {
+			data = await res.json();
+		} catch (e) {
+			return [];
+		}
+
+		if (data?.error) return [];
+
+		let artists = data?.topartists?.artist || [];
+		if (!Array.isArray(artists)) artists = artists ? [artists] : [];
+
+		return artists.map(a => ({
+			name: a.name,
+			url: a.url || '',
+			listeners: Number(a.listeners) || 0
+		})).filter(a => a.name);
+
+	} catch (e) {
+		console.error('fetchArtistsByTag error: ' + e.toString());
+		return [];
+	}
+}
+
 // Export to window namespace for MM5
 window.similarArtistsLastfmAPI = {
 	fetchSimilarArtists,
 	fetchTopTracks,
+	fetchSimilarTracks,
+	fetchArtistInfo,
+	fetchArtistsByTag,
 	API_BASE,
 };

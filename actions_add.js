@@ -27,6 +27,7 @@
  * 
  * Accessible via:
  * - Tools menu ? Similar Artists
+ * - Right-click context menu on tracks
  * - Toolbar button
  * - Configurable hotkey
  */
@@ -35,7 +36,7 @@ window.actions.SimilarArtistsRun = {
 	icon: 'script',
 	hotkeyAble: true,
 	visible: true,
-	disabled: false,
+	disabled: uitools.notMediaListSelected, // Disable when no media is selected
 	execute: function() {
 		// Call the main entry point with autoMode=false (manual invocation)
 		if (window.SimilarArtists?.runSimilarArtists) {
@@ -117,3 +118,47 @@ window._menuItems.tools.action.submenu.push({
 	order: 50,
 	grouporder: 10,
 });
+
+// ============================================================================
+// CONTEXT MENU REGISTRATION (Right-click on tracks)
+// ============================================================================
+
+/**
+ * Add "Similar Artists" to track context menu
+ * 
+ * Appears when right-clicking on selected tracks in any tracklist view.
+ * Order 100 places it in a good position after standard actions.
+ */
+if (window._menuItems.songsSelected) {
+	window._menuItems.songsSelected.action.submenu.push({
+		action: window.actions.SimilarArtistsRun,
+		order: 100,
+		grouporder: 20,
+	});
+}
+
+/**
+ * Add "Similar Artists" to album context menu
+ * 
+ * Appears when right-clicking on albums.
+ */
+if (window._menuItems.albumsSelected) {
+	window._menuItems.albumsSelected.action.submenu.push({
+		action: window.actions.SimilarArtistsRun,
+		order: 100,
+		grouporder: 20,
+	});
+}
+
+/**
+ * Add "Similar Artists" to artist context menu
+ * 
+ * Appears when right-clicking on artists.
+ */
+if (window._menuItems.artistsSelected) {
+	window._menuItems.artistsSelected.action.submenu.push({
+		action: window.actions.SimilarArtistsRun,
+		order: 100,
+		grouporder: 20,
+	});
+}
