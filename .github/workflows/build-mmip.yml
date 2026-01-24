@@ -134,20 +134,11 @@ jobs:
             dialogs/ \
             modules/ \
             -x "*.git*" \
-            -x "node_modules/*" \
             -x ".github/*" \
             -x "ai_MM/*" \
             -x "*.mmip" \
             -x "bin/*" \
-            -x "*.md" \
-            -x "*REFACTORED*" \
-            -x "*MIGRATION*" \
-            -x "*RECOMMENDATION*" \
-            -x "*Phase*" \
-            -x "*Summary*" \
-            -x "*Guide*" \
             -x "lastfm.txt" \
-            -x ".*"
 
           echo "? Package created: SimilarArtists-${{ steps.bump_version.outputs.version }}.mmip"
           echo "? Modular structure included (Phases 1-7)"
