@@ -1,5 +1,5 @@
 /**
- * SimilarArtists Action Registration
+ * MatchMonkey Action Registration
  * 
  * Registers actions and menu items with MediaMonkey 5 following MM5 standards.
  * This file is loaded by MM5's action system at startup.
@@ -23,19 +23,19 @@
 // ============================================================================
 
 /**
- * Run Similar Artists action
+ * Run action
  */
-actions.SimilarArtistsRun = {
+actions.matchMonkeyRun = {
 	title: _('Similar &Artists'),
 	icon: 'artist',
 	hotkeyAble: true,
 	visible: true,
 	disabled: uitools.notMediaListSelected,
 	execute: function() {
-		if (window.SimilarArtists && window.SimilarArtists.runSimilarArtists) {
-			window.SimilarArtists.runSimilarArtists(false, 'artist');
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'artist');
 		} else {
-			console.error('SimilarArtists: Add-on not loaded');
+			console.error('Match Monkey: Add-on not loaded');
 		}
 	}
 };
@@ -43,17 +43,17 @@ actions.SimilarArtistsRun = {
 /**
  * Run Similar Tracks action
  */
-actions.SimilarTracksRun = {
+actions.similarTracksRun = {
 	title: _('Similar &Tracks'),
 	icon: 'track',
 	hotkeyAble: true,
 	visible: true,
 	disabled: uitools.notMediaListSelected,
 	execute: function() {
-		if (window.SimilarArtists && window.SimilarArtists.runSimilarArtists) {
-			window.SimilarArtists.runSimilarArtists(false, 'track');
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'track');
 		} else {
-			console.error('SimilarArtists: Add-on not loaded');
+			console.error('Match Monkey: Add-on not loaded');
 		}
 	}
 };
@@ -61,17 +61,17 @@ actions.SimilarTracksRun = {
 /**
  * Run Similar Genre action
  */
-actions.SimilarGenreRun = {
+actions.similarGenreRun = {
 	title: _('Similar &Genre'),
 	icon: 'genre',
 	hotkeyAble: true,
 	visible: true,
 	disabled: uitools.notMediaListSelected,
 	execute: function() {
-		if (window.SimilarArtists && window.SimilarArtists.runSimilarArtists) {
-			window.SimilarArtists.runSimilarArtists(false, 'genre');
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'genre');
 		} else {
-			console.error('SimilarArtists: Add-on not loaded');
+			console.error('Match Monkey: Add-on not loaded');
 		}
 	}
 };
@@ -79,8 +79,8 @@ actions.SimilarGenreRun = {
 /**
  * Toggle Auto-Mode action
  */
-actions.SimilarArtistsToggleAuto = {
-	title: _('Similar Artists: &Auto On/Off'),
+actions.matchMonkeyToggleAuto = {
+	title: _('Similar: &Auto Queue'),
 	icon: 'script',
 	checkable: true,
 	hotkeyAble: true,
@@ -89,17 +89,17 @@ actions.SimilarArtistsToggleAuto = {
 	
 	checked: function() {
 		try {
-			return Boolean(window.SimilarArtists && window.SimilarArtists.isAutoEnabled && window.SimilarArtists.isAutoEnabled());
+			return Boolean(window.matchMonkey && window.matchMonkey.isAutoEnabled && window.matchMonkey.isAutoEnabled());
 		} catch (e) {
 			return false;
 		}
 	},
 	
 	execute: function() {
-		if (window.SimilarArtists && window.SimilarArtists.toggleAuto) {
-			window.SimilarArtists.toggleAuto();
+		if (window.matchMonkey && window.matchMonkey.toggleAuto) {
+			window.matchMonkey.toggleAuto();
 		} else {
-			console.error('SimilarArtists: Add-on not loaded');
+			console.error('Match Monkey: Add-on not loaded');
 		}
 	}
 };
@@ -115,11 +115,11 @@ _menuItems.tools.action.submenu.push({
 		icon: 'script',
 		visible: true,
 		submenu: [
-			{ action: actions.SimilarArtistsRun, order: 10 },
-			{ action: actions.SimilarTracksRun, order: 20 },
-			{ action: actions.SimilarGenreRun, order: 30 },
+			{ action: actions.matchMonkeyRun, order: 10 },
+			{ action: actions.similarTracksRun, order: 20 },
+			{ action: actions.similarGenreRun, order: 30 },
 			{ separator: true, order: 40 },
-			{ action: actions.SimilarArtistsToggleAuto, order: 50 }
+			{ action: actions.matchMonkeyToggleAuto, order: 50 }
 		]
 	},
 	order: 40,
@@ -137,9 +137,9 @@ var similarContextSubmenu = {
 	visible: true,
 	disabled: uitools.notMediaListSelected,
 	submenu: [
-		{ action: actions.SimilarArtistsRun, order: 10 },
-		{ action: actions.SimilarTracksRun, order: 20 },
-		{ action: actions.SimilarGenreRun, order: 30 }
+		{ action: actions.matchMonkeyRun, order: 10 },
+		{ action: actions.similarTracksRun, order: 20 },
+		{ action: actions.similarGenreRun, order: 30 }
 	]
 };
 

@@ -19,7 +19,7 @@ if (-not (Test-Path $binFolder)) {
 }
 
 # Define package name
-$packageName = Join-Path $binFolder "SimilarArtists-$version.mmip"
+$packageName = Join-Path $binFolder "MatchMonkey-$version.mmip"
 
 # Remove old package if it exists
 if (Test-Path $packageName) {
@@ -33,7 +33,7 @@ $rootFiles = @(
 	"info.json",
 	"init.js",
 	"actions_add.js",
-	"similarArtists.js",
+	"matchMonkey.js",
 	"smiley_yellow_128.png",
 	"README.md"
 )
@@ -91,7 +91,7 @@ try {
 	Write-Host "`nCreating archive with preserved directory structure..." -ForegroundColor Cyan
 
 	# Compress-Archive only supports .zip extension, so we create a .zip then rename to .mmip
-	$tempZipPath = Join-Path $binFolder "SimilarArtists-$version.zip"
+	$tempZipPath = Join-Path $binFolder "MatchMonkey-$version.zip"
 	
 	# Remove temp zip if it exists
 	if (Test-Path $tempZipPath) {
@@ -120,7 +120,7 @@ try {
 	}
 
 	# NOW rename .zip to .mmip (after verification)
-	Rename-Item -Path $tempZipPath -NewName "SimilarArtists-$version.mmip" -Force
+	Rename-Item -Path $tempZipPath -NewName "MatchMonkey-$version.mmip" -Force
 
 	Write-Host "`nPackage created successfully!" -ForegroundColor Green
 	Write-Host "File: $packageName" -ForegroundColor White
@@ -134,7 +134,7 @@ try {
 	Write-Host "`nCalculating checksum..." -ForegroundColor Cyan
 	$hash = Get-FileHash -Path $packageName -Algorithm SHA256
 	Write-Host "SHA256: $($hash.Hash)" -ForegroundColor Gray
-	$checksumPath = Join-Path $binFolder "SimilarArtists-$version.mmip.sha256"
+	$checksumPath = Join-Path $binFolder "MatchMonkey-$version.mmip.sha256"
 	$hash.Hash | Out-File -FilePath $checksumPath -NoNewline
 	Write-Host "Checksum saved: $checksumPath" -ForegroundColor Green
 

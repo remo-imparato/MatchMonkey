@@ -1,6 +1,6 @@
-# SimilarArtists Module Architecture
+# MatchMonkey Module Architecture
 
-This directory contains refactored, modular components for the SimilarArtists MediaMonkey 5 add-on.
+This directory contains refactored, modular components for the MatchMonkey MediaMonkey 5 add-on.
 
 ## Directory Structure
 
@@ -53,7 +53,7 @@ config
 ### Configuration
 ```javascript
 const { config } = localRequirejs('./modules');
-console.log(config.SCRIPT_ID);        // 'SimilarArtists'
+console.log(config.SCRIPT_ID);        // 'MatchMonkey'
 console.log(config.API_BASE);          // 'https://ws.audioscrobbler.com/2.0/'
 ```
 
@@ -143,7 +143,7 @@ const titleMap = await db.findLibraryTracksBatch('Pink Floyd', ['Time', 'Money']
 // Returns: Map { 'Time' => [...tracks], 'Money' => [...tracks] }
 
 // Create a new playlist
-const playlist = await db.createPlaylist('Similar Artists - Pink Floyd');
+const playlist = await db.createPlaylist('Similar - Pink Floyd');
 
 // Find existing playlist
 const playlist = db.findPlaylist('My Favorites');

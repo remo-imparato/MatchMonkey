@@ -31,9 +31,9 @@ function showToast(text, options = {}) {
 		}
 		
 		// Fallback to console log
-		console.log('SimilarArtists: ' + text);
+		console.log('Match Monkey: ' + text);
 	} catch (e) {
-		console.error('SimilarArtists: showToast error: ' + e.toString());
+		console.error('Match Monkey: showToast error: ' + e.toString());
 	}
 }
 
@@ -51,7 +51,7 @@ function updateProgress(message, value) {
 				globalProgressTask.value = Math.max(0, Math.min(1, value));
 			}
 		} catch (e) {
-			console.error('SimilarArtists: updateProgress error: ' + e.toString());
+			console.error('Match Monkey: updateProgress error: ' + e.toString());
 		}
 	}
 }
@@ -66,15 +66,15 @@ function createProgressTask(leadingText) {
 	try {
 		if (typeof app !== 'undefined' && app.backgroundTasks?.createNew) {
 			const progressTask = app.backgroundTasks.createNew();
-			progressTask.leadingText = leadingText || 'SimilarArtists';
+			progressTask.leadingText = leadingText || 'MatchMonkey';
 			progressTask.text = 'Starting...';
 			progressTask.value = 0;
 			globalProgressTask = progressTask;
-			console.log('SimilarArtists: Progress task created');
+			console.log('Match Monkey: Progress task created');
 			return progressTask.id || 'active';
 		}
 	} catch (e) {
-		console.error('SimilarArtists: createProgressTask error: ' + e.toString());
+		console.error('Match Monkey: createProgressTask error: ' + e.toString());
 	}
 	return null;
 }
@@ -88,7 +88,7 @@ function terminateProgressTask(taskId) {
 		try {
 			globalProgressTask.terminate();
 		} catch (e) {
-			console.error('SimilarArtists: Error terminating progress task: ' + e.toString());
+			console.error('Match Monkey: Error terminating progress task: ' + e.toString());
 		}
 		globalProgressTask = null;
 	}
@@ -107,7 +107,7 @@ function terminateProgressTaskAfterDelay(delay = 2000) {
 					terminateProgressTask();
 				}
 			} catch (e) {
-				console.error('SimilarArtists: Error in delayed termination: ' + e.toString());
+				console.error('Match Monkey: Error in delayed termination: ' + e.toString());
 			}
 		}, delay);
 	}
@@ -122,7 +122,7 @@ function getProgressTask() {
 }
 
 // Export to window namespace for MM5
-window.similarArtistsNotifications = {
+window.matchMonkeyNotifications = {
 	showToast,
 	updateProgress,
 	createProgressTask,

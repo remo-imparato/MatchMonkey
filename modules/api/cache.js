@@ -1,7 +1,7 @@
 /**
  * Last.fm API Response Caching
  * 
- * Per-run caches for Last.fm queries (cleared on each runSimilarArtists invocation).
+ * Per-run caches for Last.fm queries (cleared on each runMatchMonkey invocation).
  * Reduces redundant API calls within a single operation.
  * 
  * MediaMonkey 5 API Only
@@ -38,7 +38,7 @@ function cacheKeyTopTracks(artistName, limit, withPlaycount = false) {
 
 /**
  * Initialize the Last.fm per-run cache.
- * Call at the start of each runSimilarArtists operation.
+ * Call at the start of each runMatchMonkey operation.
  */
 function initLastfmRunCache() {
 	lastfmRunCache = {
@@ -49,7 +49,7 @@ function initLastfmRunCache() {
 
 /**
  * Clear the Last.fm per-run cache.
- * Call at the end of runSimilarArtists operation.
+ * Call at the end of runMatchMonkey operation.
  */
 function clearLastfmRunCache() {
 	lastfmRunCache = null;
@@ -61,10 +61,10 @@ function clearLastfmRunCache() {
  * @returns {object[]|null} Cached artists array, or null if not cached.
  */
 function getCachedSimilarArtists(artistName) {
-	if (!lastfmRunCache?.similarArtists) return null;
+	if (!lastfmRunCache?.matchMonkey) return null;
 	const key = cacheKeyArtist(artistName);
-	return lastfmRunCache.similarArtists.has(key) 
-		? lastfmRunCache.similarArtists.get(key) 
+	return lastfmRunCache.matchMonkey.has(key) 
+		? lastfmRunCache.matchMonkey.get(key) 
 		: null;
 }
 
@@ -74,9 +74,9 @@ function getCachedSimilarArtists(artistName) {
  * @param {object[]} artists Array of similar artist objects.
  */
 function cacheSimilarArtists(artistName, artists) {
-	if (!lastfmRunCache?.similarArtists) return;
+	if (!lastfmRunCache?.matchMonkey) return;
 	const key = cacheKeyArtist(artistName);
-	lastfmRunCache.similarArtists.set(key, artists || []);
+	lastfmRunCache.matchMonkey.set(key, artists || []);
 }
 
 /**

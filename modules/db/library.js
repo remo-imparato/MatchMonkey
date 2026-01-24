@@ -43,7 +43,7 @@ async function findLibraryTracks(artistName, trackTitles, limit = 100, options =
 			return [];
 		}
 
-		const normalizedArtist = window.similarArtistsPrefixes?.fixPrefixes?.(artistName) || artistName;
+		const normalizedArtist = window.matchMonkeyPrefixes?.fixPrefixes?.(artistName) || artistName;
 		if (!normalizedArtist) {
 			console.warn('findLibraryTracks: Invalid artist name');
 			return [];
@@ -68,7 +68,7 @@ async function findLibraryTracks(artistName, trackTitles, limit = 100, options =
 
 			// Add prefix variations
 			try {
-				const prefixes = window.similarArtistsPrefixes?.getIgnorePrefixes?.() || [];
+				const prefixes = window.matchMonkeyPrefixes?.getIgnorePrefixes?.() || [];
 				const nameLower = normalizedArtist.toLowerCase();
 				for (const prefix of prefixes) {
 					const p = String(prefix || '').trim();
@@ -182,7 +182,7 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 			return resultMap;
 		}
 
-		const normalizedArtist = window.similarArtistsPrefixes?.fixPrefixes?.(artistName) || artistName;
+		const normalizedArtist = window.matchMonkeyPrefixes?.fixPrefixes?.(artistName) || artistName;
 		if (!normalizedArtist) {
 			console.warn('findLibraryTracksBatch: Invalid artist name');
 			return resultMap;
@@ -228,7 +228,7 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 			add(normalizedArtist);
 
 			try {
-				const prefixes = window.similarArtistsPrefixes?.getIgnorePrefixes?.() || [];
+				const prefixes = window.matchMonkeyPrefixes?.getIgnorePrefixes?.() || [];
 				const nameLower = normalizedArtist.toLowerCase();
 				for (const prefix of prefixes) {
 					const p = String(prefix || '').trim();

@@ -44,7 +44,7 @@ function getTrackKey(track) {
 }
 
 // Export to window namespace for MM5
-window.similarArtistsSQL = {
+window.matchMonkeySQL = {
 	quoteSqlString,
 	getTrackKey,
 	escapeSql,

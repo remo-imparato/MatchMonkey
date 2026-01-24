@@ -1,11 +1,11 @@
 /**
- * SimilarArtists Options Panel for MediaMonkey 5
+ * MatchMonkey Options Panel for MediaMonkey 5
  * 
  * MediaMonkey 5 API Only
  * 
  * @author Remo Imparato
  * @version 2.0.0
- * @description Configuration panel for SimilarArtists add-on in MM5 Tools > Options.
+ * @description Configuration panel for MatchMonkey add-on in MM5 Tools > Options.
  *              Provides UI for configuring Last.fm API settings, playlist creation options,
  *              filters, and automatic behavior.
  * 
@@ -16,10 +16,10 @@
 'use strict';
 
 // Script namespace
-const SCRIPT_ID = 'SimilarArtists';
+const SCRIPT_ID = 'MatchMonkey';
 
 /**
- * Read a setting from the SimilarArtists configuration.
+ * Read a setting from the MatchMonkey configuration.
  * @param {string} key Setting key.
  * @returns {*} Setting value or undefined.
  */
@@ -28,13 +28,13 @@ function getSetting(key) {
 		const allSettings = app.getValue(SCRIPT_ID, {});
 		return allSettings[key];
 	} catch (e) {
-		console.error('SimilarArtists Options: Error reading setting:', key, e);
+		console.error('Match Monkey Options: Error reading setting:', key, e);
 		return undefined;
 	}
 }
 
 /**
- * Write a setting to the SimilarArtists configuration.
+ * Write a setting to the MatchMonkey configuration.
  * @param {string} key Setting key.
  * @param {*} value Setting value.
  */
@@ -44,21 +44,21 @@ function setSetting(key, value) {
 		allSettings[key] = value;
 		app.setValue(SCRIPT_ID, allSettings);
 	} catch (e) {
-		console.error('SimilarArtists Options: Error saving setting:', key, e);
+		console.error('Match Monkey Options: Error saving setting:', key, e);
 	}
 }
 
 /**
  * Load handler - populates UI controls with current settings.
  */
-optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function(sett, pnl, wndParams) {
+optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function(sett, pnl, wndParams) {
 	try {
 		// Read configuration from system storage
 		this.config = app.getValue(SCRIPT_ID, {});
 
 		// Verify config exists
 		if (!this.config || Object.keys(this.config).length === 0) {
-			console.warn('SimilarArtists Options: No configuration found');
+			console.warn('Match Monkey Options: No configuration found');
 			return;
 		}
 
@@ -69,7 +69,7 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function(sett
 		UI.SAConfirm.controlClass.checked = Boolean(this.config.Confirm);
 
 		// Handle seed/similar limit
-		const seedLimit = this.config.SeedLimit || this.config.SimilarLimit || 20;
+		const seedLimit = this.config.SeedLimit || this.config.similarLimit || 20;
 		UI.SALimit.controlClass.value = seedLimit;
 
 		UI.SAName.controlClass.value = this.config.Name || '- Similar to %';
@@ -100,14 +100,14 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function(sett
 		UI.SAGenre.controlClass.value = this.config.Genre || '';
 
 	} catch (e) {
-		console.error('SimilarArtists Options: load error:', e.toString());
+		console.error('Match Monkey Options: load error:', e.toString());
 	}
 };
 
 /**
  * Helper to set rating control value.
  */
-optionPanels.pnl_Library.subPanels.pnl_SimilarArtists._setRatingControl = function(uiRatingControl, value) {
+optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setRatingControl = function(uiRatingControl, value) {
 	if (!uiRatingControl?.controlClass) return;
 	
 	const ctrl = uiRatingControl.controlClass;
@@ -140,11 +140,11 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists._setRatingControl = functi
 /**
  * Helper to setup auto-mode checkbox with change listener.
  */
-optionPanels.pnl_Library.subPanels.pnl_SimilarArtists._setupAutoModeCheckbox = function(uiCheckbox) {
+optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setupAutoModeCheckbox = function(uiCheckbox) {
 	// Set initial state
 	try {
-		if (window.SimilarArtists?.isAutoEnabled) {
-			uiCheckbox.controlClass.checked = Boolean(window.SimilarArtists.isAutoEnabled());
+		if (window.matchMonkey?.isAutoEnabled) {
+			uiCheckbox.controlClass.checked = Boolean(window.matchMonkey.isAutoEnabled());
 		} else {
 			uiCheckbox.controlClass.checked = Boolean(this.config.OnPlay);
 		}
@@ -159,14 +159,14 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists._setupAutoModeCheckbox = f
 			setSetting('OnPlay', desired);
 
 			// Sync with addon
-			if (window.SimilarArtists?.toggleAuto) {
-				const current = Boolean(window.SimilarArtists.isAutoEnabled?.());
+			if (window.matchMonkey?.toggleAuto) {
+				const current = Boolean(window.matchMonkey.isAutoEnabled?.());
 				if (current !== desired) {
-					window.SimilarArtists.toggleAuto();
+					window.matchMonkey.toggleAuto();
 				}
 			}
 		} catch (e) {
-			console.error('SimilarArtists Options: OnPlay change error:', e);
+			console.error('Match Monkey Options: OnPlay change error:', e);
 		}
 	};
 
@@ -191,7 +191,7 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists._setupAutoModeCheckbox = f
 				uiCheckbox.controlClass.checked = Boolean(event.detail.enabled);
 			}
 		} catch (e) {
-			console.error('SimilarArtists Options: Auto-mode event error:', e);
+			console.error('Match Monkey Options: Auto-mode event error:', e);
 		}
 	};
 
@@ -202,7 +202,7 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists._setupAutoModeCheckbox = f
 /**
  * Save handler - persists UI control values to settings.
  */
-optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function(sett) {
+optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function(sett) {
 	try {
 		// Clean up event listener
 		if (this._autoModeListener) {
@@ -219,7 +219,7 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function(sett) {
 		this.config.ApiKey = UI.SAApiKey.controlClass.value;
 		this.config.Confirm = UI.SAConfirm.controlClass.checked;
 		this.config.SeedLimit = UI.SALimit.controlClass.value;
-		this.config.SimilarLimit = UI.SALimit.controlClass.value;
+		this.config.similarLimit = UI.SALimit.controlClass.value;
 		this.config.Name = UI.SAName.controlClass.value;
 		this.config.TPA = UI.SATPA.controlClass.value;
 		this.config.TPL = UI.SATPL.controlClass.value;
@@ -243,8 +243,8 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function(sett) {
 		// Auto-mode state
 		let autoState = false;
 		try {
-			if (typeof window.SimilarArtists?.isAutoEnabled === 'function') {
-				autoState = Boolean(window.SimilarArtists.isAutoEnabled());
+			if (typeof window.matchMonkey?.isAutoEnabled === 'function') {
+				autoState = Boolean(window.matchMonkey.isAutoEnabled());
 			} else {
 				autoState = Boolean(UI.SAOnPlay.controlClass.checked);
 			}
@@ -262,12 +262,12 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function(sett) {
 		// Save all settings
 		try {
 			app.setValue(SCRIPT_ID, this.config);
-			console.log('SimilarArtists Options: Settings saved');
+			console.log('Match Monkey Options: Settings saved');
 		} catch (e) {
-			console.error('SimilarArtists Options: Failed to save:', e.toString());
+			console.error('Match Monkey Options: Failed to save:', e.toString());
 		}
 
 	} catch (e) {
-		console.error('SimilarArtists Options: save error:', e.toString());
+		console.error('Match Monkey Options: save error:', e.toString());
 	}
 };

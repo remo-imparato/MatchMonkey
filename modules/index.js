@@ -1,5 +1,5 @@
 /**
- * SimilarArtists Modules Index
+ * MatchMonkey Modules Index
  * 
  * Exports the consolidated module namespace for organized access.
  * All modules are loaded by init.js using localRequirejs().
@@ -11,49 +11,49 @@
 
 // Build and export the modules namespace
 // This is called after all individual modules have been loaded
-window.similarArtistsModules = {
+window.matchMonkeyModules = {
 	// Configuration
-	config: window.similarArtistsConfig,
+	config: window.matchMonkeyConfig,
 	
 	// Utility modules
 	utils: {
-		normalization: window.similarArtistsNormalization || {
+		normalization: window.matchMonkeyNormalization || {
 			normalizeName: window.normalizeName,
 			splitArtists: window.splitArtists,
 			stripName: window.stripName,
 			cacheKeyArtist: window.cacheKeyArtist,
 			cacheKeyTopTracks: window.cacheKeyTopTracks,
 		},
-		helpers: window.similarArtistsHelpers,
-		sql: window.similarArtistsSQL,
+		helpers: window.matchMonkeyHelpers,
+		sql: window.matchMonkeySQL,
 	},
 	
 	// Settings modules
 	settings: {
-		storage: window.similarArtistsStorage,
-		prefixes: window.similarArtistsPrefixes,
-		lastfm: window.similarArtistsLastfm,
+		storage: window.matchMonkeyStorage,
+		prefixes: window.matchMonkeyPrefixes,
+		lastfm: window.matchMonkeyLastfm,
 	},
 	
 	// UI modules
 	ui: {
-		notifications: window.similarArtistsNotifications,
+		notifications: window.matchMonkeyNotifications,
 	},
 	
 	// API modules
 	api: {
 		cache: window.lastfmCache,
-		lastfmApi: window.similarArtistsLastfmAPI,
+		lastfmApi: window.matchMonkeyLastfmAPI,
 	},
 	
 	// Database modules
-	db: window.similarArtistsDB,
+	db: window.matchMonkeyDB,
 	
 	// Core modules
 	core: {
-		discoveryStrategies: window.similarArtistsDiscoveryStrategies,
-		orchestration: window.similarArtistsOrchestration,
-		autoMode: window.similarArtistsAutoMode,
-		mm5Integration: window.similarArtistsMM5Integration,
+		discoveryStrategies: window.matchMonkeyDiscoveryStrategies,
+		orchestration: window.matchMonkeyOrchestration,
+		autoMode: window.matchMonkeyAutoMode,
+		mm5Integration: window.matchMonkeyMM5Integration,
 	},
 };

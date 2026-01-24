@@ -45,7 +45,7 @@ function getIgnorePrefixes() {
 			}
 		}
 	} catch (e) {
-		console.error('SimilarArtists: getIgnorePrefixes error: ' + e.toString());
+		console.error('Match Monkey: getIgnorePrefixes error: ' + e.toString());
 	}
 	
 	// Default: no prefixes ignored
@@ -88,7 +88,7 @@ function fixPrefixes(name) {
 }
 
 // Export to window namespace for MM5
-window.similarArtistsPrefixes = {
+window.matchMonkeyPrefixes = {
 	getIgnorePrefixes,
 	fixPrefixes,
 };

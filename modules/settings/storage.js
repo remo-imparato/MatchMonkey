@@ -13,7 +13,7 @@
 'use strict';
 
 // Script namespace
-const SCRIPT_ID = 'SimilarArtists';
+const SCRIPT_ID = 'MatchMonkey';
 
 /**
  * Read a setting stored under this script's namespace.
@@ -115,8 +115,8 @@ function boolSetting(key, defaultValue = false) {
 function listSetting(key) {
 	const raw = getSetting(key, '');
 	// Use parseListSetting from helpers if available, otherwise inline
-	if (window.similarArtistsHelpers?.parseListSetting) {
-		return window.similarArtistsHelpers.parseListSetting(raw);
+	if (window.matchMonkeyHelpers?.parseListSetting) {
+		return window.matchMonkeyHelpers.parseListSetting(raw);
 	}
 	// Fallback inline implementation
 	if (!raw) return [];
@@ -130,7 +130,7 @@ function listSetting(key) {
 }
 
 // Export to window namespace for MM5
-window.similarArtistsStorage = {
+window.matchMonkeyStorage = {
 	getSetting,
 	setSetting,
 	intSetting,

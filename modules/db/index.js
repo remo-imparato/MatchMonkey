@@ -23,39 +23,39 @@ function buildDbInterface() {
 	const dbInterface = {
 		// Library search operations (from window.dbLibrary)
 		findLibraryTracks: window.dbLibrary?.findLibraryTracks || function() {
-			console.error('SimilarArtists: dbLibrary.findLibraryTracks not loaded');
+			console.error('Match Monkey: dbLibrary.findLibraryTracks not loaded');
 			return Promise.resolve([]);
 		},
 		findLibraryTracksBatch: window.dbLibrary?.findLibraryTracksBatch || function() {
-			console.error('SimilarArtists: dbLibrary.findLibraryTracksBatch not loaded');
+			console.error('Match Monkey: dbLibrary.findLibraryTracksBatch not loaded');
 			return Promise.resolve(new Map());
 		},
 
 		// Playlist management operations (from window.dbPlaylist)
 		createPlaylist: window.dbPlaylist?.createPlaylist || function() {
-			console.error('SimilarArtists: dbPlaylist.createPlaylist not loaded');
+			console.error('Match Monkey: dbPlaylist.createPlaylist not loaded');
 			return Promise.resolve(null);
 		},
 		findPlaylist: window.dbPlaylist?.findPlaylist || function() {
-			console.error('SimilarArtists: dbPlaylist.findPlaylist not loaded');
+			console.error('Match Monkey: dbPlaylist.findPlaylist not loaded');
 			return null;
 		},
 		getOrCreatePlaylist: window.dbPlaylist?.getOrCreatePlaylist || function() {
-			console.error('SimilarArtists: dbPlaylist.getOrCreatePlaylist not loaded');
+			console.error('Match Monkey: dbPlaylist.getOrCreatePlaylist not loaded');
 			return Promise.resolve(null);
 		},
 
 		// Queue/enqueue operations (from window.dbQueue)
 		queueTrack: window.dbQueue?.queueTrack || function() {
-			console.error('SimilarArtists: dbQueue.queueTrack not loaded');
+			console.error('Match Monkey: dbQueue.queueTrack not loaded');
 			return Promise.resolve(false);
 		},
 		queueTracks: window.dbQueue?.queueTracks || function() {
-			console.error('SimilarArtists: dbQueue.queueTracks not loaded');
+			console.error('Match Monkey: dbQueue.queueTracks not loaded');
 			return Promise.resolve(0);
 		},
 		addTracksToPlaylist: window.dbQueue?.addTracksToPlaylist || function() {
-			console.error('SimilarArtists: dbQueue.addTracksToPlaylist not loaded');
+			console.error('Match Monkey: dbQueue.addTracksToPlaylist not loaded');
 			return Promise.resolve(0);
 		},
 	};
@@ -65,7 +65,7 @@ function buildDbInterface() {
 
 // Create a proxy that lazily builds the interface on first access
 // This ensures all sub-modules are loaded before we try to use them
-window.similarArtistsDB = new Proxy({}, {
+window.matchMonkeyDB = new Proxy({}, {
 	get: function(target, prop) {
 		// Rebuild interface on each access to pick up late-loaded modules
 		const db = buildDbInterface();

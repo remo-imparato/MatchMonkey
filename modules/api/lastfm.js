@@ -27,8 +27,8 @@ async function fetchSimilarArtists(artistName, limit) {
 
 		// Get dependencies
 		const cache = window.lastfmCache;
-		const getApiKey = window.similarArtistsLastfm?.getApiKey;
-		const updateProgress = window.similarArtistsNotifications?.updateProgress || (() => {});
+		const getApiKey = window.matchMonkeyLastfm?.getApiKey;
+		const updateProgress = window.matchMonkeyNotifications?.updateProgress || (() => {});
 
 		// Check cache first
 		if (cache?.getCachedSimilarArtists) {
@@ -97,7 +97,7 @@ async function fetchSimilarArtists(artistName, limit) {
 
 	} catch (e) {
 		console.error('fetchSimilarArtists error: ' + e.toString());
-		window.similarArtistsNotifications?.updateProgress?.(`Error fetching similar artists: ${e.toString()}`);
+		window.matchMonkeyNotifications?.updateProgress?.(`Error fetching similar artists: ${e.toString()}`);
 		window.lastfmCache?.cacheSimilarArtists?.(artistName, []);
 		return [];
 	}
@@ -118,8 +118,8 @@ async function fetchTopTracks(artistName, limit, includePlaycount = false) {
 
 		// Get dependencies
 		const cache = window.lastfmCache;
-		const getApiKey = window.similarArtistsLastfm?.getApiKey;
-		const updateProgress = window.similarArtistsNotifications?.updateProgress || (() => {});
+		const getApiKey = window.matchMonkeyLastfm?.getApiKey;
+		const updateProgress = window.matchMonkeyNotifications?.updateProgress || (() => {});
 
 		// Check cache first
 		if (cache?.getCachedTopTracks) {
@@ -204,7 +204,7 @@ async function fetchTopTracks(artistName, limit, includePlaycount = false) {
 
 	} catch (e) {
 		console.error('fetchTopTracks error: ' + e.toString());
-		window.similarArtistsNotifications?.updateProgress?.(`Error fetching top tracks: ${e.toString()}`);
+		window.matchMonkeyNotifications?.updateProgress?.(`Error fetching top tracks: ${e.toString()}`);
 		window.lastfmCache?.cacheTopTracks?.(artistName, limit, includePlaycount, []);
 		return [];
 	}
@@ -226,8 +226,8 @@ async function fetchSimilarTracks(artistName, trackName, limit = 30) {
 
 		// Get dependencies
 		const cache = window.lastfmCache;
-		const getApiKey = window.similarArtistsLastfm?.getApiKey;
-		const updateProgress = window.similarArtistsNotifications?.updateProgress || (() => {});
+		const getApiKey = window.matchMonkeyLastfm?.getApiKey;
+		const updateProgress = window.matchMonkeyNotifications?.updateProgress || (() => {});
 
 		// Build cache key
 		const cacheKey = `track:${artistName}|${trackName}|${limit}`.toUpperCase();
@@ -324,7 +324,7 @@ async function fetchArtistInfo(artistName) {
 		if (!artistName) return null;
 
 		const cache = window.lastfmCache;
-		const getApiKey = window.similarArtistsLastfm?.getApiKey;
+		const getApiKey = window.matchMonkeyLastfm?.getApiKey;
 
 		// Build cache key
 		const cacheKey = `artistinfo:${artistName}`.toUpperCase();
@@ -400,7 +400,7 @@ async function fetchArtistsByTag(tag, limit = 30) {
 	try {
 		if (!tag) return [];
 
-		const getApiKey = window.similarArtistsLastfm?.getApiKey;
+		const getApiKey = window.matchMonkeyLastfm?.getApiKey;
 		const apiKey = getApiKey ? getApiKey() : '7fd988db0c4e9d8b12aed27d0a91a932';
 
 		const params = new URLSearchParams({
@@ -442,7 +442,7 @@ async function fetchArtistsByTag(tag, limit = 30) {
 }
 
 // Export to window namespace for MM5
-window.similarArtistsLastfmAPI = {
+window.matchMonkeyLastfmAPI = {
 	fetchSimilarArtists,
 	fetchTopTracks,
 	fetchSimilarTracks,

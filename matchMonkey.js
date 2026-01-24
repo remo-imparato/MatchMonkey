@@ -1,5 +1,5 @@
 /**
- * SimilarArtists Add-on for MediaMonkey 5
+ * MatchMonkey Add-on for MediaMonkey 5
  * 
  * Complete refactored implementation using modular architecture.
  * Supports three discovery modes:
@@ -24,7 +24,7 @@
 		requestAnimationFrame(function() {
 			// Get modules from window namespace
 			const modules = {
-				config: globalArg.similarArtistsConfig,
+				config: globalArg.matchMonkeyConfig,
 				utils: {
 					normalization: {
 						normalizeName: globalArg.normalizeName,
@@ -33,40 +33,40 @@
 						cacheKeyArtist: globalArg.cacheKeyArtist,
 						cacheKeyTopTracks: globalArg.cacheKeyTopTracks,
 					},
-					helpers: globalArg.similarArtistsHelpers,
-					sql: globalArg.similarArtistsSQL,
+					helpers: globalArg.matchMonkeyHelpers,
+					sql: globalArg.matchMonkeySQL,
 				},
 				settings: {
-					storage: globalArg.similarArtistsStorage,
-					prefixes: globalArg.similarArtistsPrefixes,
-					lastfm: globalArg.similarArtistsLastfm,
+					storage: globalArg.matchMonkeyStorage,
+					prefixes: globalArg.matchMonkeyPrefixes,
+					lastfm: globalArg.matchMonkeyLastfm,
 				},
 				ui: {
-					notifications: globalArg.similarArtistsNotifications,
+					notifications: globalArg.matchMonkeyNotifications,
 				},
 				api: {
 					cache: globalArg.lastfmCache,
-					lastfmApi: globalArg.similarArtistsLastfmAPI,
+					lastfmApi: globalArg.matchMonkeyLastfmAPI,
 				},
-				db: globalArg.similarArtistsDB,
+				db: globalArg.matchMonkeyDB,
 				core: {
-					orchestration: globalArg.similarArtistsOrchestration,
-					autoMode: globalArg.similarArtistsAutoMode,
-					mm5Integration: globalArg.similarArtistsMM5Integration,
+					orchestration: globalArg.matchMonkeyOrchestration,
+					autoMode: globalArg.matchMonkeyAutoMode,
+					mm5Integration: globalArg.matchMonkeyMM5Integration,
 				},
 			};
 			
 			if (!modules.config) {
-				console.error('SimilarArtists: Failed to load modules - config not found');
+				console.error('Match Monkey: Failed to load modules - config not found');
 				return;
 			}
 			
 			if (!modules.db || !modules.db.findLibraryTracksBatch) {
-				console.error('SimilarArtists: Failed to load modules - db.findLibraryTracksBatch not found');
+				console.error('Match Monkey: Failed to load modules - db.findLibraryTracksBatch not found');
 				return;
 			}
 			
-			console.log('SimilarArtists: Modules loaded successfully');
+			console.log('Match Monkey: Modules loaded successfully');
 			initializeSimilarArtists(modules);
 		});
 	});
@@ -111,29 +111,29 @@
 		 * @param {string} [discoveryMode='artist'] - Discovery mode: 'artist', 'track', or 'genre'
 		 * @returns {Promise<object>} Result from orchestration
 		 */
-		async function runSimilarArtists(autoModeFlag = false, discoveryMode = DISCOVERY_MODES.ARTIST) {
+		async function runMatchMonkey(autoModeFlag = false, discoveryMode = DISCOVERY_MODES.ARTIST) {
 			try {
 				// Validate discovery mode
 				const validModes = Object.values(DISCOVERY_MODES);
 				if (!validModes.includes(discoveryMode)) {
-					console.warn(`SimilarArtists: Invalid discovery mode "${discoveryMode}", defaulting to "artist"`);
+					console.warn(`Match Monkey: Invalid discovery mode "${discoveryMode}", defaulting to "artist"`);
 					discoveryMode = DISCOVERY_MODES.ARTIST;
 				}
 				
-				console.log(`SimilarArtists: Running (autoMode=${autoModeFlag}, discoveryMode=${discoveryMode})`);
+				console.log(`Match Monkey: Running (autoMode=${autoModeFlag}, discoveryMode=${discoveryMode})`);
 				
 				const result = await orchestration.generateSimilarPlaylist(modules, autoModeFlag, discoveryMode);
 				
 				if (result.success) {
-					console.log(`SimilarArtists: Success - added ${result.tracksAdded} tracks`);
+					console.log(`Match Monkey: Success - added ${result.tracksAdded} tracks`);
 				} else {
-					console.log(`SimilarArtists: Completed with message - ${result.error}`);
+					console.log(`Match Monkey: Completed with message - ${result.error}`);
 				}
 				
 				return result;
 
 			} catch (e) {
-				console.error(`SimilarArtists: Error in runSimilarArtists: ${e.toString()}`);
+				console.error(`Match Monkey: Error in runMatchMonkey: ${e.toString()}`);
 				// Don't throw - return error result instead
 				return {
 					success: false,
@@ -148,7 +148,7 @@
 		 */
 		function toggleAuto() {
 			try {
-				console.log('SimilarArtists: Toggling auto-mode');
+				console.log('Match Monkey: Toggling auto-mode');
 
 				const { getSetting, setSetting } = storage;
 				
@@ -156,7 +156,7 @@
 				const newState = !currentState;
 				
 				setSetting('OnPlay', newState);
-				console.log(`SimilarArtists: Auto-mode setting changed from ${currentState} to ${newState}`);
+				console.log(`Match Monkey: Auto-mode setting changed from ${currentState} to ${newState}`);
 				
 				if (!appState.autoModeState) {
 					initializeAutoMode();
@@ -178,10 +178,10 @@
 					window.updateActionState('SimilarArtistsToggleAuto');
 				}
 				
-				console.log(`SimilarArtists: Auto-mode is now ${newState ? 'enabled' : 'disabled'}`);
+				console.log(`Match Monkey: Auto-mode is now ${newState ? 'enabled' : 'disabled'}`);
 
 			} catch (e) {
-				console.error(`SimilarArtists: Error in toggleAuto: ${e.toString()}`);
+				console.error(`Match Monkey: Error in toggleAuto: ${e.toString()}`);
 			}
 		}
 
@@ -214,7 +214,7 @@
 				// AUTO-MODE USES TRACK-BASED DISCOVERY for seamless playlist continuation
 				// This finds tracks similar to the currently playing track, maintaining the mood
 				generateSimilarPlaylist: (autoModeFlag) => {
-					console.log('SimilarArtists Auto-Mode: Using Similar Tracks discovery for seamless continuation');
+					console.log('Match Monkey Auto-Mode: Using Similar Tracks discovery for seamless continuation');
 					return orchestration.generateSimilarPlaylist(modules, autoModeFlag, DISCOVERY_MODES.TRACK);
 				},
 				showToast,
@@ -228,7 +228,7 @@
 
 		function initializeAutoMode() {
 			try {
-				console.log('SimilarArtists: Initializing auto-mode (using Similar Tracks discovery)');
+				console.log('Match Monkey: Initializing auto-mode (using Similar Tracks discovery)');
 
 				const { getSetting } = storage;
 				const handler = createAutoTriggerHandler();
@@ -239,10 +239,10 @@
 					console.log
 				);
 
-				console.log('SimilarArtists: Auto-mode initialized');
+				console.log('Match Monkey: Auto-mode initialized');
 
 			} catch (e) {
-				console.error(`SimilarArtists: Error initializing auto-mode: ${e.toString()}`);
+				console.error(`Match Monkey: Error initializing auto-mode: ${e.toString()}`);
 			}
 		}
 
@@ -253,7 +253,7 @@
 					appState.autoModeState = null;
 				}
 			} catch (e) {
-				console.error(`SimilarArtists: Error shutting down auto-mode: ${e.toString()}`);
+				console.error(`Match Monkey: Error shutting down auto-mode: ${e.toString()}`);
 			}
 		}
 
@@ -278,7 +278,7 @@
 				} catch (e) { /* ignore */ }
 
 			} catch (e) {
-				console.error(`SimilarArtists: Error updating UI: ${e.toString()}`);
+				console.error(`Match Monkey: Error updating UI: ${e.toString()}`);
 			}
 		}
 
@@ -308,7 +308,7 @@
 				}
 
 			} catch (e) {
-				console.error(`SimilarArtists: Error in onSettingsChanged: ${e.toString()}`);
+				console.error(`Match Monkey: Error in onSettingsChanged: ${e.toString()}`);
 			}
 		}
 
@@ -318,18 +318,18 @@
 
 		function start() {
 			if (appState.started) {
-				console.log('SimilarArtists: Already started');
+				console.log('Match Monkey: Already started');
 				return;
 			}
 
 			appState.started = true;
 
 			try {
-				console.log('SimilarArtists: Starting add-on...');
+				console.log('Match Monkey: Starting add-on...');
 
 				const mmStatus = mm5Integration.checkMM5Availability();
 				if (!mmStatus.available) {
-					console.error(`SimilarArtists: MM5 API not available. Missing: ${mmStatus.missing.join(', ')}`);
+					console.error(`Match Monkey: MM5 API not available. Missing: ${mmStatus.missing.join(', ')}`);
 					return;
 				}
 
@@ -342,17 +342,17 @@
 
 				initializeAutoMode();
 
-				console.log('SimilarArtists: Add-on started successfully');
+				console.log('Match Monkey: Add-on started successfully');
 
 			} catch (e) {
-				console.error(`SimilarArtists: Error during startup: ${e.toString()}`);
+				console.error(`Match Monkey: Error during startup: ${e.toString()}`);
 				appState.started = false;
 			}
 		}
 
 		function shutdown() {
 			try {
-				console.log('SimilarArtists: Shutting down...');
+				console.log('Match Monkey: Shutting down...');
 
 				if (appState.mm5Integration) {
 					mm5Integration.shutdownIntegration(appState.mm5Integration, console.log);
@@ -367,10 +367,10 @@
 				}
 
 				appState.started = false;
-				console.log('SimilarArtists: Shutdown complete');
+				console.log('Match Monkey: Shutdown complete');
 
 			} catch (e) {
-				console.error(`SimilarArtists: Error during shutdown: ${e.toString()}`);
+				console.error(`Match Monkey: Error during shutdown: ${e.toString()}`);
 			}
 		}
 
@@ -378,11 +378,11 @@
 		// EXPORT TO GLOBAL
 		// ============================================================================
 
-		globalArg.SimilarArtists = {
+		globalArg.matchMonkey = {
 			// Core entry points
 			start,
 			shutdown,
-			runSimilarArtists,
+			runMatchMonkey,
 			toggleAuto,
 			isAutoEnabled,
 
@@ -406,7 +406,7 @@
 			_modulesLoaded: true,
 		};
 
-		console.log('SimilarArtists: Modules loaded and ready');
+		console.log('Match Monkey: Modules loaded and ready');
 	}
 
 })(typeof window !== 'undefined' ? window : global);

@@ -1,5 +1,5 @@
 /**
- * SimilarArtists Auto-Mode Implementation
+ * MatchMonkey Auto-Mode Implementation
  * 
  * Handles automatic queuing of similar artist tracks when the Now Playing
  * playlist is approaching its end.
@@ -18,7 +18,7 @@
 'use strict';
 
 // Export to window namespace for MM5
-window.similarArtistsAutoMode = {
+window.matchMonkeyAutoMode = {
 	/**
 	 * Auto-mode state container
 	 * Tracks listener subscriptions and prevents concurrent runs
@@ -91,7 +91,7 @@ window.similarArtistsAutoMode = {
 					
 					// Log current playlist state for debugging
 					try {
-						const remaining = window.similarArtistsAutoMode.getPlaylistRemaining(player, logger);
+						const remaining = window.matchMonkeyAutoMode.getPlaylistRemaining(player, logger);
 						logger(`Auto-Mode: Current remaining tracks: ${remaining}`);
 					} catch (e) {
 						logger(`Auto-Mode: Could not check remaining: ${e.toString()}`);

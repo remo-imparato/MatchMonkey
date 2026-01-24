@@ -1,5 +1,5 @@
 /**
- * SimilarArtists MM5 Integration Layer
+ * MatchMonkey MM5 Integration Layer
  * 
  * Bridges the refactored modules with MediaMonkey 5 UI systems.
  * Provides:
@@ -15,7 +15,7 @@
 
 'use strict';
 
-window.similarArtistsMM5Integration = {
+window.matchMonkeyMM5Integration = {
 	/**
 	 * Update action state (e.g., enable/disable, checked state).
 	 * 

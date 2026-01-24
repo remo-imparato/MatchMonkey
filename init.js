@@ -1,5 +1,5 @@
 ﻿/**
- * SimilarArtists Add-on Initialization
+ * MatchMonkey Add-on Initialization
  * 
  * This script runs on every MediaMonkey startup.
  * It loads all modules and ensures configuration exists with proper defaults.
@@ -18,7 +18,7 @@
 // ============================================================================
 
 // Load the MM5-integrated entry point which includes all phases
-localRequirejs('similarArtists');  // -> window.SimilarArtists
+localRequirejs('matchMonkey');  // -> window.matchMonkey
 
 // Load all module files in correct dependency order
 
@@ -63,7 +63,7 @@ localRequirejs('modules/core/mm5Integration');
 	'use strict';
 
 	// Script namespace
-	const SCRIPT_ID = 'SimilarArtists';
+	const SCRIPT_ID = 'MatchMonkey';
 
 	// Default configuration values
 	const DEFAULTS = {
@@ -115,7 +115,7 @@ localRequirejs('modules/core/mm5Integration');
 	 */
 	function checkConfig() {
 		try {
-			console.log('SimilarArtists: Checking configuration...');
+			console.log('Match Monkey: Checking configuration...');
 
 			// Check for existing configuration
 			const existingConfig = app.getValue(SCRIPT_ID, {});
@@ -127,9 +127,9 @@ localRequirejs('modules/core/mm5Integration');
 
 			if (needsInit) {
 				// FIRST TIME: Create fresh configuration with defaults
-				console.log('SimilarArtists: No configuration found - creating defaults...');
+				console.log('Match Monkey: No configuration found - creating defaults...');
 				app.setValue(SCRIPT_ID, Object.assign({}, DEFAULTS));
-				console.log('SimilarArtists: Default configuration created');
+				console.log('Match Monkey: Default configuration created');
 			} else {
 				// EXISTING CONFIG: Merge any missing defaults (for upgrades)
 				let updatedConfig = Object.assign({}, existingConfig);
@@ -145,22 +145,22 @@ localRequirejs('modules/core/mm5Integration');
 
 				if (addedKeys.length > 0) {
 					app.setValue(SCRIPT_ID, updatedConfig);
-					console.log(`SimilarArtists: Added ${addedKeys.length} new setting(s):`, addedKeys.join(', '));
+					console.log(`Match Monkey: Added ${addedKeys.length} new setting(s):`, addedKeys.join(', '));
 				} else {
-					console.log('SimilarArtists: Configuration up to date');
+					console.log('Match Monkey: Configuration up to date');
 				}
 			}
 
 			// Verify configuration is accessible
 			const finalConfig = app.getValue(SCRIPT_ID, {});
 			if (finalConfig && Object.keys(finalConfig).length > 0) {
-				console.log(`SimilarArtists: Configuration verified (${Object.keys(finalConfig).length} settings)`);
+				console.log(`Match Monkey: Configuration verified (${Object.keys(finalConfig).length} settings)`);
 			} else {
-				console.error('SimilarArtists: Configuration verification failed!');
+				console.error('Match Monkey: Configuration verification failed!');
 			}
 
 		} catch (e) {
-			console.error('SimilarArtists: Config error:', e.toString());
+			console.error('Match Monkey: Config error:', e.toString());
 		}
 	}
 
@@ -169,7 +169,7 @@ localRequirejs('modules/core/mm5Integration');
 	 */
 	function initializeAddon() {
 		try {
-			console.log('SimilarArtists: MediaMonkey ready, waiting for modules...');
+			console.log('Match Monkey: MediaMonkey ready, waiting for modules...');
 			
 			let checkCount = 0;
 			const maxChecks = 50; // 5 seconds max wait
@@ -178,12 +178,12 @@ localRequirejs('modules/core/mm5Integration');
 				checkCount++;
 				
 				// Check if modules are loaded
-				if (window.SimilarArtists && window.SimilarArtists._modulesLoaded) {
+				if (window.matchMonkey && window.matchMonkey._modulesLoaded) {
 					clearInterval(waitForModules);
 					
 					// Validate start function
-					if (typeof window.SimilarArtists.start !== 'function') {
-						console.error('SimilarArtists: start() function not available');
+					if (typeof window.matchMonkey.start !== 'function') {
+						console.error('Match Monkey: start() function not available');
 						return;
 					}
 					
@@ -191,18 +191,18 @@ localRequirejs('modules/core/mm5Integration');
 					checkConfig();
 					
 					// Start the add-on
-					console.log('SimilarArtists: Starting add-on...');
-					window.SimilarArtists.start();
-					console.log('SimilarArtists: Add-on ready');
+					console.log('Match Monkey: Starting add-on...');
+					window.matchMonkey.start();
+					console.log('Match Monkey: Add-on ready');
 					
 				} else if (checkCount >= maxChecks) {
 					clearInterval(waitForModules);
-					console.error('SimilarArtists: Timeout waiting for modules');
+					console.error('Match Monkey: Timeout waiting for modules');
 				}
 			}, 100);
 
 		} catch (e) {
-			console.error('SimilarArtists: Initialization failed:', e.toString());
+			console.error('Match Monkey: Initialization failed:', e.toString());
 		}
 	}
 

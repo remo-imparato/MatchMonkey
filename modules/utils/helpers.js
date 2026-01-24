@@ -73,7 +73,7 @@ function parseListSetting(raw) {
 		
 		return [];
 	} catch (e) {
-		console.error('SimilarArtists: parseListSetting error: ' + e.toString());
+		console.error('Match Monkey: parseListSetting error: ' + e.toString());
 		return [];
 	}
 }
@@ -114,7 +114,7 @@ function debounce(fn, delay) {
 }
 
 // Export to window namespace for MM5
-window.similarArtistsHelpers = {
+window.matchMonkeyHelpers = {
 	formatError,
 	shuffle,
 	parseListSetting,

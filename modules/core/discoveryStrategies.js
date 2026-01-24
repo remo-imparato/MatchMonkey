@@ -448,7 +448,7 @@ function getDiscoveryModeName(mode) {
 }
 
 // Export to window namespace for MM5
-window.similarArtistsDiscoveryStrategies = {
+window.matchMonkeyDiscoveryStrategies = {
 	DISCOVERY_MODES,
 	discoverByArtist,
 	discoverByTrack,

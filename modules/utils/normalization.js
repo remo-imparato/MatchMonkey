@@ -83,7 +83,7 @@ window.cacheKeyArtist = cacheKeyArtist;
 window.cacheKeyTopTracks = cacheKeyTopTracks;
 
 // Also export as a namespace object for organized access
-window.similarArtistsNormalization = {
+window.matchMonkeyNormalization = {
 	normalizeName,
 	splitArtists,
 	stripName,

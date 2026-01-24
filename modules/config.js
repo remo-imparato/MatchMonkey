@@ -1,5 +1,5 @@
 /**
- * SimilarArtists Add-on Configuration
+ * MatchMonkey Add-on Configuration
  * 
  * Centralized configuration constants and script identifiers.
  * 
@@ -12,7 +12,7 @@
 'use strict';
 
 // Script namespace used for settings, menu/action ids, and logging.
-const SCRIPT_ID = 'SimilarArtists';
+const SCRIPT_ID = 'MatchMonkey';
 
 // Menu/action identifiers (used by MediaMonkey add-on framework when wiring UI actions).
 const MENU_RUN_ID = `${SCRIPT_ID}.menu.run`;
@@ -31,7 +31,7 @@ const SETTINGS_SHEET_ID = `${SCRIPT_ID}.settings`;
 const API_BASE = 'https://ws.audioscrobbler.com/2.0/';
 
 // Export to window namespace for MM5
-window.similarArtistsConfig = {
+window.matchMonkeyConfig = {
 	SCRIPT_ID,
 	MENU_RUN_ID,
 	MENU_AUTO_ID,

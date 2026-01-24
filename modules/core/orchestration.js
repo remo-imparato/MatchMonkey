@@ -1,5 +1,5 @@
 /**
- * SimilarArtists Core Orchestration Logic
+ * MatchMonkey Core Orchestration Logic
  * 
  * Main orchestration layer that ties together:
  * - Input collection (seed tracks)
@@ -16,9 +16,9 @@
 
 'use strict';
 
-window.similarArtistsOrchestration = {
+window.matchMonkeyOrchestration = {
 	/**
-	 * Main orchestration function that runs the complete SimilarArtists workflow.
+	 * Main orchestration function that runs the complete MatchMonkey workflow.
 	 * 
 	 * @param {object} modules - Injected module dependencies
 	 * @param {boolean} [autoMode=false] - Whether running in auto-mode
@@ -38,9 +38,9 @@ window.similarArtistsOrchestration = {
 		const { formatError, shuffle: shuffleUtil } = helpers;
 
 		// Get discovery strategies
-		const strategies = window.similarArtistsDiscoveryStrategies;
+		const strategies = window.matchMonkeyDiscoveryStrategies;
 		if (!strategies) {
-			console.error('SimilarArtists: Discovery strategies module not loaded');
+			console.error('Match Monkey: Discovery strategies module not loaded');
 			showToast('Add-on error: Discovery strategies not loaded', 'error');
 			return { success: false, error: 'Discovery strategies not loaded', tracksAdded: 0 };
 		}
@@ -75,7 +75,7 @@ window.similarArtistsOrchestration = {
 				discoveryMode,
 			};
 
-			console.log(`SimilarArtists: Starting ${modeName} (autoMode=${autoMode})`);
+			console.log(`Match Monkey: Starting ${modeName} (autoMode=${autoMode})`);
 
 			// Step 1: Collect seed tracks
 			updateProgress('Collecting seed tracks...', 0.05);
@@ -91,7 +91,7 @@ window.similarArtistsOrchestration = {
 				};
 			}
 
-			console.log(`SimilarArtists: Collected ${seeds.length} seed(s)`);
+			console.log(`Match Monkey: Collected ${seeds.length} seed(s)`);
 			updateProgress(`Found ${seeds.length} seed(s)`, 0.1);
 
 			// Step 2: Run discovery strategy
@@ -121,7 +121,7 @@ window.similarArtistsOrchestration = {
 				};
 			}
 
-			console.log(`SimilarArtists: Discovery returned ${candidates.length} candidates`);
+			console.log(`Match Monkey: Discovery returned ${candidates.length} candidates`);
 
 			// Step 3: Match candidates to local library
 			updateProgress('Searching local library...', 0.6);
@@ -150,7 +150,7 @@ window.similarArtistsOrchestration = {
 				};
 			}
 
-			console.log(`SimilarArtists: Found ${results.length} matching tracks in library`);
+			console.log(`Match Monkey: Found ${results.length} matching tracks in library`);
 			updateProgress(`Found ${results.length} matching tracks`, 0.8);
 
 			// Step 4: Apply randomization if enabled
