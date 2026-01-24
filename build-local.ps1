@@ -1,7 +1,6 @@
 # Local MMIP Package Builder
 # This script creates a .mmip package locally for testing
 # 
-# Updated to use refactored modular structure (Phases 1-7)
 # Supports MM5 5.0+
 
 Write-Host "Building MMIP package locally..." -ForegroundColor Cyan
@@ -139,8 +138,7 @@ try {
 	$hash.Hash | Out-File -FilePath $checksumPath -NoNewline
 	Write-Host "Checksum saved: $checksumPath" -ForegroundColor Green
 
-	Write-Host "`n? Build complete! You can now install this package in MediaMonkey 5.0+" -ForegroundColor Green
-	Write-Host "  Package uses refactored modular architecture (Phases 1-7)" -ForegroundColor Gray
+	Write-Host "`n  Build complete! You can now install this package in MediaMonkey 5.0+" -ForegroundColor Green
 	Write-Host "  Directory structure properly maintained (modules/, dialogs/)" -ForegroundColor Gray
 	Write-Host "  Configuration initialized in init.js on first startup" -ForegroundColor Gray
 	Write-Host "  Note: Local builds use version $version. GitHub builds use version from info.json." -ForegroundColor Yellow

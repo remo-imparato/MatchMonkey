@@ -14,70 +14,7 @@
  */
 
 (function(globalArg) {
-	'use strict';
-
-	// Preserve any early queued start calls from a previously-created placeholder
-	// (e.g. init.js calling start() before modules finish loading)
-	const __queuedStarts = globalArg.SimilarArtists?._startQueue;
-
-	// ============================================================================
-	// EARLY EXPORT - Set window.SimilarArtists immediately to prevent race conditions
-	// ============================================================================
-	
-	// Create placeholder object immediately so init.js can detect it loaded
-	globalArg.SimilarArtists = {
-		_loading: true,
-		start: function() {
-			console.warn('SimilarArtists: start() called before modules loaded, queuing...');
-			// Queue the start call for when modules are ready
-			if (!globalArg.SimilarArtists._startQueue) {
-				globalArg.SimilarArtists._startQueue = [];
-			}
-			globalArg.SimilarArtists._startQueue.push(arguments);
-		},
-	};
-
-	// Re-attach any previous queue we captured before overwriting the placeholder
-	if (__queuedStarts && __queuedStarts.length) {
-		globalArg.SimilarArtists._startQueue = (__queuedStarts || []).slice();
-	}
-	
-	// ============================================================================
-	// MODULE LOADING - Load all modules directly using requirejs
-	// ============================================================================
-	
-	// Load all module files in correct dependency order
-	// Configuration first
-	requirejs('modules/config');
-	
-	// Utilities (no dependencies)
-	requirejs('modules/utils/normalization');
-	requirejs('modules/utils/helpers');
-	requirejs('modules/utils/sql');
-	
-	// Settings (depend on utils)
-	requirejs('modules/settings/storage');
-	requirejs('modules/settings/prefixes');
-	requirejs('modules/settings/lastfm');
-	
-	// UI (no dependencies)
-	requirejs('modules/ui/notifications');
-	
-	// API (depend on utils and settings)
-	requirejs('modules/api/cache');
-	requirejs('modules/api/lastfm');
-	
-	// Database individual modules FIRST (they export to window.dbLibrary, window.dbPlaylist, window.dbQueue)
-	requirejs('modules/db/library');
-	requirejs('modules/db/playlist');
-	requirejs('modules/db/queue');
-	// THEN load the index which depends on them
-	requirejs('modules/db/index');
-	
-	// Core orchestration and integration (depend on everything)
-	requirejs('modules/core/orchestration');
-	requirejs('modules/core/autoMode');
-	requirejs('modules/core/mm5Integration');
+	'use strict';	
 	
 	// Wait for all modules to load, then initialize
 	// Using requestAnimationFrame for better timing than setTimeout
@@ -273,7 +210,7 @@
 				showToast,
 				// Handler itself can re-check current setting at trigger-time
 				isAutoModeEnabled: () => autoMode.isAutoModeEnabled(getSetting),
-				threshold: 5,
+				threshold: 2, //-- number to tracks left to trigger auto-mode
 				logger: console.log,
 			});
 
@@ -438,10 +375,8 @@
 
 				// Initialize MM5 integration
 				appState.mm5Integration = mm5Integration.initializeIntegration({
-					onRunSimilarArtists: () => runSimilarArtists(false),
-					onToggleAuto: toggleAuto,
-					isAutoEnabled: isAutoEnabled,
 					onSettingChanged: onSettingsChanged,
+					isAutoEnabled: isAutoEnabled,
 					toolbarButtonId: config.TOOLBAR_AUTO_ID || 'SimilarArtistsToggle',
 					logger: console.log,
 				});
@@ -519,27 +454,12 @@
 			// Module access (for advanced usage)
 			modules,
 			config,
+			
+			// Flag to indicate modules are loaded
+			_modulesLoaded: true,
 		};
 
-		console.log('SimilarArtists: Module loaded, call start() to initialize');
-		
-		// Process any queued start calls (from the early placeholder object)
-		const queuedStarts = globalArg.SimilarArtists?._startQueue;
-		if (queuedStarts && queuedStarts.length > 0) {
-			console.log(`SimilarArtists: Processing ${queuedStarts.length} queued start call(s)`);
-			// Call start once; multiple queued calls are equivalent.
-			try {
-				start();
-			} catch (e) {
-				console.error('SimilarArtists: Error processing queued start:', e);
-			}
-			// Clear queue to avoid re-running on hot reloads
-			try {
-				delete globalArg.SimilarArtists._startQueue;
-			} catch (_) {
-				// ignore
-			}
-		}
+		console.log('SimilarArtists: Modules loaded and ready');
 	}
 
 })(typeof window !== 'undefined' ? window : global);

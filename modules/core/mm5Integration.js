@@ -1,14 +1,13 @@
 /**
  * SimilarArtists MM5 Integration Layer
  * 
- * Bridges the refactored modules with MediaMonkey 5 UI and action systems.
+ * Bridges the refactored modules with MediaMonkey 5 UI systems.
  * Provides:
- * - Action handler definitions for toolbar/menu
+ * - UI state management (toolbar icon updates)
  * - Settings change listeners
- * - UI state management
- * - Toolbar button registration
- * - Menu item integration
- * - Toggle button icon management
+ * - MM5 API availability checks
+ * 
+ * Note: Action registration is handled by actions_add.js as per MM5 standards.
  * 
  * @author Remo Imparato
  * @license MIT
@@ -17,190 +16,6 @@
 'use strict';
 
 window.similarArtistsMM5Integration = {
-	/**
-	 * Create MM5 action handlers for Similar Artists.
-	 * 
-	 * Returns action objects compatible with MM5's action system.
-	 * These are registered via actions_add.js in the action system.
-	 * 
-	 * @param {object} config - Configuration object
-	 * @param {Function} config.onRunSimilarArtists - Callback for run action
-	 * @param {Function} config.onToggleAuto - Callback for toggle action
-	 * @param {Function} config.isAutoEnabled - Function to check if auto-mode enabled
-	 * @param {Function} config.logger - Optional logging function
-	 * @returns {object} Actions object with Run and ToggleAuto actions
-	 */
-	createActionHandlers: function(config) {
-		const {
-			onRunSimilarArtists,
-			onToggleAuto,
-			isAutoEnabled,
-			logger = console.log,
-		} = config;
-
-		return {
-			/**
-			 * Run Similar Artists action
-			 * 
-			 * Triggered by:
-			 * - Tools menu ? Similar Artists
-			 * - Toolbar button
-			 * - Hotkey
-			 */
-			SimilarArtistsRun: {
-				title: () => _('&Similar Artists'),
-				icon: 'script',
-				category: 'tools',
-				hotkeyAble: true,
-				visible: true,
-				disabled: false,
-
-				execute: function() {
-					try {
-						logger('MM5: SimilarArtistsRun executed');
-						if (onRunSimilarArtists && typeof onRunSimilarArtists === 'function') {
-							onRunSimilarArtists();
-						} else {
-							logger('MM5: onRunSimilarArtists callback not available');
-						}
-					} catch (e) {
-						logger(`MM5: Error in SimilarArtistsRun: ${e.toString()}`);
-					}
-				}
-			},
-
-			/**
-			 * Toggle Auto-Mode action
-			 * 
-			 * Triggered by:
-			 * - Tools menu ? Similar Artists: Auto On/Off (checkbox)
-			 * - Toolbar button toggle
-			 * - Hotkey
-			 * 
-			 * Shows checked state based on isAutoEnabled() function
-			 */
-			SimilarArtistsToggleAuto: {
-				title: () => _('Similar Artists: &Auto On/Off'),
-				icon: 'script',
-				category: 'tools',
-				checkable: true,
-				hotkeyAble: true,
-				visible: true,
-				disabled: false,
-
-				checked: function() {
-					try {
-						if (!isAutoEnabled || typeof isAutoEnabled !== 'function') {
-							return false;
-						}
-						return Boolean(isAutoEnabled());
-					} catch (e) {
-						logger(`MM5: Error checking auto state: ${e.toString()}`);
-						return false;
-					}
-				},
-
-				execute: function() {
-					try {
-						logger('MM5: SimilarArtistsToggleAuto executed');
-						if (onToggleAuto && typeof onToggleAuto === 'function') {
-							onToggleAuto();
-						} else {
-							logger('MM5: onToggleAuto callback not available');
-						}
-					} catch (e) {
-						logger(`MM5: Error in SimilarArtistsToggleAuto: ${e.toString()}`);
-					}
-				}
-			}
-		};
-	},
-
-	/**
-	 * Register actions with MM5 action system.
-	 * 
-	 * Adds the action objects to window.actions so MM5 can discover them.
-	 * 
-	 * @param {object} actions - Actions object from createActionHandlers()
-	 * @param {Function} logger - Optional logging function
-	 * @returns {boolean} True if successfully registered
-	 */
-	registerActions: function(actions, logger = console.log) {
-		try {
-			if (!window.actions) {
-				logger('MM5: window.actions not available');
-				return false;
-			}
-
-			if (!actions) {
-				logger('MM5: No actions provided');
-				return false;
-			}
-
-			// Add our actions to the global actions object
-			window.actions.SimilarArtistsRun = actions.SimilarArtistsRun;
-			window.actions.SimilarArtistsToggleAuto = actions.SimilarArtistsToggleAuto;
-
-			logger('MM5: Actions registered successfully');
-			return true;
-
-		} catch (e) {
-			logger(`MM5: Error registering actions: ${e.toString()}`);
-			return false;
-		}
-	},
-
-	/**
-	 * Register actions in Tools menu.
-	 * 
-	 * Adds action items to window._menuItems.tools.action.submenu
-	 * so they appear in Tools ? Similar Artists menu.
-	 * 
-	 * @param {object} actions - Actions object (with SimilarArtistsRun, SimilarArtistsToggleAuto)
-	 * @param {Function} logger - Optional logging function
-	 * @returns {boolean} True if successfully registered
-	 */
-	registerToolsMenu: function(actions, logger = console.log) {
-		try {
-			if (!window._menuItems || !window._menuItems.tools) {
-				logger('MM5: window._menuItems.tools not available');
-				return false;
-			}
-
-			if (!window._menuItems.tools.action) {
-				logger('MM5: window._menuItems.tools.action not available');
-				return false;
-			}
-
-			if (!window._menuItems.tools.action.submenu) {
-				window._menuItems.tools.action.submenu = [];
-				logger('MM5: Created tools.action.submenu array');
-			}
-
-			// Register Run action
-			window._menuItems.tools.action.submenu.push({
-				action: actions.SimilarArtistsRun,
-				order: 40,
-				grouporder: 10,
-			});
-			logger('MM5: Registered SimilarArtistsRun in Tools menu');
-
-			// Register Toggle Auto action
-			window._menuItems.tools.action.submenu.push({
-				action: actions.SimilarArtistsToggleAuto,
-				order: 50,
-				grouporder: 10,
-			});
-			logger('MM5: Registered SimilarArtistsToggleAuto in Tools menu');
-
-			return true;
-
-		} catch (e) {
-			logger(`MM5: Error registering Tools menu items: ${e.toString()}`);
-			return false;
-		}
-	},
-
 	/**
 	 * Update action state (e.g., enable/disable, checked state).
 	 * 
@@ -338,62 +153,37 @@ window.similarArtistsMM5Integration = {
 	 * Initialize MM5 integration.
 	 * 
 	 * Sets up all UI elements:
-	 * 1. Register actions
-	 * 2. Register Tools menu items
-	 * 3. Set up settings change listener
-	 * 4. Update initial toolbar icon state
+	 * 1. Set up settings change listener
+	 * 2. Update initial toolbar icon state
+	 * 
+	 * Note: Actions and menu items are registered by actions_add.js
 	 * 
 	 * @param {object} config - Configuration object
-	 * @param {Function} config.onRunSimilarArtists - Run action callback
-	 * @param {Function} config.onToggleAuto - Toggle action callback
-	 * @param {Function} config.isAutoEnabled - Check auto-enabled state
 	 * @param {Function} config.onSettingChanged - Settings change callback
+	 * @param {Function} config.isAutoEnabled - Check auto-enabled state
 	 * @param {string} [config.toolbarButtonId='SimilarArtistsToggle'] - Toolbar button ID
 	 * @param {Function} [config.logger=console.log] - Logging function
-	 * @returns {object} Integration state {actions, unsubscribe}
+	 * @returns {object} Integration state {unsubscribe}
 	 */
 	initializeIntegration: function(config) {
 		const {
-			onRunSimilarArtists,
-			onToggleAuto,
-			isAutoEnabled,
 			onSettingChanged,
+			isAutoEnabled,
 			toolbarButtonId = 'SimilarArtistsToggle',
 			logger = console.log,
 		} = config;
 
 		const state = {
-			actions: null,
 			unsubscribe: null,
 		};
 
 		try {
 			logger('MM5: Initializing MM5 integration...');
 
-			// 1. Create action handlers
-			state.actions = this.createActionHandlers({
-				onRunSimilarArtists,
-				onToggleAuto,
-				isAutoEnabled,
-				logger,
-			});
-
-			// 2. Register actions
-			if (!this.registerActions(state.actions, logger)) {
-				logger('MM5: Failed to register actions');
-				return state;
-			}
-
-			// 3. Register Tools menu
-			if (!this.registerToolsMenu(state.actions, logger)) {
-				logger('MM5: Failed to register Tools menu');
-				// Continue anyway - menu might be optional
-			}
-
-			// 4. Set up settings listener
+			// 1. Set up settings listener
 			state.unsubscribe = this.listenSettingsChanges(onSettingChanged, logger);
 
-			// 5. Update initial toolbar state
+			// 2. Update initial toolbar state
 			if (isAutoEnabled && typeof isAutoEnabled === 'function') {
 				const enabled = isAutoEnabled();
 				this.updateToolbarIcon(toolbarButtonId, enabled, logger);
@@ -426,34 +216,10 @@ window.similarArtistsMM5Integration = {
 				state.unsubscribe = null;
 			}
 
-			// Clear action references
-			if (state && state.actions) {
-				state.actions = null;
-			}
-
 			logger('MM5: Integration shutdown complete');
 
 		} catch (e) {
 			logger(`MM5: Error during integration shutdown: ${e.toString()}`);
-		}
-	},
-
-	/**
-	 * Get action object by name.
-	 * 
-	 * Useful for direct access to action definitions.
-	 * 
-	 * @param {string} actionName - Action ID
-	 * @returns {object} Action object or null
-	 */
-	getAction: function(actionName) {
-		try {
-			if (!window.actions || !actionName) {
-				return null;
-			}
-			return window.actions[actionName] || null;
-		} catch (e) {
-			return null;
 		}
 	},
 

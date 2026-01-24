@@ -76,17 +76,30 @@ window.similarArtistsAutoMode = {
 			const player = app.player;
 			state.autoListen = app.listen(player, 'playbackState', (newState) => {
 				logger(`Auto-Mode: Playback state changed to '${newState}'`);
+				
+				// Only respond to track changes
 				if (newState === 'trackChanged') {
+					// Check cooldown
 					const now = Date.now();
 					const timeSinceLastTrigger = now - state.lastTriggerTime;
 					if (timeSinceLastTrigger < state.triggerCooldown) {
-						logger(`Auto-Mode: Cooldown active (${state.triggerCooldown - timeSinceLastTrigger}ms remaining), skipping trigger`);
+						logger(`Auto-Mode: Cooldown active (${state.triggerCooldown - timeSinceLastTrigger}ms remaining), skipping trigger check`);
 						return;
 					}
 
-					logger('Auto-Mode: Track changed event - calling trigger handler');
+					logger('Auto-Mode: Track changed event - checking if should trigger...');
+					
+					// Log current playlist state for debugging
+					try {
+						const remaining = window.similarArtistsAutoMode.getPlaylistRemaining(player, logger);
+						logger(`Auto-Mode: Current remaining tracks: ${remaining}`);
+					} catch (e) {
+						logger(`Auto-Mode: Could not check remaining: ${e.toString()}`);
+					}
+					
+					// Call handler
 					Promise.resolve(handleAutoTrigger(state, logger)).catch((e) => {
-						logger(`Auto-Mode: Trigger handler rejected: ${e?.stack || e?.message || e}`);
+						logger(`Auto-Mode: Trigger handler error: ${e?.stack || e?.message || e}`);
 					});
 				}
 			});
@@ -163,9 +176,10 @@ window.similarArtistsAutoMode = {
 			const total = typeof player.entriesCount === 'number' ? player.entriesCount : 0;
 			if (total > 0 && typeof player.getCountOfPlayedEntries === 'function') {
 				const played = player.getCountOfPlayedEntries();
+				// Remaining = total - played (this includes the currently playing track)
 				remaining = total - played;
 				logger(`Auto-Mode: Method 1 (entriesCount): total=${total}, played=${played}, remaining=${remaining}`);
-				if (remaining > 0) return remaining;
+				if (remaining >= 0) return remaining;
 			}
 		} catch (e) {
 			logger(`Auto-Mode: Method 1 failed: ${e.toString()}`);
@@ -176,24 +190,37 @@ window.similarArtistsAutoMode = {
 			if (player.playlist && typeof player.playlist.getCursor === 'function' && typeof player.playlist.count === 'function') {
 				const cursor = player.playlist.getCursor();
 				const count = player.playlist.count();
-				remaining = count - cursor;
-				logger(`Auto-Mode: Method 2 (playlist): cursor=${cursor}, count=${count}, remaining=${remaining}`);
-				if (remaining > 0) return remaining;
+				// Cursor is 0-indexed position of currently playing track
+				// Remaining = total count - (current position + 1)
+				// This gives tracks that haven't played yet (not including current)
+				remaining = count - (cursor + 1);
+				logger(`Auto-Mode: Method 2 (playlist): cursor=${cursor}, count=${count}, remaining=${remaining} (after current)`);
+				if (remaining >= 0) return remaining;
 			}
 		} catch (e) {
 			logger(`Auto-Mode: Method 2 failed: ${e.toString()}`);
 		}
 
-		// Method 3: Fallback to songList tracklist count
+		// Method 3: Try getSongList with position tracking
 		try {
 			const songList = player.getSongList?.();
 			if (songList) {
 				const tracklist = songList.getTracklist?.();
 				if (tracklist && typeof tracklist.count === 'number') {
-					// This gives us total count, not current position
-					// We'll use this as a fallback estimate only
-					remaining = tracklist.count;
-					logger(`Auto-Mode: Method 3 (songList): tracklist.count=${remaining}`);
+					const total = tracklist.count;
+					// Try to get current position
+					const currentTrack = player.getCurrentTrack?.();
+					if (currentTrack && typeof tracklist.indexOf === 'function') {
+						const currentIndex = tracklist.indexOf(currentTrack);
+						if (currentIndex >= 0) {
+							remaining = total - (currentIndex + 1);
+							logger(`Auto-Mode: Method 3 (songList with indexOf): total=${total}, currentIndex=${currentIndex}, remaining=${remaining}`);
+							if (remaining >= 0) return remaining;
+						}
+					}
+					// Fallback: just use total as rough estimate
+					remaining = total;
+					logger(`Auto-Mode: Method 3 fallback (total only): tracklist.count=${remaining}`);
 					if (remaining > 0) return remaining;
 				}
 			}
@@ -287,18 +314,25 @@ window.similarArtistsAutoMode = {
 
 				// Use captured autoMode reference instead of 'this'
 				const remaining = autoMode.getPlaylistRemaining(player, log);
-				log(`Auto-Mode: Remaining entries: ${remaining}`);
+				log(`Auto-Mode: Remaining entries: ${remaining} (threshold: ${threshold})`);
 
-				// Check if we should trigger (remaining <= threshold)
+				// Trigger when remaining entries <= threshold AND > 0
+				// remaining = 0 means on last track
+				// remaining = 1 means 1 track left after current (on second-to-last)
+				// remaining = 2 means 2 tracks left after current (on third-to-last)
+				// Default threshold = 2, so trigger when on second-to-last or third-to-last
 				if (remaining > threshold) {
 					log(`Auto-Mode: Not near end yet (remaining=${remaining}, threshold=${threshold}), skipping`);
 					return;
 				}
 				
-				if (remaining <= 0) {
-					log(`Auto-Mode: Playlist already ended (remaining=${remaining}), too late to trigger`);
+				if (remaining < 0) {
+					log(`Auto-Mode: Invalid remaining count (${remaining}), skipping`);
 					return;
 				}
+				
+				// Note: We trigger even when remaining=0 (on last track) to give one last chance
+				log(`Auto-Mode: Near end of playlist detected (remaining=${remaining}), will trigger`);
 
 				// Check cooldown (prevent rapid re-triggers)
 				const now = Date.now();

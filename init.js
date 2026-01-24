@@ -16,6 +16,39 @@
 // This is the refactored modular version with complete architecture
 localRequirejs('similarArtists');  // -> window.SimilarArtists
 
+// Load all module files in correct dependency order
+// Configuration first
+localRequirejs('modules/config');
+	
+// Utilities (no dependencies)
+localRequirejs('modules/utils/normalization');
+localRequirejs('modules/utils/helpers');
+localRequirejs('modules/utils/sql');
+	
+// Settings (depend on utils)
+localRequirejs('modules/settings/storage');
+localRequirejs('modules/settings/prefixes');
+localRequirejs('modules/settings/lastfm');
+	
+// UI (no dependencies)
+localRequirejs('modules/ui/notifications');
+	
+// API (depend on utils and settings)
+localRequirejs('modules/api/cache');
+localRequirejs('modules/api/lastfm');
+	
+// Database individual modules FIRST (they export to window.dbLibrary, window.dbPlaylist, window.dbQueue)
+localRequirejs('modules/db/library');
+localRequirejs('modules/db/playlist');
+localRequirejs('modules/db/queue');
+// THEN load the index which depends on them
+localRequirejs('modules/db/index');
+	
+// Core orchestration and integration (depend on everything)
+localRequirejs('modules/core/orchestration');
+localRequirejs('modules/core/autoMode');
+localRequirejs('modules/core/mm5Integration');
+
 // ============================================================================
 // DEBUG TOOLS (OPTIONAL)
 // ============================================================================
@@ -23,7 +56,7 @@ localRequirejs('similarArtists');  // -> window.SimilarArtists
 // Uncomment to enable debugging:
 /*
 try {
-	requirejs('helpers/debugTools');
+	localRequirejs('helpers/debugTools');
 	if (window.SimilarArtists && typeof registerDebuggerEntryPoint === 'function') {
 		registerDebuggerEntryPoint.call(window.SimilarArtists, 'start');
 		console.log('SimilarArtists: Debug tools registered');
@@ -31,7 +64,7 @@ try {
 } catch (e) {
 	// Ignore if debug tools not available
 }
-*/
+//*/
 
 // ============================================================================
 // INITIALIZATION
@@ -43,23 +76,41 @@ try {
 	// Initialize when MediaMonkey 5 is ready
 	window.whenReady(() => {
 		try {
-			// Validate that entry point loaded
-			if (!window.SimilarArtists) {
-				console.error('SimilarArtists: Entry point not loaded');
-				return;
-			}
-
-			// Validate that start function exists
-			if (typeof window.SimilarArtists.start !== 'function') {
-				console.error('SimilarArtists: start() function not available');
-				return;
-			}
-			checkConfig();
-			// Initialize the add-on
-			window.SimilarArtists.start();
-
-			// Log successful initialization
-			console.log('SimilarArtists: Initialization complete - add-on ready');
+			console.log('SimilarArtists: MediaMonkey ready, waiting for modules to load...');
+			
+			// Wait for modules to finish loading
+			// Check every 100ms until SimilarArtists object is fully loaded
+			let checkCount = 0;
+			const maxChecks = 50; // 5 seconds max wait
+			
+			const waitForModules = setInterval(() => {
+				checkCount++;
+				
+				// Check if modules are loaded
+				if (window.SimilarArtists && window.SimilarArtists._modulesLoaded) {
+					clearInterval(waitForModules);
+					
+					// Validate that start function exists
+					if (typeof window.SimilarArtists.start !== 'function') {
+						console.error('SimilarArtists: start() function not available');
+						return;
+					}
+					
+					// Check and initialize configuration
+					checkConfig();
+					
+					// Initialize the add-on
+					console.log('SimilarArtists: Starting add-on...');
+					window.SimilarArtists.start();
+					
+					// Log successful initialization
+					console.log('SimilarArtists: Initialization complete - add-on ready');
+					
+				} else if (checkCount >= maxChecks) {
+					clearInterval(waitForModules);
+					console.error('SimilarArtists: Timeout waiting for modules to load');
+				}
+			}, 100);
 
 		} catch (e) {
 			// Log initialization error but don't crash MM5
@@ -68,7 +119,6 @@ try {
 	});
 
 })();
-
 
 function checkConfig() {
 	'use strict';
