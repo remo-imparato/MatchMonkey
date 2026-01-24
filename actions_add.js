@@ -37,7 +37,8 @@ actions.similarArtistsRun = {
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
-	}
+	},
+	getTracklist: uitools.getSelectedTracklist
 };
 
 /**
@@ -55,7 +56,8 @@ actions.similarTracksRun = {
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
-	}
+	},
+	getTracklist: uitools.getSelectedTracklist
 };
 
 /**
@@ -73,7 +75,8 @@ actions.similarGenreRun = {
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
-	}
+	},
+	getTracklist: uitools.getSelectedTracklist
 };
 
 /**
@@ -127,54 +130,52 @@ _menuItems.tools.action.submenu.push({
 });
 
 // ============================================================================
-// CONTEXT MENU REGISTRATION (Right-click on tracks)
+// CONTEXT MENU REGISTRATION - Add to tracklistMenuItems
 // ============================================================================
 
-// Define the context submenu action
-var similarContextSubmenu = {
-	title: _('&Match...'),
-	icon: 'script',
-	visible: true,
-	disabled: uitools.notMediaListSelected,
-	submenu: [
-		{ action: actions.similarArtistsRun, order: 10 },
-		{ action: actions.similarTracksRun, order: 20 },
-		{ action: actions.similarGenreRun, order: 30 }
-	]
-};
-
-// Add to track context menu (songsSelected)
-if (_menuItems.songsSelected && _menuItems.songsSelected.action && _menuItems.songsSelected.action.submenu) {
-	_menuItems.songsSelected.action.submenu.push({
-		action: similarContextSubmenu,
-		order: 100,
-		grouporder: 20
-	});
+// Ensure menus object exists
+if (!window.menus) {
+	window.menus = {};
 }
 
-// Add to album context menu
-if (_menuItems.albumsSelected && _menuItems.albumsSelected.action && _menuItems.albumsSelected.action.submenu) {
-	_menuItems.albumsSelected.action.submenu.push({
-		action: similarContextSubmenu,
+// Wait for tracklistMenuItems to be initialized, then add our items
+(function() {
+	var matchMonkeyMenuItem = {
+		action: {
+			title: _('&Match Monkey...'),
+			icon: 'script',
+			visible: true,
+			disabled: uitools.notMediaListSelected,
+			submenu: [
+				{ action: actions.similarArtistsRun, order: 10 },
+				{ action: actions.similarTracksRun, order: 20 },
+				{ action: actions.similarGenreRun, order: 30 }
+			]
+		},
 		order: 100,
-		grouporder: 20
-	});
-}
-
-// Add to artist context menu
-if (_menuItems.artistsSelected && _menuItems.artistsSelected.action && _menuItems.artistsSelected.action.submenu) {
-	_menuItems.artistsSelected.action.submenu.push({
-		action: similarContextSubmenu,
-		order: 100,
-		grouporder: 20
-	});
-}
-
-// Add to Now Playing context menu
-if (_menuItems.nowplayingSelected && _menuItems.nowplayingSelected.action && _menuItems.nowplayingSelected.action.submenu) {
-	_menuItems.nowplayingSelected.action.submenu.push({
-		action: similarContextSubmenu,
-		order: 100,
-		grouporder: 20
-	});
-}
+		grouporder: 50
+	};
+	
+	// Check if tracklistMenuItems is already initialized
+	if (window.menus.tracklistMenuItems && Array.isArray(window.menus.tracklistMenuItems)) {
+		// Already initialized, add our item
+		window.menus.tracklistMenuItems.push(matchMonkeyMenuItem);
+	} else {
+		// Not yet initialized, wait for it
+		var checkInterval = setInterval(function() {
+			if (window.menus.tracklistMenuItems && Array.isArray(window.menus.tracklistMenuItems)) {
+				clearInterval(checkInterval);
+				window.menus.tracklistMenuItems.push(matchMonkeyMenuItem);
+			}
+		}, 100);
+		
+		// Fallback: if it never initializes (shouldn't happen), create it
+		setTimeout(function() {
+			if (!window.menus.tracklistMenuItems) {
+				clearInterval(checkInterval);
+				console.warn('MatchMonkey: tracklistMenuItems never initialized, creating array');
+				window.menus.tracklistMenuItems = [matchMonkeyMenuItem];
+			}
+		}, 5000);
+	}
+})();
