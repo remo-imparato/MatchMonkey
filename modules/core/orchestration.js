@@ -85,13 +85,13 @@ window.similarArtistsOrchestration = {
 			// Load configuration
 			const config_ = {
 				seedLimit: autoMode ? 2 : intSetting('SeedLimit'),
-				similarLimit: intSetting('SimilarLimit'),
+				similarLimit: autoMode ? 10 : intSetting('SimilarLimit'),
 				tracksPerArtist: autoMode ? 5 : intSetting('TPA'),
 				totalLimit: autoMode ? 10 : intSetting('TPL'),
-				includeSeedArtist: !autoMode && boolSetting('Seed'),
-				rankEnabled: boolSetting('Rank'),
-				bestEnabled: boolSetting('Best'),
-				randomize: boolSetting('Random'),
+				includeSeedArtist: autoMode || boolSetting('Seed'),
+				rankEnabled: autoMode || boolSetting('Rank'),
+				bestEnabled: autoMode || boolSetting('Best'),
+				randomize: !autoMode && boolSetting('Random'),
 				showConfirm: !autoMode && boolSetting('Confirm'),
 				autoMode,
 			};
@@ -556,8 +556,8 @@ window.similarArtistsOrchestration = {
 				console.log('buildResultsPlaylist: "Do not create playlist" mode - enqueueing to Now Playing instead');
 				// Delegate to queueResults
 				const queueResult = await this.queueResults(
-					modules, 
-					tracks, 
+					modules,
+					tracks,
 					{ ...config, autoMode: false }
 				);
 				return {
@@ -570,7 +570,7 @@ window.similarArtistsOrchestration = {
 
 			// Build playlist name from seed artists (passed in config)
 			const seedName = config.seedName || 'Similar';
-			
+
 			// Apply template: replace % with seed artist names, or append if no %
 			let playlistName;
 			if (template.indexOf('%') >= 0) {
@@ -585,7 +585,6 @@ window.similarArtistsOrchestration = {
 			}
 
 			console.log(`buildResultsPlaylist: Generated playlist name: "${playlistName}"`);
-			console.log(`buildResultsPlaylist: Template: "${template}", seedName: "${seedName}"`);
 
 			// Show selection dialog if confirmation is enabled
 			let targetPlaylist = null;
@@ -627,48 +626,53 @@ window.similarArtistsOrchestration = {
 					console.log('buildResultsPlaylist: "Create new playlist" mode');
 					// Find unique name by appending index
 					let idx = 1;
-					let testPlaylist = this.findPlaylist(finalName);
+					let testPlaylist = await this.findPlaylist(finalName);
 					while (testPlaylist) {
 						idx += 1;
 						finalName = `${playlistName}_${idx}`;
-						testPlaylist = this.findPlaylist(finalName);
+						testPlaylist = await this.findPlaylist(finalName);
 					}
 					console.log(`buildResultsPlaylist: Create mode - using unique name: "${finalName}"`);
 					shouldClear = false; // New playlist, nothing to clear
+					// targetPlaylist remains null, will create below
 				}
 				// "Overwrite existing playlist" mode - find existing or create new
 				else if (overwriteMode.toLowerCase().indexOf('overwrite') > -1) {
 					console.log('buildResultsPlaylist: "Overwrite existing playlist" mode');
+
 					// Try to find existing playlist with this name
-					targetPlaylist = this.findPlaylist(finalName);
+					targetPlaylist = await this.findPlaylist(finalName);
 					if (targetPlaylist) {
-						console.log(`buildResultsPlaylist: Found existing playlist "${finalName}" - will overwrite (clear first)`);
+						console.log(`buildResultsPlaylist: Found existing playlist "${finalName}" (ID: ${targetPlaylist.id || targetPlaylist.ID}) - will overwrite (clear first)`);
 						shouldClear = true; // Existing playlist, clear it
+						// targetPlaylist is set, skip creation below
 					} else {
 						console.log(`buildResultsPlaylist: No existing playlist "${finalName}" found - will create new`);
 						shouldClear = false; // New playlist, nothing to clear
+						// targetPlaylist remains null, will create below
 					}
 				} else {
 					// Default/unknown mode - treat as create
 					console.log(`buildResultsPlaylist: Unknown mode "${overwriteMode}" - treating as create`);
 					shouldClear = false;
+					// targetPlaylist remains null, will create below
 				}
 			} else {
 				// User selected a playlist from dialog - respect overwrite mode for clearing
 				shouldClear = overwriteMode.toLowerCase().indexOf('overwrite') > -1;
-				console.log(`buildResultsPlaylist: User selected playlist, shouldClear = ${shouldClear}`);
+				console.log(`buildResultsPlaylist: User selected playlist "${targetPlaylist.name}", shouldClear = ${shouldClear}`);
 			}
 
-			// Create new playlist if we don't have one yet
+			// Create new playlist ONLY if we don't have one yet
 			if (!targetPlaylist) {
-				console.log(`buildResultsPlaylist: Creating new playlist with name: "${finalName}"`);
-				
+				console.log(`buildResultsPlaylist: No target playlist set - creating new playlist with name: "${finalName}"`);
+
 				const parentName = stringSetting('Parent', '');
 				let parentPlaylist = null;
 
 				// Find parent playlist if specified (and not empty)
 				if (parentName && parentName.trim() !== '') {
-					parentPlaylist = this.findPlaylist(parentName);
+					parentPlaylist = await this.findPlaylist(parentName);
 					if (parentPlaylist) {
 						console.log(`buildResultsPlaylist: Found parent playlist '${parentName}' (ID: ${parentPlaylist.id || parentPlaylist.ID})`);
 					} else {
@@ -733,12 +737,12 @@ window.similarArtistsOrchestration = {
 			try {
 				const nav = getSetting('Navigate', 'None');
 				console.log(`buildResultsPlaylist: Navigation setting: "${nav}"`);
-				
+
 				// Exact string matching for navigation options
 				if (nav === 'Navigate to new playlist') {
 					const playlistId = targetPlaylist.id || targetPlaylist.ID;
 					console.log(`buildResultsPlaylist: Navigating to playlist ID: ${playlistId}`);
-					
+
 					// Try multiple navigation methods (MM5 API variations)
 					if (window.navigationHandlers?.playlist?.navigate) {
 						window.navigationHandlers.playlist.navigate(targetPlaylist);
@@ -755,7 +759,7 @@ window.similarArtistsOrchestration = {
 				}
 				else if (nav === 'Navigate to now playing') {
 					console.log('buildResultsPlaylist: Navigating to Now Playing');
-					
+
 					// Try multiple navigation methods (MM5 API variations)
 					if (window.navigationHandlers?.nowPlaying?.navigate) {
 						window.navigationHandlers.nowPlaying.navigate();
@@ -794,7 +798,7 @@ window.similarArtistsOrchestration = {
 	 * Opens dlgSelectPlaylist dialog to let user select or create a playlist.
 	 * @param {string} seedName Seed artist name used in playlist naming.
 	 * @param {string} overwriteMode Mode label (Create/Overwrite/Do not create).
-	 * @returns {Promise<object|null>} Selected/created playlist object, special auto-create indicator, or null if cancelled.
+	 * @returns {Promise<object|null}> Selected/created playlist object, special auto-create indicator, or null if cancelled.
 	 */
 	async confirmPlaylist(seedName, overwriteMode) {
 		return new Promise((resolve) => {
@@ -858,25 +862,137 @@ window.similarArtistsOrchestration = {
 	 * @param {string} name Playlist title to search for.
 	 * @returns {object|null} Playlist object if found, null otherwise.
 	 */
-	findPlaylist(name) {
+	async findPlaylist(name) {
 		if (!name || typeof app === 'undefined' || !app.playlists) {
 			return null;
 		}
 
 		try {
-			// Use findByTitle (MM5 API)
+			console.log(`findPlaylist: Searching for playlist: "${name}"`);
+
+			// Method 1: Try getByTitleAsync (MM5 API - case-insensitive, returns Promise)
+			if (app.playlists?.getByTitleAsync && typeof app.playlists.getByTitleAsync === 'function') {
+				const playlist = await app.playlists.getByTitleAsync(name);
+				if (playlist) {
+					console.log(`findPlaylist: Found playlist by getByTitleAsync: "${playlist.name}" (ID: ${playlist.id || playlist.ID})`);
+					return playlist;
+				} else {
+					console.log(`findPlaylist: getByTitleAsync did not find playlist "${name}"`);
+				}
+			} else {
+				console.log('findPlaylist: app.playlists.getByTitleAsync not available');
+			}
+
+			// Method 2: Try synchronous findByTitle if available
 			if (app.playlists?.findByTitle && typeof app.playlists.findByTitle === 'function') {
 				const playlist = app.playlists.findByTitle(name);
 				if (playlist) {
-					console.log(`findPlaylist: Found playlist by title: "${name}"`);
+					console.log(`findPlaylist: Found playlist by findByTitle: "${playlist.name}" (ID: ${playlist.id || playlist.ID})`);
 					return playlist;
+				} else {
+					console.log(`findPlaylist: findByTitle did not find playlist "${name}"`);
+				}
+			} else {
+				console.log('findPlaylist: app.playlists.findByTitle not available');
+			}
+
+			// Method 3: Fallback - iterate through all playlists manually
+			if (app.playlists?.root) {
+				console.log('findPlaylist: Trying manual search through playlist tree...');
+				const found = await this.searchPlaylistTree(app.playlists.root, name);
+				if (found) {
+					console.log(`findPlaylist: Found playlist by tree search: "${found.name}" (ID: ${found.id || found.ID})`);
+					return found;
+				} else {
+					console.log(`findPlaylist: Manual tree search did not find playlist "${name}"`);
 				}
 			}
+
 		} catch (e) {
 			console.error(`findPlaylist: Error: ${e.toString()}`);
 		}
 
 		console.log(`findPlaylist: Playlist not found: "${name}"`);
+		return null;
+	},
+
+	/**
+	 * Recursively search playlist tree for a playlist by name (case-insensitive).
+	 * @param {object} node - Current playlist node to search
+	 * @param {string} name - Playlist name to find
+	 * @returns {Promise<object|null>} Playlist object if found, null otherwise
+	 */
+	async searchPlaylistTree(node, name) {
+		if (!node) return null;
+
+		const searchName = name.trim().toUpperCase();
+
+		// Check current node
+		const nodeName = (node.name || node.title || '').trim().toUpperCase();
+		if (nodeName === searchName) {
+			return node;
+		}
+
+		// Search children
+		try {
+			if (node.getChildren && typeof node.getChildren === 'function') {
+				const children = node.getChildren();
+				if (children) {
+					// Wait for children to load if it's async
+					if (children.whenLoaded && typeof children.whenLoaded === 'function') {
+						await children.whenLoaded();
+					}
+
+					if (children.count > 0) {
+						// Use locked() to safely iterate children
+						let found = null;
+						children.locked(() => {
+							for (let i = 0; i < children.count; i++) {
+								const child = children.getValue ? children.getValue(i) : children[i];
+								if (child) {
+									const childName = (child.name || child.title || '').trim().toUpperCase();
+									if (childName === searchName) {
+										found = child;
+										return; // Exit early
+									}
+								}
+							}
+						});
+
+						// If found at this level, return it
+						if (found) return found;
+
+						// Otherwise, recursively search each child
+						children.locked(() => {
+							for (let i = 0; i < children.count; i++) {
+								const child = children.getValue ? children.getValue(i) : children[i];
+								if (child && !found) {
+									// We can't await inside locked(), so we collect children to search
+									// and search them outside the lock
+								}
+							}
+						});
+
+						// Search children recursively (outside lock)
+						for (let i = 0; i < children.count; i++) {
+							let child;
+							children.locked(() => {
+								child = children.getValue ? children.getValue(i) : children[i];
+							});
+
+							if (child) {
+								found = await this.searchPlaylistTree(child, name);
+								if (found) return found;
+							}
+						}
+					}
+				}
+			}
+		} catch (e) {
+			// Ignore errors iterating children
+			console.error(`searchPlaylistTree: Error searching children: ${e.toString()}`);
+		}
+
 		return null;
 	},
 
@@ -915,12 +1031,13 @@ window.similarArtistsOrchestration = {
 		const existing = new Set();
 		if (ignoreDupes) {
 			try {
-				// Try getTracklist() for playlists
 				if (target.getTracklist && typeof target.getTracklist === 'function') {
 					const tracklist = target.getTracklist();
 					await tracklist.whenLoaded();
-					tracklist.forEach((t) => {
-						if (t) existing.add(t.id || t.ID);
+					tracklist.locked(() => {
+						tracklist.forEach((t) => {
+							if (t) existing.add(t.id || t.ID);
+						});
 					});
 				}
 			} catch (e) {
@@ -941,76 +1058,56 @@ window.similarArtistsOrchestration = {
 			return 0;
 		}
 
-		// Add tracks using MM5 API
 		try {
-			if (!app.utils?.createTracklist) {
-				console.log('addTracksToTarget: app.utils.createTracklist not available');
-				return 0;
+			// Determine add method on the provided target.
+			let addMethod = null;
+			if (target.addTracksAsync && typeof target.addTracksAsync === 'function') {
+				addMethod = 'addTracksAsync';
+			} else if (target.addTracks && typeof target.addTracks === 'function') {
+				addMethod = 'addTracks';
+			} else if (target.addTrack && typeof target.addTrack === 'function') {
+				addMethod = 'addTrack';
 			}
 
-			if (!target.addTracksAsync || typeof target.addTracksAsync !== 'function') {
-				console.log('addTracksToTarget: target.addTracksAsync not available');
-				return 0;
+			if (!addMethod) {
+				console.error('addTracksToTarget: No add method available on target');
+				console.error('addTracksToTarget: Available methods:', Object.keys(target));
+				throw new Error('Target does not have addTracks method');
 			}
 
-			// Create a mutable temporary tracklist
+			if (!app?.utils?.createTracklist) {
+				throw new Error('app.utils.createTracklist not available');
+			}
+
 			const tracklist = app.utils.createTracklist(true);
-
-			if (!tracklist) {
-				console.log('addTracksToTarget: Failed to create tracklist');
-				return 0;
-			}
-
-			// Add all tracks to the temporary tracklist
 			for (const t of tracksToAdd) {
 				if (t && typeof tracklist.add === 'function') {
 					tracklist.add(t);
 				}
 			}
-
-			// Wait for tracklist to be ready
 			await tracklist.whenLoaded();
 
-			// Add tracks to target
-			if (tracklist.count > 0) {
+			if (tracklist.count <= 0) {
+				return 0;
+			}
+
+			if (addMethod === 'addTracksAsync') {
 				await target.addTracksAsync(tracklist);
-				console.log(`addTracksToTarget: Added ${tracklist.count} tracks (async batch)`);
-				return tracklist.count;
+			} else if (addMethod === 'addTracks') {
+				target.addTracks(tracklist);
+			} else {
+				for (let i = 0; i < tracklist.count; i++) {
+					const tr = tracklist.getValue(i);
+					if (tr) target.addTrack(tr);
+				}
 			}
 
-			console.log('addTracksToTarget: No tracks in tracklist to add');
-			return 0;
-
+			return tracklist.count;
 		} catch (e) {
-			console.error(`addTracksToTarget: Error: ${e.toString()}`);
-			return 0;
+			console.error(`addTracksToTarget: Error adding tracks: ${e.toString()}`);
+			console.error(`addTracksToTarget: Error stack: ${e.stack}`);
+			throw e;
 		}
-	},
-
-	/**
-	 * Build a comma-separated artist label from seed artists for playlist naming.
-	 * Limits total length to keep playlist names readable.
-	 * @param {Array<{name: string}>} seeds Array of seed artist objects.
-	 * @returns {string} Comma-separated artist names with ellipsis if truncated.
-	 */
-	buildPlaylistSeedName(seeds) {
-		const names = (seeds || []).map((s) => s?.name).filter((n) => n && n.trim().length);
-		if (!names.length) return 'Similar';
-
-		// Limit artist portion to 80 characters to keep full playlist name under 100
-		const maxLabelLen = 80;
-		let label = names[0];
-		
-		for (let i = 1; i < names.length; i++) {
-			const candidate = `${label}, ${names[i]}`;
-			if (candidate.length > maxLabelLen) {
-				label += '...';
-				break;
-			}
-			label = candidate;
-		}
-		
-		return label;
 	},
 
 	/**
@@ -1034,57 +1131,41 @@ window.similarArtistsOrchestration = {
 		try {
 			console.log(`queueResults: Enqueueing ${tracks.length} tracks to Now Playing`);
 
-			// Validate environment
 			if (typeof app === 'undefined' || !app.player) {
 				throw new Error('MediaMonkey player not available');
 			}
 
 			const player = app.player;
 
-			// Get configuration
+			if (typeof player.addTracksAsync !== 'function') {
+				throw new Error('MediaMonkey Player API addTracksAsync not available');
+			}
+
 			const clearNP = config.autoMode ? false : boolSetting('ClearNP', false);
 			const ignoreDupes = config.autoMode ? true : boolSetting('Ignore', false);
 
-			// Clear Now Playing if requested
-			let cleared = false;
-			if (clearNP) {
-				updateProgress('Clearing Now Playing...', 0.1);
-				try {
-					if (player.clearPlaylistAsync && typeof player.clearPlaylistAsync === 'function') {
-						await player.clearPlaylistAsync();
-						cleared = true;
-						console.log('queueResults: Cleared Now Playing');
-					} else if (player.stop && typeof player.stop === 'function') {
-						player.stop();
-						console.log('queueResults: Stopped playback (clearPlaylistAsync not available)');
-					}
-				} catch (e) {
-					console.error(`queueResults: Error clearing Now Playing: ${e.toString()}`);
-				}
-			}
-
-			// Build set of existing track IDs for deduplication
 			const existing = new Set();
 			if (ignoreDupes) {
 				updateProgress('Checking for duplicates...', 0.2);
 				try {
-					const songList = player.getSongList?.();
-					if (songList) {
-						const tracklist = songList.getTracklist?.();
-						if (tracklist) {
-							await tracklist.whenLoaded();
-							tracklist.forEach((t) => {
-								if (t) existing.add(t.id || t.ID);
-							});
-							console.log(`queueResults: Found ${existing.size} existing tracks in Now Playing`);
-						}
+					const playqueue = player.getSongList?.()?.getTracklist?.();
+					if (playqueue) {
+						await playqueue.whenLoaded();
+						playqueue.locked(() => {
+							let tmp;
+							for (let i = 0; i < (playqueue.count || 0); i++) {
+								tmp = playqueue.getFastObject ? playqueue.getFastObject(i, tmp) : playqueue.getValue(i);
+								const id = tmp?.id || tmp?.ID;
+								if (id) existing.add(id);
+							}
+						});
+						console.log(`queueResults: Found ${existing.size} existing tracks in Now Playing`);
 					}
 				} catch (e) {
 					console.error(`queueResults: Error building existing track set: ${e.toString()}`);
 				}
 			}
 
-			// Filter out duplicates if needed
 			const tracksToAdd = ignoreDupes
 				? tracks.filter((t) => {
 					const id = t?.id || t?.ID;
@@ -1095,69 +1176,69 @@ window.similarArtistsOrchestration = {
 			if (!tracksToAdd || tracksToAdd.length === 0) {
 				console.log('queueResults: No tracks to add after filtering');
 				showToast('No new tracks to add to Now Playing', 'info');
-				return {
-					added: 0,
-					cleared,
-				};
+				return { added: 0, cleared: false };
 			}
 
-			// Add tracks using MM5 API
 			updateProgress(`Adding ${tracksToAdd.length} tracks to Now Playing...`, 0.5);
 
-			try {
-				if (!app.utils?.createTracklist) {
-					throw new Error('app.utils.createTracklist not available');
-				}
-
-				if (!player.addTracksAsync || typeof player.addTracksAsync !== 'function') {
-					throw new Error('player.addTracksAsync not available');
-				}
-
-				// Create a mutable temporary tracklist
-				const tracklist = app.utils.createTracklist(true);
-
-				if (!tracklist) {
-					throw new Error('Failed to create tracklist');
-				}
-
-				// Add all tracks to the temporary tracklist
-				for (const t of tracksToAdd) {
-					if (t && typeof tracklist.add === 'function') {
-						tracklist.add(t);
-					}
-				}
-
-				// Wait for tracklist to be ready
-				await tracklist.whenLoaded();
-
-				// Add tracks to Now Playing
-				if (tracklist.count > 0) {
-					await player.addTracksAsync(tracklist);
-					console.log(`queueResults: Successfully added ${tracklist.count} track(s) to Now Playing`);
-
-					updateProgress('Complete!', 1.0);
-
-					return {
-						added: tracklist.count,
-						cleared,
-					};
-				} else {
-					console.log('queueResults: No tracks in tracklist to add');
-					return {
-						added: 0,
-						cleared,
-					};
-				}
-
-			} catch (e) {
-				console.error(`queueResults: Error adding tracks: ${e.toString()}`);
-				throw e;
+			const list = app.utils.createTracklist(true);
+			for (const t of tracksToAdd) {
+				if (t) list.add(t);
 			}
+			await list.whenLoaded();
+
+			if (list.count <= 0) {
+				return { added: 0, cleared: false };
+			}
+
+			// If caller requested clear, do it via official API (preferred is withClear on addTracksAsync).
+			// clearPlaylistAsync is harmless and helps ensure a clean queue if there are pending operations.
+			if (clearNP && typeof player.clearPlaylistAsync === 'function') {
+				try { await player.clearPlaylistAsync(); } catch (_e) { /* ignore */ }
+			}
+
+			await player.addTracksAsync(list, {
+				withClear: !!clearNP,
+				saveHistory: true,
+				startPlayback: false,
+			});
+
+			updateProgress('Complete!', 1.0);
+			return { added: list.count, cleared: !!clearNP };
 
 		} catch (e) {
 			console.error('queueResults error: ' + e.toString());
 			showToast(`Error enqueuing tracks: ${e.message}`, 'error');
 			throw e;
 		}
+	},
+
+	/**
+	 * Build a human-friendly seed name for playlist naming.
+	 * Accepts a list of seed objects ({ name, track }) or strings.
+	 * @param {Array} seeds
+	 * @returns {string}
+	 */
+	buildPlaylistSeedName(seeds) {
+		if (!Array.isArray(seeds) || seeds.length === 0) return 'Similar';
+
+		const names = [];
+		const seen = new Set();
+
+		for (const s of seeds) {
+			const raw = (typeof s === 'string') ? s : (s?.name || s?.track?.artist || '');
+			const name = String(raw || '').trim();
+			if (!name) continue;
+			const key = name.toUpperCase();
+			if (seen.has(key)) continue;
+			seen.add(key);
+			names.push(name);
+			if (names.length >= 3) break; // keep playlist names short
+		}
+
+		if (names.length === 0) return 'Similar';
+		if (names.length === 1) return names[0];
+		if (names.length === 2) return `${names[0]} & ${names[1]}`;
+		return `${names[0]}, ${names[1]} & ${names[2]}`;
 	},
 };
