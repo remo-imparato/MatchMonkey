@@ -1,35 +1,31 @@
 /**
  * SimilarArtists Options Panel for MediaMonkey 5
  * 
+ * MediaMonkey 5 API Only
+ * 
  * @author Remo Imparato
- * @version 1.0.0
+ * @version 2.0.0
  * @description Configuration panel for SimilarArtists add-on in MM5 Tools > Options.
  *              Provides UI for configuring Last.fm API settings, playlist creation options,
  *              filters, and automatic behavior.
  * 
  * @repository https://github.com/remo-imparato/SimilarArtistsMM5
  * @license MIT
- * 
- * Features:
- * - Last.fm API key configuration
- * - Playlist naming and creation modes
- * - Artist/track limits and filtering options
- * - Rating-based filtering
- * - Parent playlist selection
- * - Auto-enqueue and navigation settings
- * 
- * Requirements:
- * - MediaMonkey 5.0+
- * - SimilarArtists add-on installed
- * 
- * NOTE: This panel reads configuration from app.getValue('SimilarArtists')
- *       Default values are set by install.js during addon installation
  */
 
-// Helper functions to read/write settings from system config
+'use strict';
+
+// Script namespace
+const SCRIPT_ID = 'SimilarArtists';
+
+/**
+ * Read a setting from the SimilarArtists configuration.
+ * @param {string} key Setting key.
+ * @returns {*} Setting value or undefined.
+ */
 function getSetting(key) {
 	try {
-		const allSettings = app.getValue('SimilarArtists', {});
+		const allSettings = app.getValue(SCRIPT_ID, {});
 		return allSettings[key];
 	} catch (e) {
 		console.error('SimilarArtists Options: Error reading setting:', key, e);
@@ -37,37 +33,44 @@ function getSetting(key) {
 	}
 }
 
+/**
+ * Write a setting to the SimilarArtists configuration.
+ * @param {string} key Setting key.
+ * @param {*} value Setting value.
+ */
 function setSetting(key, value) {
 	try {
-		const allSettings = app.getValue('SimilarArtists', {});
+		const allSettings = app.getValue(SCRIPT_ID, {});
 		allSettings[key] = value;
-		app.setValue('SimilarArtists', allSettings);
+		app.setValue(SCRIPT_ID, allSettings);
 	} catch (e) {
 		console.error('SimilarArtists Options: Error saving setting:', key, e);
 	}
 }
 
-optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (sett, pnl, wndParams) {
+/**
+ * Load handler - populates UI controls with current settings.
+ */
+optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function(sett, pnl, wndParams) {
 	try {
-		// Read ALL configuration from system storage (set by install.js)
-		this.config = app.getValue('SimilarArtists', {});
+		// Read configuration from system storage
+		this.config = app.getValue(SCRIPT_ID, {});
 
-		// Verify config exists (should have been created by install.js)
+		// Verify config exists
 		if (!this.config || Object.keys(this.config).length === 0) {
-			console.warn('SimilarArtists Options: No configuration found! Install script may not have run.');
+			console.warn('SimilarArtists Options: No configuration found');
 			return;
 		}
 
-		var UI = getAllUIElements(pnl);
+		const UI = getAllUIElements(pnl);
 
-		// Load all settings from system config with proper defaults matching install.js
+		// Load all settings from config
 		UI.SAApiKey.controlClass.value = this.config.ApiKey || '7fd988db0c4e9d8b12aed27d0a91a932';
 		UI.SAConfirm.controlClass.checked = Boolean(this.config.Confirm);
 
-		// Handle legacy Limit vs new SeedLimit/SimilarLimit
-		const seedLimit = this.config.SeedLimit || 20;
-		const similarLimit = this.config.SimilarLimit || 30;
-		UI.SALimit.controlClass.value = seedLimit || similarLimit || 20;
+		// Handle seed/similar limit
+		const seedLimit = this.config.SeedLimit || this.config.SimilarLimit || 20;
+		UI.SALimit.controlClass.value = seedLimit;
 
 		UI.SAName.controlClass.value = this.config.Name || '- Similar to %';
 		UI.SATPA.controlClass.value = this.config.TPA || 30;
@@ -77,29 +80,9 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 		UI.SABest.controlClass.checked = Boolean(this.config.Best);
 		UI.SARank.controlClass.checked = Boolean(this.config.Rank);
 
-		// Rating control setup
+		// Rating control
 		const ratingValue = parseInt(this.config.Rating, 10) || 0;
-
-		const setRatingWhenReady = (uiRatingControl, val) => {
-			if (!uiRatingControl || !uiRatingControl.controlClass) return;
-			const ctrl = uiRatingControl.controlClass;
-			const apply = () => {
-				try { ctrl.setRating(val, { force: true, disableChangeEvent: true }); }
-				catch (e) { ctrl.value = val; }
-			};
-
-			if (ctrl._initialized && Array.isArray(ctrl.stars) && ctrl.stars.length) {
-				apply();
-				return;
-			}
-
-			const onLoad = () => {
-				try { apply(); } finally { app.unlisten(ctrl.container, 'load', onLoad); }
-			};
-			app.listen(ctrl.container, 'load', onLoad);
-		};
-
-		setRatingWhenReady(UI.SARating, ratingValue);
+		this._setRatingControl(UI.SARating, ratingValue);
 
 		UI.SAUnknown.controlClass.checked = Boolean(this.config.Unknown);
 		UI.SAOverwrite.controlClass.value = this.config.Overwrite || 'Create new playlist';
@@ -107,69 +90,7 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 		UI.SANavigate.controlClass.value = this.config.Navigate || 'None';
 
 		// Auto-mode checkbox
-		const setOnPlayCheckbox = () => {
-			try {
-				if (window.SimilarArtists?.isAutoEnabled) {
-					UI.SAOnPlay.controlClass.checked = Boolean(window.SimilarArtists.isAutoEnabled());
-				} else {
-					UI.SAOnPlay.controlClass.checked = Boolean(this.config.OnPlay);
-				}
-			} catch (e) {
-				UI.SAOnPlay.controlClass.checked = Boolean(this.config.OnPlay);
-			}
-		};
-
-		setOnPlayCheckbox();
-
-		// Checkbox change listener
-		const onPlayCheckboxChanged = () => {
-			try {
-				const desired = Boolean(UI.SAOnPlay.controlClass.checked);
-
-				// Persist immediately so toggleAuto (which reads settings) sees the new value.
-				setSetting('OnPlay', desired);
-
-				// Ensure addon listener/UI is synced.
-				if (window.SimilarArtists?.toggleAuto && typeof window.SimilarArtists.toggleAuto === 'function') {
-					const current = Boolean(window.SimilarArtists.isAutoEnabled?.());
-					if (current !== desired) {
-						window.SimilarArtists.toggleAuto();
-					}
-				}
-			} catch (e) {
-				console.error('Similar Artists: OnPlay checkbox change error:', e);
-			}
-		};
-
-		// MM option panel controls don't always bubble 'change' from container.
-		// Prefer listening on the actual checkbox element when available.
-		try {
-			const ctrl = UI.SAOnPlay?.controlClass;
-			const el = ctrl?.container?.querySelector?.('input[type="checkbox"]') || ctrl?.container;
-			if (el) {
-				app.listen(el, 'change', onPlayCheckboxChanged);
-				app.listen(el, 'click', onPlayCheckboxChanged);
-			}
-		} catch (e) {
-			// fallback
-			if (UI.SAOnPlay?.controlClass?.container) {
-				app.listen(UI.SAOnPlay.controlClass.container, 'change', onPlayCheckboxChanged);
-			}
-		}
-
-		// Listen for auto-mode changes from other sources
-		const onAutoModeChanged = (event) => {
-			try {
-				if (event.detail && event.detail.enabled !== undefined) {
-					UI.SAOnPlay.controlClass.checked = Boolean(event.detail.enabled);
-				}
-			} catch (e) {
-				console.error('Similar Artists: Auto-mode event handler error:', e);
-			}
-		};
-
-		this._autoModeListener = onAutoModeChanged;
-		window.addEventListener('similarartists:automodechanged', onAutoModeChanged);
+		this._setupAutoModeCheckbox(UI.SAOnPlay);
 
 		UI.SAClearNP.controlClass.checked = Boolean(this.config.ClearNP);
 		UI.SAIgnore.controlClass.checked = Boolean(this.config.Ignore);
@@ -179,11 +100,109 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.load = async function (set
 		UI.SAGenre.controlClass.value = this.config.Genre || '';
 
 	} catch (e) {
-		console.error('Similar Artists: load error: ' + e.toString());
+		console.error('SimilarArtists Options: load error:', e.toString());
 	}
-}
+};
 
-optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function (sett) {
+/**
+ * Helper to set rating control value.
+ */
+optionPanels.pnl_Library.subPanels.pnl_SimilarArtists._setRatingControl = function(uiRatingControl, value) {
+	if (!uiRatingControl?.controlClass) return;
+	
+	const ctrl = uiRatingControl.controlClass;
+	const apply = () => {
+		try {
+			if (typeof ctrl.setRating === 'function') {
+				ctrl.setRating(value, { force: true, disableChangeEvent: true });
+			} else {
+				ctrl.value = value;
+			}
+		} catch (e) {
+			ctrl.value = value;
+		}
+	};
+
+	// Check if control is initialized
+	if (ctrl._initialized && Array.isArray(ctrl.stars) && ctrl.stars.length) {
+		apply();
+	} else {
+		// Wait for control to initialize
+		const onLoad = () => {
+			try { apply(); } 
+			finally { app.unlisten(ctrl.container, 'load', onLoad); }
+		};
+		app.listen(ctrl.container, 'load', onLoad);
+	}
+};
+
+
+/**
+ * Helper to setup auto-mode checkbox with change listener.
+ */
+optionPanels.pnl_Library.subPanels.pnl_SimilarArtists._setupAutoModeCheckbox = function(uiCheckbox) {
+	// Set initial state
+	try {
+		if (window.SimilarArtists?.isAutoEnabled) {
+			uiCheckbox.controlClass.checked = Boolean(window.SimilarArtists.isAutoEnabled());
+		} else {
+			uiCheckbox.controlClass.checked = Boolean(this.config.OnPlay);
+		}
+	} catch (e) {
+		uiCheckbox.controlClass.checked = Boolean(this.config.OnPlay);
+	}
+
+	// Change handler
+	const onCheckboxChanged = () => {
+		try {
+			const desired = Boolean(uiCheckbox.controlClass.checked);
+			setSetting('OnPlay', desired);
+
+			// Sync with addon
+			if (window.SimilarArtists?.toggleAuto) {
+				const current = Boolean(window.SimilarArtists.isAutoEnabled?.());
+				if (current !== desired) {
+					window.SimilarArtists.toggleAuto();
+				}
+			}
+		} catch (e) {
+			console.error('SimilarArtists Options: OnPlay change error:', e);
+		}
+	};
+
+	// Listen for changes
+	try {
+		const ctrl = uiCheckbox.controlClass;
+		const el = ctrl.container?.querySelector?.('input[type="checkbox"]') || ctrl.container;
+		if (el) {
+			app.listen(el, 'change', onCheckboxChanged);
+			app.listen(el, 'click', onCheckboxChanged);
+		}
+	} catch (e) {
+		if (uiCheckbox.controlClass?.container) {
+			app.listen(uiCheckbox.controlClass.container, 'change', onCheckboxChanged);
+		}
+	}
+
+	// Listen for auto-mode changes from other sources
+	const onAutoModeChanged = (event) => {
+		try {
+			if (event.detail?.enabled !== undefined) {
+				uiCheckbox.controlClass.checked = Boolean(event.detail.enabled);
+			}
+		} catch (e) {
+			console.error('SimilarArtists Options: Auto-mode event error:', e);
+		}
+	};
+
+	this._autoModeListener = onAutoModeChanged;
+	window.addEventListener('similarartists:automodechanged', onAutoModeChanged);
+};
+
+/**
+ * Save handler - persists UI control values to settings.
+ */
+optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function(sett) {
 	try {
 		// Clean up event listener
 		if (this._autoModeListener) {
@@ -191,12 +210,12 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function (sett) {
 			this._autoModeListener = null;
 		}
 
-		var UI = getAllUIElements();
+		const UI = getAllUIElements();
 
-		// Read current config from system
-		this.config = app.getValue('SimilarArtists', {});
+		// Read current config
+		this.config = app.getValue(SCRIPT_ID, {});
 
-		// Update all values
+		// Update all values from UI
 		this.config.ApiKey = UI.SAApiKey.controlClass.value;
 		this.config.Confirm = UI.SAConfirm.controlClass.checked;
 		this.config.SeedLimit = UI.SALimit.controlClass.value;
@@ -210,8 +229,10 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function (sett) {
 		this.config.Rank = UI.SARank.controlClass.checked;
 		this.config.Parent = UI.SAParent.controlClass.value;
 
-		const rawRating = Number.isFinite(UI.SARating.controlClass.value) ?
-			Math.max(0, Math.min(100, UI.SARating.controlClass.value)) : 0;
+		// Rating value
+		const rawRating = Number.isFinite(UI.SARating.controlClass.value) 
+			? Math.max(0, Math.min(100, UI.SARating.controlClass.value)) 
+			: 0;
 		this.config.Rating = String(rawRating);
 
 		this.config.Unknown = UI.SAUnknown.controlClass.checked;
@@ -220,35 +241,33 @@ optionPanels.pnl_Library.subPanels.pnl_SimilarArtists.save = function (sett) {
 		this.config.Navigate = UI.SANavigate.controlClass.value;
 
 		// Auto-mode state
-		let actualAutoState = false;
+		let autoState = false;
 		try {
 			if (typeof window.SimilarArtists?.isAutoEnabled === 'function') {
-				actualAutoState = Boolean(window.SimilarArtists.isAutoEnabled());
+				autoState = Boolean(window.SimilarArtists.isAutoEnabled());
 			} else {
-				actualAutoState = Boolean(UI.SAOnPlay.controlClass.checked);
+				autoState = Boolean(UI.SAOnPlay.controlClass.checked);
 			}
 		} catch (e) {
-			console.error('Similar Artists: Error reading auto state:', e);
-			actualAutoState = Boolean(UI.SAOnPlay.controlClass.checked);
+			autoState = Boolean(UI.SAOnPlay.controlClass.checked);
 		}
 
-		this.config.OnPlay = actualAutoState;
+		this.config.OnPlay = autoState;
 		this.config.ClearNP = UI.SAClearNP.controlClass.checked;
 		this.config.Ignore = UI.SAIgnore.controlClass.checked;
 		this.config.Exclude = UI.SAExclude.controlClass.value;
 		this.config.Black = UI.SABlack.controlClass.value;
 		this.config.Genre = UI.SAGenre.controlClass.value;
 
-		// Save ALL settings back to system
+		// Save all settings
 		try {
-			app.setValue('SimilarArtists', this.config);
+			app.setValue(SCRIPT_ID, this.config);
+			console.log('SimilarArtists Options: Settings saved');
 		} catch (e) {
-			console.error('Similar Artists: save: failed to persist settings:', e.toString());
+			console.error('SimilarArtists Options: Failed to save:', e.toString());
 		}
 
-		console.log('Similar Artists: Settings saved successfully');
-
 	} catch (e) {
-		console.error('Similar Artists: save error: ' + e.toString());
+		console.error('SimilarArtists Options: save error:', e.toString());
 	}
-}
+};

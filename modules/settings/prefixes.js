@@ -3,51 +3,51 @@
  * 
  * Handles MediaMonkey's "Ignore THE" feature to normalize artist names
  * for Last.fm API queries and comparisons.
+ * 
+ * MediaMonkey 5 API Only
  */
 
 'use strict';
 
 /**
- * Get the list of prefix strings to ignore (e.g., "The", "A")
+ * Get the list of prefix strings to ignore (e.g., "The", "A").
  * Reads from MediaMonkey's Options settings.
  * @returns {string[]} Array of prefixes.
  */
 function getIgnorePrefixes() {
 	try {
-		// 1) Preferred source used by core UI panels
+		// Method 1: window.settings.get (MM5 preferred)
 		if (window?.settings && typeof window.settings.get === 'function') {
 			const opts = window.settings.get('Options') || {};
-			// Some callers store under an Options wrapper, others directly on the object.
 			const cfg = opts.Options || opts;
-			const enabled = cfg?.IgnoreTHEs;
-			const list = cfg?.IgnoreTHEStrings;
-			if (enabled) {
-				return String(list || 'The').split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+			if (cfg?.IgnoreTHEs) {
+				const list = cfg.IgnoreTHEStrings || 'The';
+				return String(list).split(',').map(s => s.trim()).filter(s => s.length > 0);
 			}
 		}
 
-		// 2) MM app.settings API (fallback)
-		if (app?.settings && typeof app.settings.getValue === 'function') {
+		// Method 2: app.settings.getValue (MM5 fallback)
+		if (typeof app !== 'undefined' && app?.settings?.getValue) {
 			const enabled = app.settings.getValue('IgnoreTHEs', false);
 			if (enabled) {
 				const list = app.settings.getValue('IgnoreTHEStrings', 'The');
-				return String(list || 'The').split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+				return String(list || 'The').split(',').map(s => s.trim()).filter(s => s.length > 0);
 			}
 		}
 
-		// 3) Generic app.getValue (another possible storage location)
-		if (app?.getValue && typeof app.getValue === 'function') {
+		// Method 3: app.getValue (MM5 another possible location)
+		if (typeof app !== 'undefined' && app?.getValue) {
 			const opts = app.getValue('Options', {}) || {};
 			const cfg = opts.Options || opts;
-			const enabled = cfg?.IgnoreTHEs;
-			const list = cfg?.IgnoreTHEStrings;
-			if (enabled) {
-				return String(list || 'The').split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+			if (cfg?.IgnoreTHEs) {
+				const list = cfg.IgnoreTHEStrings || 'The';
+				return String(list).split(',').map(s => s.trim()).filter(s => s.length > 0);
 			}
 		}
 	} catch (e) {
-		console.error('Similar Artists: getIgnorePrefixes error: ' + e.toString());
+		console.error('SimilarArtists: getIgnorePrefixes error: ' + e.toString());
 	}
+	
 	// Default: no prefixes ignored
 	return [];
 }
@@ -61,23 +61,29 @@ function getIgnorePrefixes() {
  */
 function fixPrefixes(name) {
 	if (!name) return name;
-	let result = name;
+	
+	let result = String(name).trim();
 	const prefixes = getIgnorePrefixes();
 
 	for (const prefix of prefixes) {
+		const p = String(prefix).trim();
+		if (!p) continue;
+		
 		// Check for "Artist, The" format
-		const suffixComma = `, ${prefix}`;
-		if (result.toUpperCase().endsWith(suffixComma.toUpperCase())) {
-			result = `${prefix} ${result.slice(0, -suffixComma.length)}`;
+		const suffixComma = `, ${p}`;
+		if (result.toLowerCase().endsWith(suffixComma.toLowerCase())) {
+			result = `${p} ${result.slice(0, -suffixComma.length)}`;
 			break;
 		}
+		
 		// Check for "Artist (The)" format
-		const suffixParen = ` (${prefix})`;
-		if (result.toUpperCase().endsWith(suffixParen.toUpperCase())) {
-			result = `${prefix} ${result.slice(0, -suffixParen.length)}`;
+		const suffixParen = ` (${p})`;
+		if (result.toLowerCase().endsWith(suffixParen.toLowerCase())) {
+			result = `${p} ${result.slice(0, -suffixParen.length)}`;
 			break;
 		}
 	}
+	
 	return result;
 }
 
@@ -86,3 +92,7 @@ window.similarArtistsPrefixes = {
 	getIgnorePrefixes,
 	fixPrefixes,
 };
+
+// Also export fixPrefixes globally for backward compatibility
+window.fixPrefixes = fixPrefixes;
+window.getIgnorePrefixes = getIgnorePrefixes;

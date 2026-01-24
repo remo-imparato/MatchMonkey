@@ -1,22 +1,23 @@
 /**
  * SimilarArtists Modules Index
  * 
- * NOTE: This file is no longer the primary loader.
- * All modules are now loaded directly in similarArtists.js
+ * Exports the consolidated module namespace for organized access.
+ * All modules are loaded by init.js using localRequirejs().
  * 
- * This file is kept for backward compatibility and exports the module namespace.
+ * MediaMonkey 5 API Only
  */
 
 'use strict';
 
-// All modules are loaded by similarArtists.js using requirejs()
-// This file just exports the namespace for convenience
-
-// Export to window namespace (modules should already be loaded)
+// Build and export the modules namespace
+// This is called after all individual modules have been loaded
 window.similarArtistsModules = {
+	// Configuration
 	config: window.similarArtistsConfig,
+	
+	// Utility modules
 	utils: {
-		normalization: {
+		normalization: window.similarArtistsNormalization || {
 			normalizeName: window.normalizeName,
 			splitArtists: window.splitArtists,
 			stripName: window.stripName,
@@ -26,19 +27,29 @@ window.similarArtistsModules = {
 		helpers: window.similarArtistsHelpers,
 		sql: window.similarArtistsSQL,
 	},
+	
+	// Settings modules
 	settings: {
 		storage: window.similarArtistsStorage,
 		prefixes: window.similarArtistsPrefixes,
 		lastfm: window.similarArtistsLastfm,
 	},
+	
+	// UI modules
 	ui: {
 		notifications: window.similarArtistsNotifications,
 	},
+	
+	// API modules
 	api: {
 		cache: window.lastfmCache,
 		lastfmApi: window.similarArtistsLastfmAPI,
 	},
+	
+	// Database modules
 	db: window.similarArtistsDB,
+	
+	// Core modules
 	core: {
 		orchestration: window.similarArtistsOrchestration,
 		autoMode: window.similarArtistsAutoMode,

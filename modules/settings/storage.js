@@ -4,15 +4,16 @@
  * Get/set application settings persisted under the script namespace.
  * Handles type coercion for settings retrieval.
  * 
- * NOTE: Default values are set by install.js during addon installation.
+ * MediaMonkey 5 API Only
+ * 
+ * NOTE: Default values are set by init.js during addon initialization.
  *       This module only provides get/set helpers and type conversion.
  */
 
 'use strict';
 
-// Load dependencies from window namespace
-const SCRIPT_ID = () => window.similarArtistsConfig.SCRIPT_ID;
-const parseListSetting = () => window.similarArtistsHelpers.parseListSetting;
+// Script namespace
+const SCRIPT_ID = 'SimilarArtists';
 
 /**
  * Read a setting stored under this script's namespace.
@@ -21,10 +22,11 @@ const parseListSetting = () => window.similarArtistsHelpers.parseListSetting;
  * @returns {*} Stored value or fallback.
  */
 function getSetting(key, fallback) {
-	if (typeof app === 'undefined' || !app.getValue)
+	if (typeof app === 'undefined' || !app.getValue) {
 		return fallback;
+	}
 
-	const allSettings = app.getValue(SCRIPT_ID(), {});
+	const allSettings = app.getValue(SCRIPT_ID, {});
 	const val = allSettings[key];
 	
 	if (val === undefined || val === null) {
@@ -47,47 +49,50 @@ function setSetting(key, value) {
 	// 1. Get the current config object
 	// 2. Update the specific key
 	// 3. Save the entire object back
-	const config = app.getValue(SCRIPT_ID(), {});
+	const config = app.getValue(SCRIPT_ID, {});
 	config[key] = value;
-	app.setValue(SCRIPT_ID(), config);
+	app.setValue(SCRIPT_ID, config);
 }
 
 /**
  * Get a setting coerced to integer.
  * @param {string} key Setting key.
- * @returns {number} Integer value, or 0 if not found.
+ * @param {number} [defaultValue=0] Default value if setting not found.
+ * @returns {number} Integer value.
  */
-function intSetting(key) {
+function intSetting(key, defaultValue = 0) {
 	const v = getSetting(key, undefined);
 	
-	// If setting doesn't exist, return 0
-	if (v === undefined || v === null) return 0;
+	// If setting doesn't exist, return default
+	if (v === undefined || v === null) return defaultValue;
 	
 	// Handle number types directly
 	if (typeof v === 'number') return v;
 	
 	// Convert strings to numbers
 	const n = parseInt(String(v), 10);
-	return Number.isFinite(n) ? n : 0;
+	return Number.isFinite(n) ? n : defaultValue;
 }
 
 /**
  * Get a setting coerced to string.
  * @param {string} key Setting key.
- * @returns {string} String value, or empty string if not found.
+ * @param {string} [defaultValue=''] Default value if setting not found.
+ * @returns {string} String value.
  */
-function stringSetting(key) {
-	const v = getSetting(key, '');
-	return v === null || v === undefined ? '' : String(v);
+function stringSetting(key, defaultValue = '') {
+	const v = getSetting(key, defaultValue);
+	return v === null || v === undefined ? defaultValue : String(v);
 }
 
 /**
  * Get a setting coerced to boolean.
  * @param {string} key Setting key.
- * @returns {boolean} Boolean value, or false if not found.
+ * @param {boolean} [defaultValue=false] Default value if setting not found.
+ * @returns {boolean} Boolean value.
  */
-function boolSetting(key) {
-	const val = getSetting(key, false);
+function boolSetting(key, defaultValue = false) {
+	const val = getSetting(key, defaultValue);
 	
 	if (val === true || val === false) return val;
 	
@@ -109,7 +114,19 @@ function boolSetting(key) {
  */
 function listSetting(key) {
 	const raw = getSetting(key, '');
-	return parseListSetting()(raw);
+	// Use parseListSetting from helpers if available, otherwise inline
+	if (window.similarArtistsHelpers?.parseListSetting) {
+		return window.similarArtistsHelpers.parseListSetting(raw);
+	}
+	// Fallback inline implementation
+	if (!raw) return [];
+	if (Array.isArray(raw)) {
+		return raw.map(s => String(s || '').trim()).filter(s => s.length > 0);
+	}
+	if (typeof raw === 'string') {
+		return raw.split(',').map(s => s.trim()).filter(s => s.length > 0);
+	}
+	return [];
 }
 
 // Export to window namespace for MM5

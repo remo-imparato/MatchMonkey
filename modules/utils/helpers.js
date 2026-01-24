@@ -2,6 +2,7 @@
  * General Helper Utilities
  * 
  * Common utilities for error formatting, shuffling, parsing, and other helper functions.
+ * MediaMonkey 5 API Only
  */
 
 'use strict';
@@ -25,7 +26,7 @@ function formatError(err) {
 }
 
 /**
- * In-place Fisher–Yates shuffle for random reordering.
+ * In-place Fisher-Yates shuffle for random reordering.
  * @param {any[]} arr Array to shuffle.
  */
 function shuffle(arr) {
@@ -68,11 +69,11 @@ function parseListSetting(raw) {
 			const s = String(raw);
 			if (s.indexOf(',') >= 0) return s.split(',').map(x => x.trim()).filter(x => x.length > 0);
 			if (s.length) return [s.trim()];
-		} catch (e) { }
+		} catch (_) { /* ignore */ }
 		
 		return [];
 	} catch (e) {
-		console.error('Similar Artists: parseListSetting error: ' + e.toString());
+		console.error('SimilarArtists: parseListSetting error: ' + e.toString());
 		return [];
 	}
 }
@@ -92,7 +93,24 @@ function sleep(ms) {
  * @returns {string} Escaped string (single quotes doubled).
  */
 function escapeSql(str) {
-	return (str || '').replace(/'/g, "''");
+	return String(str ?? '').replace(/'/g, "''");
+}
+
+/**
+ * Debounce a function call.
+ * @param {Function} fn Function to debounce.
+ * @param {number} delay Delay in milliseconds.
+ * @returns {Function} Debounced function.
+ */
+function debounce(fn, delay) {
+	let timer = null;
+	return function(...args) {
+		if (timer) clearTimeout(timer);
+		timer = setTimeout(() => {
+			fn.apply(this, args);
+			timer = null;
+		}, delay);
+	};
 }
 
 // Export to window namespace for MM5
@@ -102,4 +120,5 @@ window.similarArtistsHelpers = {
 	parseListSetting,
 	sleep,
 	escapeSql,
+	debounce,
 };

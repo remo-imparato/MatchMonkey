@@ -6,8 +6,10 @@
  * - Playlist creation and management
  * - Track queue operations (Now Playing and custom playlists)
  *
- * All functions use the MediaMonkey API (`app.db`, `app.player`) and provide
+ * All functions use the MediaMonkey 5 API (`app.db`, `app.player`) and provide
  * error handling with graceful degradation.
+ *
+ * MediaMonkey 5 API Only
  *
  * @module modules/db
  * @exports {object} Database operations grouped by category
@@ -15,19 +17,58 @@
 
 'use strict';
 
-// Export unified interface to window namespace for MM5
-window.similarArtistsDB = {
-	// Library search operations (from window.dbLibrary)
-	findLibraryTracks: window.dbLibrary.findLibraryTracks,
-	findLibraryTracksBatch: window.dbLibrary.findLibraryTracksBatch,
+// Defer building the export object until modules are loaded
+// This handles potential load order issues
+function buildDbInterface() {
+	const dbInterface = {
+		// Library search operations (from window.dbLibrary)
+		findLibraryTracks: window.dbLibrary?.findLibraryTracks || function() {
+			console.error('SimilarArtists: dbLibrary.findLibraryTracks not loaded');
+			return Promise.resolve([]);
+		},
+		findLibraryTracksBatch: window.dbLibrary?.findLibraryTracksBatch || function() {
+			console.error('SimilarArtists: dbLibrary.findLibraryTracksBatch not loaded');
+			return Promise.resolve(new Map());
+		},
 
-	// Playlist management operations (from window.dbPlaylist)
-	createPlaylist: window.dbPlaylist.createPlaylist,
-	findPlaylist: window.dbPlaylist.findPlaylist,
-	getOrCreatePlaylist: window.dbPlaylist.getOrCreatePlaylist,
+		// Playlist management operations (from window.dbPlaylist)
+		createPlaylist: window.dbPlaylist?.createPlaylist || function() {
+			console.error('SimilarArtists: dbPlaylist.createPlaylist not loaded');
+			return Promise.resolve(null);
+		},
+		findPlaylist: window.dbPlaylist?.findPlaylist || function() {
+			console.error('SimilarArtists: dbPlaylist.findPlaylist not loaded');
+			return null;
+		},
+		getOrCreatePlaylist: window.dbPlaylist?.getOrCreatePlaylist || function() {
+			console.error('SimilarArtists: dbPlaylist.getOrCreatePlaylist not loaded');
+			return Promise.resolve(null);
+		},
 
-	// Queue/enqueue operations (from window.dbQueue)
-	queueTrack: window.dbQueue.queueTrack,
-	queueTracks: window.dbQueue.queueTracks,
-	addTracksToPlaylist: window.dbQueue.addTracksToPlaylist,
-};
+		// Queue/enqueue operations (from window.dbQueue)
+		queueTrack: window.dbQueue?.queueTrack || function() {
+			console.error('SimilarArtists: dbQueue.queueTrack not loaded');
+			return Promise.resolve(false);
+		},
+		queueTracks: window.dbQueue?.queueTracks || function() {
+			console.error('SimilarArtists: dbQueue.queueTracks not loaded');
+			return Promise.resolve(0);
+		},
+		addTracksToPlaylist: window.dbQueue?.addTracksToPlaylist || function() {
+			console.error('SimilarArtists: dbQueue.addTracksToPlaylist not loaded');
+			return Promise.resolve(0);
+		},
+	};
+	
+	return dbInterface;
+}
+
+// Create a proxy that lazily builds the interface on first access
+// This ensures all sub-modules are loaded before we try to use them
+window.similarArtistsDB = new Proxy({}, {
+	get: function(target, prop) {
+		// Rebuild interface on each access to pick up late-loaded modules
+		const db = buildDbInterface();
+		return db[prop];
+	}
+});

@@ -2,6 +2,7 @@
  * UI Notifications and Progress Display
  * 
  * Handles toast notifications and progress bar updates for user feedback.
+ * MediaMonkey 5 API Only
  */
 
 'use strict';
@@ -13,21 +14,26 @@
 let globalProgressTask = null;
 
 /**
- * Display a toast-like UI notification when possible, otherwise fallback to logging.
+ * Display a toast-like UI notification.
+ * Uses MM5's uitools.toastMessage.show API.
  * @param {string} text Toast message text.
- * @param {object} options Toast options object (implementation-specific).
+ * @param {string|object} [options] Toast options ('info', 'success', 'error', 'warning') or options object.
  */
 function showToast(text, options = {}) {
 	try {
-		// Use uitools.toastMessage.show (MM5 API)
+		// Normalize options - if string, treat as type
+		const opts = typeof options === 'string' ? { type: options } : options;
+		
+		// Use MM5's toastMessage API
 		if (typeof uitools !== 'undefined' && uitools?.toastMessage?.show) {
-			uitools.toastMessage.show(text, options);
+			uitools.toastMessage.show(text, opts);
 			return;
 		}
+		
 		// Fallback to console log
-		console.log('Similar Artists: ' + text);
+		console.log('SimilarArtists: ' + text);
 	} catch (e) {
-		console.error('Similar Artists: showToast error: ' + e.toString());
+		console.error('SimilarArtists: showToast error: ' + e.toString());
 	}
 }
 
@@ -39,42 +45,50 @@ function showToast(text, options = {}) {
  */
 function updateProgress(message, value) {
 	if (globalProgressTask) {
-		globalProgressTask.text = message;
-		if (value !== undefined) {
-			globalProgressTask.value = value;
+		try {
+			globalProgressTask.text = message;
+			if (value !== undefined && typeof value === 'number') {
+				globalProgressTask.value = Math.max(0, Math.min(1, value));
+			}
+		} catch (e) {
+			console.error('SimilarArtists: updateProgress error: ' + e.toString());
 		}
 	}
 }
 
 /**
  * Create and initialize a progress task for display during operations.
+ * Uses MM5's app.backgroundTasks API.
  * @param {string} leadingText Initial text to display.
- * @returns {object|null} Progress task object, or null if not available.
+ * @returns {string|null} Task ID for reference, or null if not available.
  */
 function createProgressTask(leadingText) {
 	try {
-		if (app.backgroundTasks?.createNew) {
+		if (typeof app !== 'undefined' && app.backgroundTasks?.createNew) {
 			const progressTask = app.backgroundTasks.createNew();
-			progressTask.leadingText = leadingText;
+			progressTask.leadingText = leadingText || 'SimilarArtists';
+			progressTask.text = 'Starting...';
+			progressTask.value = 0;
 			globalProgressTask = progressTask;
-			console.log('Similar Artists: Progress task created');
-			return progressTask;
+			console.log('SimilarArtists: Progress task created');
+			return progressTask.id || 'active';
 		}
 	} catch (e) {
-		console.error('Similar Artists: createProgressTask error: ' + e.toString());
+		console.error('SimilarArtists: createProgressTask error: ' + e.toString());
 	}
 	return null;
 }
 
 /**
  * Terminate the current progress task.
+ * @param {string} [taskId] Optional task ID (currently unused, kept for API compatibility).
  */
-function terminateProgressTask() {
+function terminateProgressTask(taskId) {
 	if (globalProgressTask) {
 		try {
 			globalProgressTask.terminate();
 		} catch (e) {
-			console.error('Similar Artists: Error terminating progress task: ' + e.toString());
+			console.error('SimilarArtists: Error terminating progress task: ' + e.toString());
 		}
 		globalProgressTask = null;
 	}
@@ -82,12 +96,19 @@ function terminateProgressTask() {
 
 /**
  * Terminate progress task after a delay (to keep it visible briefly).
- * @param {number} delay Milliseconds to wait before terminating.
+ * @param {number} [delay=2000] Milliseconds to wait before terminating.
  */
 function terminateProgressTaskAfterDelay(delay = 2000) {
 	if (globalProgressTask) {
+		const task = globalProgressTask;
 		setTimeout(() => {
-			terminateProgressTask();
+			try {
+				if (task === globalProgressTask) {
+					terminateProgressTask();
+				}
+			} catch (e) {
+				console.error('SimilarArtists: Error in delayed termination: ' + e.toString());
+			}
 		}, delay);
 	}
 }
@@ -109,3 +130,6 @@ window.similarArtistsNotifications = {
 	terminateProgressTaskAfterDelay,
 	getProgressTask,
 };
+
+// Also export updateProgress globally for backward compatibility
+window.updateProgress = updateProgress;

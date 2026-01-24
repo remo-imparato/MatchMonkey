@@ -2,12 +2,19 @@
  * SQL Query Building Utilities
  * 
  * Helpers for constructing safe SQL queries with proper escaping and filtering.
+ * MediaMonkey 5 API Only
  */
 
 'use strict';
 
-// Load dependencies from window namespace
-const escapeSql = () => window.similarArtistsHelpers.escapeSql;
+/**
+ * Escape single quotes for SQL queries.
+ * @param {string} str String to escape.
+ * @returns {string} Escaped string (single quotes doubled).
+ */
+function escapeSql(str) {
+	return String(str ?? '').replace(/'/g, "''");
+}
 
 /**
  * Quote a string literal for SQL safely.
@@ -18,7 +25,7 @@ function quoteSqlString(s) {
 	if (s === undefined || s === null) return "''";
 	// Remove control chars that may break SQL/logging
 	const cleaned = String(s).replace(/[\u0000-\u001F]/g, '');
-	return `'${escapeSql()(cleaned)}'`;
+	return `'${escapeSql(cleaned)}'`;
 }
 
 /**
@@ -40,5 +47,9 @@ function getTrackKey(track) {
 window.similarArtistsSQL = {
 	quoteSqlString,
 	getTrackKey,
-	escapeSql: escapeSql(),
+	escapeSql,
 };
+
+// Also export escapeSql and quoteSqlString globally for backward compatibility
+window.escapeSql = escapeSql;
+window.quoteSqlString = quoteSqlString;

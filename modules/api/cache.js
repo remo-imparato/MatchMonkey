@@ -3,6 +3,8 @@
  * 
  * Per-run caches for Last.fm queries (cleared on each runSimilarArtists invocation).
  * Reduces redundant API calls within a single operation.
+ * 
+ * MediaMonkey 5 API Only
  */
 
 'use strict';
@@ -15,13 +17,33 @@
 let lastfmRunCache = null;
 
 /**
+ * Get a normalized cache key for artist names.
+ * @param {string} name Artist name.
+ * @returns {string} Normalized cache key (uppercase, trimmed).
+ */
+function cacheKeyArtist(name) {
+	return String(name || '').trim().toUpperCase();
+}
+
+/**
+ * Get a cache key for top tracks (includes artist, limit, and playcount flag).
+ * @param {string} artistName Artist name.
+ * @param {number} limit Track limit.
+ * @param {boolean} withPlaycount Whether playcount is included.
+ * @returns {string} Cache key.
+ */
+function cacheKeyTopTracks(artistName, limit, withPlaycount = false) {
+	return `${cacheKeyArtist(artistName)}|${Number(limit) || ''}|pc:${withPlaycount ? 1 : 0}`;
+}
+
+/**
  * Initialize the Last.fm per-run cache.
  * Call at the start of each runSimilarArtists operation.
  */
 function initLastfmRunCache() {
 	lastfmRunCache = {
-		similarArtists: new Map(), // key: normalized artist name -> artists[]
-		topTracks: new Map(), // key: normalized artist name + '|' + limit -> titles[]
+		similarArtists: new Map(),
+		topTracks: new Map(),
 	};
 }
 
@@ -39,11 +61,11 @@ function clearLastfmRunCache() {
  * @returns {object[]|null} Cached artists array, or null if not cached.
  */
 function getCachedSimilarArtists(artistName) {
-	const cacheKey = window.cacheKeyArtist(artistName);
-	if (lastfmRunCache?.similarArtists?.has(cacheKey)) {
-		return lastfmRunCache.similarArtists.get(cacheKey) || [];
-	}
-	return null;
+	if (!lastfmRunCache?.similarArtists) return null;
+	const key = cacheKeyArtist(artistName);
+	return lastfmRunCache.similarArtists.has(key) 
+		? lastfmRunCache.similarArtists.get(key) 
+		: null;
 }
 
 /**
@@ -52,10 +74,9 @@ function getCachedSimilarArtists(artistName) {
  * @param {object[]} artists Array of similar artist objects.
  */
 function cacheSimilarArtists(artistName, artists) {
-	const cacheKey = window.cacheKeyArtist(artistName);
-	if (lastfmRunCache?.similarArtists) {
-		lastfmRunCache.similarArtists.set(cacheKey, artists || []);
-	}
+	if (!lastfmRunCache?.similarArtists) return;
+	const key = cacheKeyArtist(artistName);
+	lastfmRunCache.similarArtists.set(key, artists || []);
 }
 
 /**
@@ -66,11 +87,11 @@ function cacheSimilarArtists(artistName, artists) {
  * @returns {(string|object)[]|null} Cached tracks array, or null if not cached.
  */
 function getCachedTopTracks(artistName, limit, withPlaycount = false) {
-	const cacheKey = window.cacheKeyTopTracks(artistName, limit, withPlaycount);
-	if (lastfmRunCache?.topTracks?.has(cacheKey)) {
-		return lastfmRunCache.topTracks.get(cacheKey) || [];
-	}
-	return null;
+	if (!lastfmRunCache?.topTracks) return null;
+	const key = cacheKeyTopTracks(artistName, limit, withPlaycount);
+	return lastfmRunCache.topTracks.has(key) 
+		? lastfmRunCache.topTracks.get(key) 
+		: null;
 }
 
 /**
@@ -81,10 +102,9 @@ function getCachedTopTracks(artistName, limit, withPlaycount = false) {
  * @param {(string|object)[]} tracks Array of track titles or objects.
  */
 function cacheTopTracks(artistName, limit, withPlaycount, tracks) {
-	const cacheKey = window.cacheKeyTopTracks(artistName, limit, withPlaycount);
-	if (lastfmRunCache?.topTracks) {
-		lastfmRunCache.topTracks.set(cacheKey, tracks || []);
-	}
+	if (!lastfmRunCache?.topTracks) return;
+	const key = cacheKeyTopTracks(artistName, limit, withPlaycount);
+	lastfmRunCache.topTracks.set(key, tracks || []);
 }
 
 /**
@@ -99,9 +119,13 @@ function isCacheActive() {
 window.lastfmCache = {
 	init: initLastfmRunCache,
 	clear: clearLastfmRunCache,
-	getCachedSimilarArtists: getCachedSimilarArtists,
-	cacheSimilarArtists: cacheSimilarArtists,
-	getCachedTopTracks: getCachedTopTracks,
-	cacheTopTracks: cacheTopTracks,
-	isActive: isCacheActive
+	getCachedSimilarArtists,
+	cacheSimilarArtists,
+	getCachedTopTracks,
+	cacheTopTracks,
+	isActive: isCacheActive,
 };
+
+// Also export cache key functions globally for other modules
+window.cacheKeyArtist = cacheKeyArtist;
+window.cacheKeyTopTracks = cacheKeyTopTracks;

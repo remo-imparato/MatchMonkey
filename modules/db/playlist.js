@@ -3,9 +3,10 @@
  *
  * Handles MediaMonkey playlist operations including creation, retrieval,
  * and population with tracks from the library.
+ * 
+ * MediaMonkey 5 API Only
  *
  * @module modules/db/playlist
- * @requires ../ui/notifications - Progress and toast notifications
  */
 
 'use strict';
@@ -14,31 +15,13 @@
  * Create a new playlist in MediaMonkey.
  *
  * Creates a new user playlist with the specified name. The playlist
- * will be added to the user's playlist collection and made available
- * for track operations.
+ * will be added to the user's playlist collection.
  *
  * @async
  * @function createPlaylist
  * @param {string} playlistName - Name for the new playlist
- * @param {boolean} [autoOverwrite=false] - If true, overwrites existing playlist with same name
- * @returns {Promise<object|null>} Playlist object with methods:
- *   - add(track) - Add a track to the playlist
- *   - addTracklist(tracklist) - Add multiple tracks
- *   - commitAsync() - Save changes to database
- *   Or null if creation failed
- *
- * @example
- * // Create a new playlist
- * const playlist = await createPlaylist('Similar Artists - Pink Floyd');
- * if (playlist) {
- *   // Add tracks to the playlist
- *   playlist.add(trackObject);
- *   await playlist.commitAsync();
- * }
- *
- * @example
- * // Create or overwrite existing playlist
- * const playlist = await createPlaylist('My Favorites', true);
+ * @param {boolean} [autoOverwrite=false] - If true, removes existing playlist with same name first
+ * @returns {Promise<object|null>} Playlist object or null if creation failed
  */
 async function createPlaylist(playlistName, autoOverwrite = false) {
 	try {
@@ -49,19 +32,23 @@ async function createPlaylist(playlistName, autoOverwrite = false) {
 
 		const name = String(playlistName).trim();
 
-		// Get root playlists collection
+		// Validate MM5 environment
 		if (typeof app === 'undefined' || !app.playlists) {
-			console.error('createPlaylist: app.playlists not available');
+			console.error('createPlaylist: MM5 app.playlists not available');
 			return null;
 		}
 
-		// Check for existing playlist with the same name
+		// Remove existing playlist if overwrite requested
 		if (autoOverwrite) {
 			const existing = findPlaylist(name);
 			if (existing) {
 				console.log(`createPlaylist: Removing existing playlist "${name}"`);
 				try {
-					await existing.removeAsync?.();
+					if (typeof existing.removeAsync === 'function') {
+						await existing.removeAsync();
+					} else if (typeof existing.remove === 'function') {
+						existing.remove();
+					}
 				} catch (e) {
 					console.warn(`createPlaylist: Could not remove existing playlist: ${e.toString()}`);
 				}
@@ -81,7 +68,6 @@ async function createPlaylist(playlistName, autoOverwrite = false) {
 		await newPlaylist.commitAsync();
 
 		console.log(`createPlaylist: Created playlist "${name}"`);
-		window.updateProgress(`Created playlist "${name}"`);
 
 		return newPlaylist;
 	} catch (e) {
@@ -94,18 +80,11 @@ async function createPlaylist(playlistName, autoOverwrite = false) {
  * Find an existing playlist by name in MediaMonkey.
  *
  * Searches the user's playlist collection for a playlist matching
- * the specified name (case-sensitive).
+ * the specified name (case-insensitive).
  *
  * @function findPlaylist
  * @param {string} playlistName - Name of playlist to find
  * @returns {object|null} Playlist object if found, null otherwise
- *
- * @example
- * // Find existing playlist
- * const playlist = findPlaylist('My Favorites');
- * if (playlist) {
- *   console.log('Found playlist:', playlist.title);
- * }
  */
 function findPlaylist(playlistName) {
 	try {
@@ -114,24 +93,29 @@ function findPlaylist(playlistName) {
 		}
 
 		if (typeof app === 'undefined' || !app.playlists) {
-			console.warn('findPlaylist: app.playlists not available');
+			console.warn('findPlaylist: MM5 app.playlists not available');
 			return null;
 		}
 
-		const targetName = String(playlistName).trim();
+		const targetName = String(playlistName).trim().toLowerCase();
 
 		// Recursive search through playlist hierarchy
 		function searchNode(node) {
 			if (!node) return null;
 
-			// Check if this node is the target playlist
-			if (node.title === targetName) {
+			// Check if this node is the target playlist (case-insensitive)
+			if (node.title && node.title.toLowerCase() === targetName) {
 				return node;
 			}
 
 			// Search in child playlists if available
-			if (node.childNodes && Array.isArray(node.childNodes)) {
-				for (const child of node.childNodes) {
+			if (node.childNodes) {
+				// childNodes may be array or list-like
+				const children = Array.isArray(node.childNodes) 
+					? node.childNodes 
+					: (node.childNodes.length ? Array.from(node.childNodes) : []);
+				
+				for (const child of children) {
 					const found = searchNode(child);
 					if (found) return found;
 				}
@@ -159,17 +143,12 @@ function findPlaylist(playlistName) {
  * Get or create a playlist, preferring to find existing if available.
  *
  * Attempts to find an existing playlist by name. If not found, creates
- * a new one. Useful for operations that want to reuse existing playlists
- * when possible.
+ * a new one.
  *
  * @async
  * @function getOrCreatePlaylist
  * @param {string} playlistName - Name of the playlist
  * @returns {Promise<object|null>} Playlist object or null on failure
- *
- * @example
- * // Get or create "My Artists" playlist
- * const playlist = await getOrCreatePlaylist('My Artists');
  */
 async function getOrCreatePlaylist(playlistName) {
 	try {

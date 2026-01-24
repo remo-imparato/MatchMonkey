@@ -4,6 +4,8 @@
  * Registers actions and menu items with MediaMonkey 5 following MM5 standards.
  * This file is loaded by MM5's action system at startup.
  * 
+ * MediaMonkey 5 API Only
+ * 
  * Actions registered:
  * - SimilarArtistsRun: Main "Similar Artists" command
  * - SimilarArtistsToggleAuto: Toggle auto-queue mode on/off
@@ -11,6 +13,8 @@
  * @author Remo Imparato
  * @license MIT
  */
+
+'use strict';
 
 // ============================================================================
 // ACTION DEFINITIONS
@@ -34,7 +38,11 @@ window.actions.SimilarArtistsRun = {
 	disabled: false,
 	execute: function() {
 		// Call the main entry point with autoMode=false (manual invocation)
-		window.SimilarArtists?.runSimilarArtists(false);
+		if (window.SimilarArtists?.runSimilarArtists) {
+			window.SimilarArtists.runSimilarArtists(false);
+		} else {
+			console.error('SimilarArtists: Add-on not loaded');
+		}
 	}
 };
 
@@ -60,9 +68,9 @@ window.actions.SimilarArtistsToggleAuto = {
 	disabled: false,
 	
 	/**
-	 * Dynamic checked state - reads from settings
+	 * Dynamic checked state - reads from SimilarArtists module
 	 */
-	checked: function () {
+	checked: function() {
 		try {
 			return Boolean(window.SimilarArtists?.isAutoEnabled?.());
 		} catch (e) {
@@ -73,8 +81,12 @@ window.actions.SimilarArtistsToggleAuto = {
 	/**
 	 * Toggle the auto-mode on/off
 	 */
-	execute: function () {
-		window.SimilarArtists?.toggleAuto();
+	execute: function() {
+		if (window.SimilarArtists?.toggleAuto) {
+			window.SimilarArtists.toggleAuto();
+		} else {
+			console.error('SimilarArtists: Add-on not loaded');
+		}
 	}
 };
 

@@ -5,6 +5,8 @@
  * artist names and track titles. Supports both single and batch lookups
  * with configurable filtering options.
  *
+ * MediaMonkey 5 API Only - No MM4 fallbacks
+ *
  * @module modules/db/library
  * @requires ../utils/sql       - SQL query building utilities
  * @requires ../utils/helpers   - General helper functions
@@ -29,71 +31,46 @@
  * @param {boolean} [options.rank=true] - Include ranking in results
  * @param {boolean} [options.best=false] - Only include highly-rated tracks
  * @param {number} [options.minRating=0] - Minimum rating threshold (0-100)
- * @returns {Promise<object[]>} Array of matching track objects with fields:
- *   - id: unique track identifier
- *   - title: track title
- *   - artist: artist name
- *   - album: album name
- *   - path: file path
- *   - playCount: number of times played
- *
- * @example
- * // Find any tracks by Pink Floyd
- * const tracks = await findLibraryTracks('Pink Floyd', null, 20);
- *
- * @example
- * // Find specific Pink Floyd tracks
- * const tracks = await findLibraryTracks(
- *   'Pink Floyd',
- *   ['Time', 'Money', 'Us and Them'],
- *   10
- * );
- *
- * @example
- * // Find high-rated The Beatles tracks
- * const tracks = await findLibraryTracks(
- *   'The Beatles',
- *   null,
- *   50,
- *   { best: true, minRating: 80 }
- * );
+ * @returns {Promise<object[]>} Array of matching track objects
  */
 async function findLibraryTracks(artistName, trackTitles, limit = 100, options = {}) {
 	try {
 		const { rank = true, best = false, minRating = 0 } = options;
 
-		const normalizedArtist = window.fixPrefixes(artistName);
+		// Validate MM5 environment
+		if (typeof app === 'undefined' || !app.db || !app.db.getTracklist) {
+			console.warn('findLibraryTracks: MM5 app.db.getTracklist not available');
+			return [];
+		}
+
+		const normalizedArtist = window.similarArtistsPrefixes?.fixPrefixes?.(artistName) || artistName;
 		if (!normalizedArtist) {
 			console.warn('findLibraryTracks: Invalid artist name');
 			return [];
 		}
 
-		// IMPORTANT: Do NOT default to 80 when best is enabled.
-		// Always use the configured rating setting (passed in as minRating).
 		const ratingThreshold = Number(minRating) || 0;
 
-		// Use the same artist join strategy as the working monolithic implementation.
-		// NOTE: MM5 schema uses Songs.ID, Songs.SongTitle, Songs.Rating (not SongID/SongRating/SongArtist).
-		const quote = (s) => window.quoteSqlString(String(s ?? ''));
-		const escape = (s) => window.escapeSql(String(s ?? ''));
+		// SQL escaping helpers
+		const escapeSql = (s) => String(s ?? '').replace(/'/g, "''");
+		const quote = (s) => `'${escapeSql(s)}'`;
 
+		// Build artist matching clause with prefix variations
 		const artistClause = (() => {
 			const artistConds = [];
 			const add = (name) => {
 				const n = String(name || '').trim();
 				if (!n) return;
-				artistConds.push(`Artists.Artist = ${quote(escape(n))}`);
+				artistConds.push(`Artists.Artist = ${quote(n)}`);
 			};
 
 			add(normalizedArtist);
 
-			// prefix variations
+			// Add prefix variations
 			try {
-				const prefixes = window.similarArtistsPrefixes?.getIgnorePrefixes
-					? window.similarArtistsPrefixes.getIgnorePrefixes()
-					: (window.getIgnorePrefixes ? window.getIgnorePrefixes() : []);
+				const prefixes = window.similarArtistsPrefixes?.getIgnorePrefixes?.() || [];
 				const nameLower = normalizedArtist.toLowerCase();
-				for (const prefix of prefixes || []) {
+				for (const prefix of prefixes) {
 					const p = String(prefix || '').trim();
 					if (!p) continue;
 
@@ -105,90 +82,72 @@ async function findLibraryTracks(artistName, trackTitles, limit = 100, options =
 						add(`${p} ${normalizedArtist}`);
 					}
 				}
-			} catch (_) {
-				// ignore
-			}
+			} catch (_) { /* ignore prefix errors */ }
 
 			return artistConds.length ? `(${artistConds.join(' OR ')})` : '';
 		})();
 
+		// Build title matching clause
 		const titleClause = (() => {
 			if (!trackTitles) return '';
 			const titles = Array.isArray(trackTitles) ? trackTitles : [trackTitles];
 			const nonEmpty = titles.map(t => String(t || '').trim()).filter(Boolean);
 			if (!nonEmpty.length) return '';
-			const conds = nonEmpty.map(t => `UPPER(Songs.SongTitle) LIKE '%${escape(t.toUpperCase())}%'`);
+			const conds = nonEmpty.map(t => `UPPER(Songs.SongTitle) LIKE '%${escapeSql(t.toUpperCase())}%'`);
 			return `(${conds.join(' OR ')})`;
 		})();
 
+		// Build WHERE clause
 		const where = [];
 		if (artistClause) where.push(artistClause);
 		if (titleClause) where.push(titleClause);
 		if (ratingThreshold > 0) where.push(`(Songs.Rating >= ${Number(ratingThreshold)})`);
 
-		const orderClause = rank
-			? (best ? 'ORDER BY Songs.Rating DESC, Random()' : 'ORDER BY Random()')
-			: (best ? 'ORDER BY Songs.Rating DESC, Random()' : 'ORDER BY Random()');
+		const orderClause = best ? 'ORDER BY Songs.Rating DESC, Random()' : 'ORDER BY Random()';
 
 		const query = `
 			SELECT Songs.*
 			FROM Songs
-			INNER JOIN ArtistsSongs 
-				on Songs.ID = ArtistsSongs.IDSong 
-				AND ArtistsSongs.PersonType = 1
-			INNER JOIN Artists 
-				on ArtistsSongs.IDArtist = Artists.ID
+			INNER JOIN ArtistsSongs ON Songs.ID = ArtistsSongs.IDSong AND ArtistsSongs.PersonType = 1
+			INNER JOIN Artists ON ArtistsSongs.IDArtist = Artists.ID
 			${where.length ? 'WHERE ' + where.join(' AND ') : ''}
 			${orderClause}
 			LIMIT ${Math.max(1, Math.min(limit, 10000))}
 		`;
 
-		if (typeof app !== 'undefined' && app.db && app.db.getTracklist) {
-			const tracklist = app.db.getTracklist(query, -1);
-			if (!tracklist) return [];
+		// Execute query via MM5 API
+		const tracklist = app.db.getTracklist(query, -1);
+		if (!tracklist) return [];
 
-			tracklist.autoUpdateDisabled = true;
-			tracklist.dontNotify = true;
+		tracklist.autoUpdateDisabled = true;
+		tracklist.dontNotify = true;
 
-			await tracklist.whenLoaded();
+		await tracklist.whenLoaded();
 
-			const results = [];
-			// Preferred: locked + getFastObject (fast + explicit lock)
-			if (typeof tracklist.locked === 'function') {
-				tracklist.locked(() => {
-					let tmp;
-					for (let i = 0; i < (tracklist.count || 0); i++) {
-						tmp = tracklist.getFastObject ? tracklist.getFastObject(i, tmp) : null;
-						if (tmp) {
-							results.push(tmp);
-						}
-					}
-				});
-			} else if (typeof tracklist.forEach === 'function') {
-				// Fallback like aa_orig_SimilarArtist.js: forEach acquires read lock internally
-				tracklist.forEach((t) => {
-					if (t) {
-						results.push(t);
-					}
-				});
-			} else {
-				console.warn('findLibraryTracks: Tracklist cannot be iterated safely (no locked()/forEach()).');
-			}
-
-			tracklist.autoUpdateDisabled = false;
-			tracklist.dontNotify = false;
-
-			// Log a single summary of matched tracks
-			if (results.length > 0) {
-				const summary = results.map(r => `${r.ID || r.id || ''}:${(r.SongTitle || r.title || '').replace(/"/g, "'")} by ${(r.Artist || r.artist || '').replace(/"/g, "'")}`).join(' ; ');
-				console.log(`findLibraryTracks: matched ${results.length} local track(s): ${summary}`);
-			}
-
-			return results;
+		// Extract results using locked() for thread-safe access (MM5 best practice)
+		const results = [];
+		if (typeof tracklist.locked === 'function') {
+			tracklist.locked(() => {
+				let tmp;
+				const count = tracklist.count || 0;
+				for (let i = 0; i < count; i++) {
+					tmp = tracklist.getFastObject(i, tmp);
+					if (tmp) results.push(tmp);
+				}
+			});
 		}
 
-		console.warn('findLibraryTracks: app.db.getTracklist not available, returning empty');
-		return [];
+		tracklist.autoUpdateDisabled = false;
+		tracklist.dontNotify = false;
+
+		if (results.length > 0) {
+			const summary = results.slice(0, 5).map(r => 
+				`"${r.SongTitle || r.title || ''}" by ${r.Artist || r.artist || ''}`
+			).join(', ');
+			console.log(`findLibraryTracks: Found ${results.length} track(s) for "${artistName}": ${summary}${results.length > 5 ? '...' : ''}`);
+		}
+
+		return results;
 	} catch (e) {
 		console.error('findLibraryTracks error: ' + e.toString());
 		return [];
@@ -208,18 +167,6 @@ async function findLibraryTracks(artistName, trackTitles, limit = 100, options =
  * @param {number} [limit=100] - Max tracks per title
  * @param {object} [options={}] - Query options (same as findLibraryTracks)
  * @returns {Promise<Map<string, object[]>>} Map of title -> matched tracks
- *
- * @example
- * // Find all tracks across multiple titles efficiently
- * const titleMap = await findLibraryTracksBatch(
- *   'Pink Floyd',
- *   ['Time', 'Money', 'Us and Them'],
- *   5
- * );
- *
- * // Access results by title
- * const timeMatches = titleMap.get('Time');
- * const moneyMatches = titleMap.get('Money');
  */
 async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, options = {}) {
 	const resultMap = new Map();
@@ -228,27 +175,33 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 		return resultMap;
 	}
 
+	// Initialize result map with empty arrays for each title
 	for (const title of trackTitles) {
 		resultMap.set(title, []);
 	}
 
 	try {
-		const normalizedArtist = window.fixPrefixes(artistName);
+		// Validate MM5 environment
+		if (typeof app === 'undefined' || !app.db || !app.db.getTracklist) {
+			console.warn('findLibraryTracksBatch: MM5 app.db.getTracklist not available');
+			return resultMap;
+		}
+
+		const normalizedArtist = window.similarArtistsPrefixes?.fixPrefixes?.(artistName) || artistName;
 		if (!normalizedArtist) {
 			console.warn('findLibraryTracksBatch: Invalid artist name');
 			return resultMap;
 		}
 
 		const { best = false, minRating = 0, allowUnknown = false } = options;
-
-		// IMPORTANT: Do NOT default to 80 when best is enabled.
-		// Always use the configured rating setting (passed in as minRating).
 		const ratingThreshold = Number(minRating) || 0;
 
-		const quote = (s) => window.quoteSqlString(String(s ?? ''));
-		const escape = (s) => window.escapeSql(String(s ?? ''));
+		// SQL escaping helpers
+		const escapeSql = (s) => String(s ?? '').replace(/'/g, "''");
+		const quote = (s) => `'${escapeSql(s)}'`;
 
-		// Prepare requested titles and a normalized variant for fuzzy matching.
+		// Prepare requested titles with normalized variants for fuzzy matching
+		const stripName = window.stripName || ((s) => s.toUpperCase().replace(/\W/g, ''));
 		const wanted = trackTitles
 			.map((t, idx) => {
 				const raw = String(t || '').trim();
@@ -256,34 +209,33 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 					idx,
 					raw,
 					rawUpper: raw.toUpperCase(),
-					norm: (window.stripName ? window.stripName(raw) : raw.toUpperCase().replace(/\W/g, '')),
+					norm: stripName(raw),
 				};
 			})
 			.filter(r => r.raw.length > 0);
 
 		if (wanted.length === 0) return resultMap;
 
+		// Build VALUES clause for CTE
 		const wantedValuesSql = wanted
-			.map(r => `(${r.idx}, '${escape(r.raw)}', '${escape(r.rawUpper)}', '${escape(r.norm)}')`)
+			.map(r => `(${r.idx}, '${escapeSql(r.raw)}', '${escapeSql(r.rawUpper)}', '${escapeSql(r.norm)}')`)
 			.join(',');
 
-		// Artist matching like original (ArtistsSongs + Artists)
+		// Build artist matching clause with prefix variations
 		const artistClause = (() => {
 			const artistConds = [];
 			const add = (name) => {
 				const n = String(name || '').trim();
 				if (!n) return;
-				artistConds.push(`Artists.Artist = ${quote(escape(n))}`);
+				artistConds.push(`Artists.Artist = ${quote(n)}`);
 			};
 
 			add(normalizedArtist);
 
 			try {
-				const prefixes = window.similarArtistsPrefixes?.getIgnorePrefixes
-					? window.similarArtistsPrefixes.getIgnorePrefixes()
-					: (window.getIgnorePrefixes ? window.getIgnorePrefixes() : []);
+				const prefixes = window.similarArtistsPrefixes?.getIgnorePrefixes?.() || [];
 				const nameLower = normalizedArtist.toLowerCase();
-				for (const prefix of prefixes || []) {
+				for (const prefix of prefixes) {
 					const p = String(prefix || '').trim();
 					if (!p) continue;
 
@@ -295,14 +247,12 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 						add(`${p} ${normalizedArtist}`);
 					}
 				}
-			} catch (_) {
-				// ignore
-			}
+			} catch (_) { /* ignore prefix errors */ }
 
 			return artistConds.length ? `(${artistConds.join(' OR ')})` : '';
 		})();
 
-		// SQL-side normalization expression (aligned with stripName usage)
+		// SQL-side normalization expression (matches stripName logic)
 		const songTitleNormExpr =
 			"REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(" +
 			"REPLACE(REPLACE(REPLACE(REPLACE(" +
@@ -310,15 +260,16 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 			"'&','AND'),'+','AND'),' N ','AND'),'''N''','AND'),' ',''),'.','')," +
 			"',',''),':',''),';',''),'-',''),'_',''),'!',''),'''',''),'\"','')";
 
+		// Build WHERE clause
 		const whereParts = [];
 		if (artistClause) whereParts.push(artistClause);
 		whereParts.push(`(UPPER(Songs.SongTitle) = Wanted.RawUpper OR ${songTitleNormExpr} = Wanted.Norm)`);
 
 		if (ratingThreshold > 0) {
 			if (allowUnknown) {
-				whereParts.push(`(Songs.Rating < 0 OR Songs.Rating >= ${Number(ratingThreshold)})`);
+				whereParts.push(`(Songs.Rating < 0 OR Songs.Rating >= ${ratingThreshold})`);
 			} else {
-				whereParts.push(`(Songs.Rating >= ${Number(ratingThreshold)} AND Songs.Rating <= 100)`);
+				whereParts.push(`(Songs.Rating >= ${ratingThreshold} AND Songs.Rating <= 100)`);
 			}
 		} else if (!allowUnknown) {
 			whereParts.push(`(Songs.Rating >= 0 AND Songs.Rating <= 100)`);
@@ -330,79 +281,66 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 			WITH Wanted(Idx, Raw, RawUpper, Norm) AS (VALUES ${wantedValuesSql})
 			SELECT Songs.*, Wanted.Raw AS RequestedTitle
 			FROM Songs
-			INNER JOIN ArtistsSongs 
-				on Songs.ID = ArtistsSongs.IDSong 
-				AND ArtistsSongs.PersonType = 1
-			INNER JOIN Artists 
-				on ArtistsSongs.IDArtist = Artists.ID
-			INNER JOIN Wanted
-				ON (UPPER(Songs.SongTitle) = Wanted.RawUpper OR ${songTitleNormExpr} = Wanted.Norm)
+			INNER JOIN ArtistsSongs ON Songs.ID = ArtistsSongs.IDSong AND ArtistsSongs.PersonType = 1
+			INNER JOIN Artists ON ArtistsSongs.IDArtist = Artists.ID
+			INNER JOIN Wanted ON (UPPER(Songs.SongTitle) = Wanted.RawUpper OR ${songTitleNormExpr} = Wanted.Norm)
 			WHERE ${whereParts.join(' AND ')}
 			${orderClause}
 			LIMIT ${Math.max(1, Math.min(limit * wanted.length, 10000))}
 		`;
 
-		if (typeof app !== 'undefined' && app.db && app.db.getTracklist) {
-			const tl = app.db.getTracklist(query, -1);
-			if (!tl) return resultMap;
+		// Execute query via MM5 API
+		const tl = app.db.getTracklist(query, -1);
+		if (!tl) return resultMap;
 
-			tl.autoUpdateDisabled = true;
-			tl.dontNotify = true;
+		tl.autoUpdateDisabled = true;
+		tl.dontNotify = true;
 
-			await tl.whenLoaded();
+		await tl.whenLoaded();
 
-			// Iterate safely: prefer locked()+getFastObject, else fall back to forEach (original behavior)
-			if (typeof tl.locked === 'function') {
-				tl.locked(() => {
-					let tmp;
-					for (let i = 0; i < (tl.count || 0); i++) {
-						tmp = tl.getFastObject ? tl.getFastObject(i, tmp) : null;
-						if (!tmp) continue;
+		// Extract results using locked() for thread-safe access (MM5 best practice)
+		if (typeof tl.locked === 'function') {
+			tl.locked(() => {
+				let tmp;
+				const count = tl.count || 0;
+				for (let i = 0; i < count; i++) {
+					tmp = tl.getFastObject(i, tmp);
+					if (!tmp) continue;
 
-						const key = String(tmp.title);
-						if (!resultMap.has(key))
-							continue;
-						const arr = resultMap.get(key);
-						if (arr.length < limit) {
+					// Match track to requested title
+					const trackTitle = tmp.SongTitle || tmp.title || '';
+					
+					// Try exact match first, then fuzzy match
+					for (const [reqTitle, arr] of resultMap.entries()) {
+						if (arr.length >= limit) continue;
+						
+						const reqUpper = reqTitle.toUpperCase();
+						const trackUpper = trackTitle.toUpperCase();
+						const reqNorm = stripName(reqTitle);
+						const trackNorm = stripName(trackTitle);
+						
+						if (trackUpper === reqUpper || trackNorm === reqNorm) {
 							arr.push(tmp);
+							break;
 						}
 					}
-				});
-			} else if (typeof tl.forEach === 'function') {
-				// Fallback like aa_orig_SimilarArtist.js
-				tl.forEach((t) => {
-					if (!t) return;
-
-					const key = String(tmp.title);
-					if (!resultMap.has(key))
-						return;
-					const arr = resultMap.get(key);
-					if (arr.length < limit) {
-						arr.push(t);
-					}
-				});
-			} else {
-				console.warn('findLibraryTracksBatch: Tracklist cannot be iterated safely (no locked()/forEach()).');
-			}
-
-			// Summarize all matches into a single log statement
-			{
-				const allMatches = [];
-				for (const [req, arr] of resultMap.entries()) {
-					for (const t of arr) {
-						allMatches.push(`${(t.SongTitle || t.title || '').replace(/"/g, "'")}`);
-					}
 				}
-				if (allMatches.length > 0) {
-					console.log(`findLibraryTracksBatch: found ${allMatches.length} local match(es): ${allMatches.join(' ; ')}`);
-				}
-			}
-
-			tl.autoUpdateDisabled = false;
-			tl.dontNotify = false;
-
-			return resultMap;
+			});
 		}
+
+		tl.autoUpdateDisabled = false;
+		tl.dontNotify = false;
+
+		// Log summary
+		let totalMatches = 0;
+		for (const arr of resultMap.values()) {
+			totalMatches += arr.length;
+		}
+		if (totalMatches > 0) {
+			console.log(`findLibraryTracksBatch: Found ${totalMatches} match(es) for "${artistName}" across ${wanted.length} title(s)`);
+		}
+
+		return resultMap;
 	} catch (e) {
 		console.error('findLibraryTracksBatch error: ' + e.toString());
 	}

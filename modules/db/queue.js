@@ -5,9 +5,10 @@
  * (the current playback queue) or to custom playlists.
  *
  * Supports both single track and batch operations with progress feedback.
+ * 
+ * MediaMonkey 5 API Only
  *
  * @module modules/db/queue
- * @requires ../ui/notifications - Progress and toast notifications
  */
 
 'use strict';
@@ -16,21 +17,12 @@
  * Add a single track to the Now Playing queue.
  *
  * Appends a track to the end of the current playback queue.
- * The track must be a valid MediaMonkey track object.
  *
  * @async
  * @function queueTrack
  * @param {object} track - Track object to queue
  * @param {boolean} [playNow=false] - If true, start playing immediately
  * @returns {Promise<boolean>} True if successfully queued, false otherwise
- *
- * @example
- * // Add a track to Now Playing
- * const success = await queueTrack(trackObject);
- *
- * @example
- * // Queue and start playing
- * const success = await queueTrack(trackObject, true);
  */
 async function queueTrack(track, playNow = false) {
 	try {
@@ -40,34 +32,22 @@ async function queueTrack(track, playNow = false) {
 		}
 
 		if (typeof app === 'undefined' || !app.player) {
-			console.error('queueTrack: app.player not available');
+			console.error('queueTrack: MM5 app.player not available');
 			return false;
 		}
 
-		const player = app.player;
-		const nowPlayingQueue = player.playlist;
+		// Create a tracklist with single track and use MM5's addTracksAsync
+		const list = app.utils.createTracklist(true);
+		list.add(track);
+		await list.whenLoaded();
 
-		if (!nowPlayingQueue) {
-			console.error('queueTrack: Now Playing queue not available');
-			return false;
-		}
+		await app.player.addTracksAsync(list, {
+			withClear: false,
+			saveHistory: true,
+			startPlayback: playNow,
+		});
 
-		// Add track to queue
-		if (typeof nowPlayingQueue.add === 'function') {
-			nowPlayingQueue.add(track);
-		} else if (typeof nowPlayingQueue.addTrack === 'function') {
-			nowPlayingQueue.addTrack(track);
-		} else {
-			console.error('queueTrack: No add method available on playlist');
-			return false;
-		}
-
-		// Optionally start playback
-		if (playNow && typeof player.play === 'function') {
-			player.play();
-		}
-
-		console.log(`queueTrack: Queued track "${track.title}"`);
+		console.log(`queueTrack: Queued track "${track.title || track.SongTitle}"`);
 		return true;
 	} catch (e) {
 		console.error('queueTrack error: ' + e.toString());
@@ -79,87 +59,51 @@ async function queueTrack(track, playNow = false) {
  * Add multiple tracks to the Now Playing queue in batch.
  *
  * More efficient than calling queueTrack multiple times.
- * Supports showing progress feedback during the operation.
  *
  * @async
  * @function queueTracks
  * @param {object[]} tracks - Array of track objects to queue
  * @param {boolean} [playNow=false] - If true, start playing immediately
- * @param {boolean} [showProgress=false] - If true, update progress bar
+ * @param {boolean} [clearFirst=false] - If true, clear queue before adding
  * @returns {Promise<number>} Number of tracks successfully queued
- *
- * @example
- * // Queue multiple tracks
- * const count = await queueTracks(trackArray);
- * console.log(`Queued ${count} tracks`);
- *
- * @example
- * // Queue with progress feedback
- * const count = await queueTracks(trackArray, false, true);
  */
-async function queueTracks(tracks, playNow = false, showProgress = false) {
+async function queueTracks(tracks, playNow = false, clearFirst = false) {
 	try {
-		if (!Array.isArray(tracks)) {
-			console.error('queueTracks: tracks must be an array');
-			return 0;
-		}
-
-		if (tracks.length === 0) {
+		if (!Array.isArray(tracks) || tracks.length === 0) {
 			return 0;
 		}
 
 		if (typeof app === 'undefined' || !app.player) {
-			console.error('queueTracks: app.player not available');
+			console.error('queueTracks: MM5 app.player not available');
 			return 0;
 		}
 
-		const player = app.player;
-		const nowPlayingQueue = player.playlist;
+		// Create tracklist with all valid tracks
+		const list = app.utils.createTracklist(true);
+		let validCount = 0;
+		
+		for (const track of tracks) {
+			if (track && typeof track === 'object') {
+				list.add(track);
+				validCount++;
+			}
+		}
 
-		if (!nowPlayingQueue) {
-			console.error('queueTracks: Now Playing queue not available');
+		if (validCount === 0) {
 			return 0;
 		}
 
-		let queuedCount = 0;
+		await list.whenLoaded();
 
-		for (let i = 0; i < tracks.length; i++) {
-			const track = tracks[i];
+		// Use MM5's addTracksAsync with batch options
+		await app.player.addTracksAsync(list, {
+			withClear: clearFirst,
+			saveHistory: true,
+			startPlayback: playNow,
+		});
 
-			if (!track || typeof track !== 'object') {
-				console.warn(`queueTracks: Skipping invalid track at index ${i}`);
-				continue;
-			}
-
-			try {
-				if (typeof nowPlayingQueue.add === 'function') {
-					nowPlayingQueue.add(track);
-				} else if (typeof nowPlayingQueue.addTrack === 'function') {
-					nowPlayingQueue.addTrack(track);
-				} else {
-					continue;
-				}
-
-				queuedCount++;
-
-				// Show progress if requested
-				if (showProgress && queuedCount % 10 === 0) {
-					const progress = i / tracks.length;
-					window.updateProgress(`Queued ${queuedCount}/${tracks.length} tracks...`, progress);
-				}
-			} catch (e) {
-				console.warn(`queueTracks: Error queuing track ${i}: ${e.toString()}`);
-				continue;
-			}
-		}
-
-		// Start playback if requested
-		if (playNow && queuedCount > 0 && typeof player.play === 'function') {
-			player.play();
-		}
-
-		console.log(`queueTracks: Queued ${queuedCount}/${tracks.length} tracks`);
-		return queuedCount;
+		console.log(`queueTracks: Queued ${validCount} tracks`);
+		return validCount;
 	} catch (e) {
 		console.error('queueTracks error: ' + e.toString());
 		return 0;
@@ -170,82 +114,65 @@ async function queueTracks(tracks, playNow = false, showProgress = false) {
  * Add tracks to a specific playlist.
  *
  * Appends multiple tracks to the end of a specified playlist.
- * The playlist must be a valid MediaMonkey playlist object.
  *
  * @async
  * @function addTracksToPlaylist
  * @param {object} playlist - Playlist object (from createPlaylist or findPlaylist)
  * @param {object[]} tracks - Array of track objects to add
- * @param {boolean} [showProgress=false] - If true, update progress bar
+ * @param {boolean} [clearFirst=false] - If true, clear playlist before adding
  * @returns {Promise<number>} Number of tracks successfully added
- *
- * @example
- * // Add tracks to a playlist
- * const playlist = await createPlaylist('My Collection');
- * const count = await addTracksToPlaylist(playlist, trackArray);
- * console.log(`Added ${count} tracks to playlist`);
- *
- * @example
- * // Add tracks with progress feedback
- * const count = await addTracksToPlaylist(playlist, trackArray, true);
- * await playlist.commitAsync(); // Save changes
  */
-async function addTracksToPlaylist(playlist, tracks, showProgress = false) {
+async function addTracksToPlaylist(playlist, tracks, clearFirst = false) {
 	try {
 		if (!playlist || typeof playlist !== 'object') {
 			console.error('addTracksToPlaylist: Invalid playlist object');
 			return 0;
 		}
 
-		if (!Array.isArray(tracks)) {
-			console.error('addTracksToPlaylist: tracks must be an array');
+		if (!Array.isArray(tracks) || tracks.length === 0) {
 			return 0;
 		}
 
-		if (tracks.length === 0) {
-			return 0;
+		// Clear playlist if requested
+		if (clearFirst) {
+			try {
+				if (typeof playlist.clear === 'function') {
+					playlist.clear();
+				} else if (typeof playlist.removeAllTracks === 'function') {
+					playlist.removeAllTracks();
+				}
+			} catch (e) {
+				console.warn(`addTracksToPlaylist: Error clearing playlist: ${e.toString()}`);
+			}
 		}
 
 		let addedCount = 0;
 
-		for (let i = 0; i < tracks.length; i++) {
-			const track = tracks[i];
-
+		for (const track of tracks) {
 			if (!track || typeof track !== 'object') {
-				console.warn(`addTracksToPlaylist: Skipping invalid track at index ${i}`);
 				continue;
 			}
 
 			try {
-				// Use add() method if available
+				// Use add() method (MM5 standard)
 				if (typeof playlist.add === 'function') {
 					playlist.add(track);
 					addedCount++;
 				} else if (typeof playlist.addTrack === 'function') {
 					playlist.addTrack(track);
 					addedCount++;
-				} else {
-					console.warn(`addTracksToPlaylist: Playlist has no add method`);
-					continue;
-				}
-
-				// Show progress if requested
-				if (showProgress && addedCount % 10 === 0) {
-					const progress = i / tracks.length;
-					window.updateProgress(`Added ${addedCount}/${tracks.length} tracks to playlist...`, progress);
 				}
 			} catch (e) {
-				console.warn(`addTracksToPlaylist: Error adding track ${i}: ${e.toString()}`);
-				continue;
+				console.warn(`addTracksToPlaylist: Error adding track: ${e.toString()}`);
 			}
 		}
 
 		// Commit changes to database
-		if (typeof playlist.commitAsync === 'function') {
+		if (addedCount > 0 && typeof playlist.commitAsync === 'function') {
 			await playlist.commitAsync();
 		}
 
-		console.log(`addTracksToPlaylist: Added ${addedCount}/${tracks.length} tracks to playlist`);
+		console.log(`addTracksToPlaylist: Added ${addedCount} tracks to playlist`);
 		return addedCount;
 	} catch (e) {
 		console.error('addTracksToPlaylist error: ' + e.toString());
