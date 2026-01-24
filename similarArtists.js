@@ -2,11 +2,14 @@
  * SimilarArtists Add-on for MediaMonkey 5
  * 
  * Complete refactored implementation using modular architecture.
- * All phases (0-7) integrated into single entry point.
+ * Supports three discovery modes:
+ * - Artist-based: Find similar artists (artist.getSimilar API)
+ * - Track-based: Find similar tracks (track.getSimilar API)
+ * - Genre-based: Find artists in same genre (tag.getTopArtists API)
  * 
  * @author Remo Imparato
- * @version 2.0.0
- * @description Generates playlists or queues tracks from similar artists using Last.fm API.
+ * @version 2.1.0
+ * @description Generates playlists or queues tracks from similar artists/tracks/genres using Last.fm API.
  *              Supports automatic mode to queue similar tracks when approaching end of playlist.
  * 
  * @repository https://github.com/remo-imparato/SimilarArtistsMM5
@@ -17,12 +20,9 @@
 	'use strict';	
 	
 	// Wait for all modules to load, then initialize
-	// Using requestAnimationFrame for better timing than setTimeout
-	// This ensures all requirejs calls have completed
 	requestAnimationFrame(function() {
-		// Double-wrap to ensure all modules are fully loaded
 		requestAnimationFrame(function() {
-			// Get modules from window namespace (exported by individual module files)
+			// Get modules from window namespace
 			const modules = {
 				config: globalArg.similarArtistsConfig,
 				utils: {
@@ -63,7 +63,6 @@
 			
 			if (!modules.db || !modules.db.findLibraryTracksBatch) {
 				console.error('SimilarArtists: Failed to load modules - db.findLibraryTracksBatch not found');
-				console.error('SimilarArtists: db object:', modules.db);
 				return;
 			}
 			
@@ -84,66 +83,85 @@
 		};
 
 		// ============================================================================
-		// MAIN ENTRY POINTS (exported to global)
+		// DISCOVERY MODES
+		// ============================================================================
+		
+		/**
+		 * Discovery mode types
+		 * - 'artist': Use artist.getSimilar to find similar artists
+		 * - 'track': Use track.getSimilar to find musically similar tracks
+		 * - 'genre': Use tag.getTopArtists to find artists in same genre
+		 */
+		const DISCOVERY_MODES = {
+			ARTIST: 'artist',
+			TRACK: 'track',
+			GENRE: 'genre'
+		};
+
+		// ============================================================================
+		// MAIN ENTRY POINTS
 		// ============================================================================
 
 		/**
-		 * Run similar artists workflow.
+		 * Run similar discovery workflow.
 		 * 
-		 * Main entry point for the action handler.
-		 * Calls orchestration directly.
+		 * Main entry point for all action handlers.
 		 * 
 		 * @param {boolean} [autoModeFlag=false] - Whether running in auto-mode
+		 * @param {string} [discoveryMode='artist'] - Discovery mode: 'artist', 'track', or 'genre'
 		 * @returns {Promise<object>} Result from orchestration
 		 */
-		async function runSimilarArtists(autoModeFlag = false) {
+		async function runSimilarArtists(autoModeFlag = false, discoveryMode = DISCOVERY_MODES.ARTIST) {
 			try {
-				console.log(`SimilarArtists: Running (autoMode=${autoModeFlag})`);
+				// Validate discovery mode
+				const validModes = Object.values(DISCOVERY_MODES);
+				if (!validModes.includes(discoveryMode)) {
+					console.warn(`SimilarArtists: Invalid discovery mode "${discoveryMode}", defaulting to "artist"`);
+					discoveryMode = DISCOVERY_MODES.ARTIST;
+				}
 				
-				const result = await orchestration.generateSimilarPlaylist(modules, autoModeFlag);
+				console.log(`SimilarArtists: Running (autoMode=${autoModeFlag}, discoveryMode=${discoveryMode})`);
+				
+				const result = await orchestration.generateSimilarPlaylist(modules, autoModeFlag, discoveryMode);
 				
 				if (result.success) {
 					console.log(`SimilarArtists: Success - added ${result.tracksAdded} tracks`);
 				} else {
-					console.error(`SimilarArtists: Failed - ${result.error}`);
+					console.log(`SimilarArtists: Completed with message - ${result.error}`);
 				}
 				
 				return result;
 
 			} catch (e) {
 				console.error(`SimilarArtists: Error in runSimilarArtists: ${e.toString()}`);
-				throw e;
+				// Don't throw - return error result instead
+				return {
+					success: false,
+					error: e.message || String(e),
+					tracksAdded: 0,
+				};
 			}
 		}
 
 		/**
 		 * Toggle auto-mode on/off.
-		 * 
-		 * Called by toggle action handler.
-		 * Updates settings and syncs listener.
 		 */
 		function toggleAuto() {
 			try {
 				console.log('SimilarArtists: Toggling auto-mode');
 
-				// Get handlers
 				const { getSetting, setSetting } = storage;
 				
-				// Read current state from settings (not from autoModeState)
 				const currentState = autoMode.isAutoModeEnabled(getSetting);
 				const newState = !currentState;
 				
-				// Write new state to settings
 				setSetting('OnPlay', newState);
 				console.log(`SimilarArtists: Auto-mode setting changed from ${currentState} to ${newState}`);
 				
-				// Initialize autoModeState if needed
 				if (!appState.autoModeState) {
-					console.log('SimilarArtists: Auto-mode state not initialized, initializing now');
 					initializeAutoMode();
 				}
 				
-				// Sync listener with new setting
 				if (appState.autoModeState) {
 					const handler = createAutoTriggerHandler();
 					autoMode.syncAutoModeListener(
@@ -154,10 +172,8 @@
 					);
 				}
 				
-				// Update UI
 				updateAutoModeUI(newState);
 				
-				// Notify action state changed to update checkmark
 				if (typeof window.updateActionState === 'function') {
 					window.updateActionState('SimilarArtistsToggleAuto');
 				}
@@ -171,15 +187,12 @@
 
 		/**
 		 * Check if auto-mode is enabled.
-		 * 
-		 * @returns {boolean} True if auto-mode enabled
 		 */
 		function isAutoEnabled() {
 			try {
 				const { getSetting } = storage;
 				return autoMode.isAutoModeEnabled(getSetting);
 			} catch (e) {
-				console.error(`SimilarArtists: Error checking auto-enabled: ${e.toString()}`);
 				return false;
 			}
 		}
@@ -188,16 +201,8 @@
 		// AUTO-MODE SETUP
 		// ============================================================================
 
-		// Cache a single trigger handler for the lifetime of the add-on instance.
 		let cachedAutoTriggerHandler = null;
 
-		/**
-		 * Create auto-trigger handler.
-		 * 
-		 * This is the callback invoked when playback near end.
-		 * 
-		 * @returns {Function} Handler function
-		 */
 		function createAutoTriggerHandler() {
 			if (cachedAutoTriggerHandler) return cachedAutoTriggerHandler;
 
@@ -206,25 +211,24 @@
 
 			cachedAutoTriggerHandler = autoMode.createAutoTriggerHandler({
 				getSetting,
-				generateSimilarPlaylist: (autoModeFlag) => orchestration.generateSimilarPlaylist(modules, autoModeFlag),
+				// AUTO-MODE USES TRACK-BASED DISCOVERY for seamless playlist continuation
+				// This finds tracks similar to the currently playing track, maintaining the mood
+				generateSimilarPlaylist: (autoModeFlag) => {
+					console.log('SimilarArtists Auto-Mode: Using Similar Tracks discovery for seamless continuation');
+					return orchestration.generateSimilarPlaylist(modules, autoModeFlag, DISCOVERY_MODES.TRACK);
+				},
 				showToast,
-				// Handler itself can re-check current setting at trigger-time
 				isAutoModeEnabled: () => autoMode.isAutoModeEnabled(getSetting),
-				threshold: 2, //-- number to tracks left to trigger auto-mode
+				threshold: 2,
 				logger: console.log,
 			});
 
 			return cachedAutoTriggerHandler;
 		}
 
-		/**
-		 * Initialize auto-mode listener.
-		 * 
-		 * Sets up playback event listener if enabled.
-		 */
 		function initializeAutoMode() {
 			try {
-				console.log('SimilarArtists: Initializing auto-mode');
+				console.log('SimilarArtists: Initializing auto-mode (using Similar Tracks discovery)');
 
 				const { getSetting } = storage;
 				const handler = createAutoTriggerHandler();
@@ -242,22 +246,12 @@
 			}
 		}
 
-		/**
-		 * Shutdown auto-mode listener.
-		 * 
-		 * Detaches playback event listener.
-		 */
 		function shutdownAutoMode() {
 			try {
-				console.log('SimilarArtists: Shutting down auto-mode');
-
 				if (appState.autoModeState) {
 					autoMode.shutdownAutoMode(appState.autoModeState, console.log);
 					appState.autoModeState = null;
 				}
-
-				console.log('SimilarArtists: Auto-mode shutdown complete');
-
 			} catch (e) {
 				console.error(`SimilarArtists: Error shutting down auto-mode: ${e.toString()}`);
 			}
@@ -267,53 +261,31 @@
 		// MM5 UI INTEGRATION
 		// ============================================================================
 
-		/**
-		 * Update auto-mode UI (toolbar icon, menu state, etc).
-		 * 
-		 * Called when auto-mode state changes.
-		 * 
-		 * @param {boolean} enabled - New auto-mode state
-		 */
 		function updateAutoModeUI(enabled) {
 			try {
 				const { mm5Integration: integration } = appState;
 				if (!integration) return;
 
-				// Update toolbar icon
 				const toolbarId = config.TOOLBAR_AUTO_ID || 'SimilarArtistsToggle';
 				mm5Integration.updateToolbarIcon(toolbarId, enabled, console.log);
-
-				// Update action state
 				mm5Integration.updateActionState('SimilarArtistsToggleAuto', console.log);
 				
-				// Fire a global event so other UI components (like settings dialog) can update
 				try {
 					const event = new CustomEvent('similarartists:automodechanged', {
 						detail: { enabled: enabled }
 					});
 					window.dispatchEvent(event);
-				} catch (e) {
-					console.error('Failed to dispatch automode changed event:', e);
-				}
+				} catch (e) { /* ignore */ }
 
 			} catch (e) {
 				console.error(`SimilarArtists: Error updating UI: ${e.toString()}`);
 			}
 		}
 
-		/**
-		 * Handle settings change event.
-		 * 
-		 * Called when user changes settings.
-		 * Syncs auto-mode listener if needed.
-		 */
 		function onSettingsChanged() {
 			try {
-				console.log('SimilarArtists: Settings changed, syncing auto-mode');
-
 				const { getSetting } = storage;
 
-				// Ensure auto-mode state exists before attempting to sync.
 				if (!appState.autoModeState) {
 					initializeAutoMode();
 				}
@@ -328,11 +300,9 @@
 					);
 				}
 
-				// Update UI
 				const enabled = isAutoEnabled();
 				updateAutoModeUI(enabled);
 				
-				// Notify action state to update menu checkmark
 				if (typeof window.updateActionState === 'function') {
 					window.updateActionState('SimilarArtistsToggleAuto');
 				}
@@ -346,12 +316,6 @@
 		// ADD-ON LIFECYCLE
 		// ============================================================================
 
-		/**
-		 * Initialize add-on.
-		 * 
-		 * Called once on application startup.
-		 * Sets up all modules and listeners.
-		 */
 		function start() {
 			if (appState.started) {
 				console.log('SimilarArtists: Already started');
@@ -363,17 +327,12 @@
 			try {
 				console.log('SimilarArtists: Starting add-on...');
 
-				// NOTE: Configuration initialization is now handled by install.js
-				// which runs on first install and upgrades. No need to initialize here.
-
-				// Validate MM5 environment
 				const mmStatus = mm5Integration.checkMM5Availability();
 				if (!mmStatus.available) {
 					console.error(`SimilarArtists: MM5 API not available. Missing: ${mmStatus.missing.join(', ')}`);
 					return;
 				}
 
-				// Initialize MM5 integration
 				appState.mm5Integration = mm5Integration.initializeIntegration({
 					onSettingChanged: onSettingsChanged,
 					isAutoEnabled: isAutoEnabled,
@@ -381,7 +340,6 @@
 					logger: console.log,
 				});
 
-				// Initialize auto-mode
 				initializeAutoMode();
 
 				console.log('SimilarArtists: Add-on started successfully');
@@ -392,27 +350,18 @@
 			}
 		}
 
-		/**
-		 * Shutdown add-on.
-		 * 
-		 * Called on application shutdown.
-		 * Cleans up all listeners and state.
-		 */
 		function shutdown() {
 			try {
 				console.log('SimilarArtists: Shutting down...');
 
-				// Shutdown MM5 integration
 				if (appState.mm5Integration) {
 					mm5Integration.shutdownIntegration(appState.mm5Integration, console.log);
 					appState.mm5Integration = null;
 				}
 
-				// Shutdown auto-mode
 				shutdownAutoMode();
 
-				// Unsubscribe from settings
-				if (appState.settingsUnsubscribe && typeof appState.settingsUnsubscribe === 'function') {
+				if (appState.settingsUnsubscribe) {
 					appState.settingsUnsubscribe();
 					appState.settingsUnsubscribe = null;
 				}
@@ -429,11 +378,6 @@
 		// EXPORT TO GLOBAL
 		// ============================================================================
 
-		/**
-		 * Main SimilarArtists global object.
-		 * 
-		 * Exported to window for access by MM5 and action handlers.
-		 */
 		globalArg.SimilarArtists = {
 			// Core entry points
 			start,
@@ -441,6 +385,9 @@
 			runSimilarArtists,
 			toggleAuto,
 			isAutoEnabled,
+
+			// Discovery modes (for external use)
+			DISCOVERY_MODES,
 
 			// Lifecycle
 			isStarted: () => appState.started,
@@ -451,7 +398,7 @@
 				autoModeEnabled: isAutoEnabled(),
 			}),
 
-			// Module access (for advanced usage)
+			// Module access
 			modules,
 			config,
 			

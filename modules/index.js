@@ -51,6 +51,7 @@ window.similarArtistsModules = {
 	
 	// Core modules
 	core: {
+		discoveryStrategies: window.similarArtistsDiscoveryStrategies,
 		orchestration: window.similarArtistsOrchestration,
 		autoMode: window.similarArtistsAutoMode,
 		mm5Integration: window.similarArtistsMM5Integration,

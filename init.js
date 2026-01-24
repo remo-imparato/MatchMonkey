@@ -7,7 +7,7 @@
  * MediaMonkey 5 API Only
  * 
  * @author Remo Imparato
- * @version 2.0.0
+ * @version 2.1.0
  * @license MIT
  */
 
@@ -50,6 +50,7 @@ localRequirejs('modules/db/queue');
 localRequirejs('modules/db/index');
 	
 // Core orchestration and integration (depend on everything)
+localRequirejs('modules/core/discoveryStrategies'); // NEW: Discovery strategies
 localRequirejs('modules/core/orchestration');
 localRequirejs('modules/core/autoMode');
 localRequirejs('modules/core/mm5Integration');

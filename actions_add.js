@@ -7,7 +7,9 @@
  * MediaMonkey 5 API Only
  * 
  * Actions registered:
- * - SimilarArtistsRun: Main "Similar Artists" command
+ * - SimilarArtistsRun: Find similar artists (artist.getSimilar API)
+ * - SimilarTracksRun: Find similar tracks (track.getSimilar API)
+ * - SimilarGenreRun: Find artists in same genre (tag.getTopArtists API)
  * - SimilarArtistsToggleAuto: Toggle auto-queue mode on/off
  * 
  * @author Remo Imparato
@@ -22,25 +24,52 @@
 
 /**
  * Run Similar Artists action
- * 
- * Generates a playlist or queue of similar artists based on selected/playing track(s).
- * 
- * Accessible via:
- * - Tools menu ? Similar Artists
- * - Right-click context menu on tracks
- * - Toolbar button
- * - Configurable hotkey
  */
-window.actions.SimilarArtistsRun = {
-	title: () => _('&Similar Artists'),
-	icon: 'script',
+actions.SimilarArtistsRun = {
+	title: _('Similar &Artists'),
+	icon: 'artist',
 	hotkeyAble: true,
 	visible: true,
-	disabled: uitools.notMediaListSelected, // Disable when no media is selected
+	disabled: uitools.notMediaListSelected,
 	execute: function() {
-		// Call the main entry point with autoMode=false (manual invocation)
-		if (window.SimilarArtists?.runSimilarArtists) {
-			window.SimilarArtists.runSimilarArtists(false);
+		if (window.SimilarArtists && window.SimilarArtists.runSimilarArtists) {
+			window.SimilarArtists.runSimilarArtists(false, 'artist');
+		} else {
+			console.error('SimilarArtists: Add-on not loaded');
+		}
+	}
+};
+
+/**
+ * Run Similar Tracks action
+ */
+actions.SimilarTracksRun = {
+	title: _('Similar &Tracks'),
+	icon: 'track',
+	hotkeyAble: true,
+	visible: true,
+	disabled: uitools.notMediaListSelected,
+	execute: function() {
+		if (window.SimilarArtists && window.SimilarArtists.runSimilarArtists) {
+			window.SimilarArtists.runSimilarArtists(false, 'track');
+		} else {
+			console.error('SimilarArtists: Add-on not loaded');
+		}
+	}
+};
+
+/**
+ * Run Similar Genre action
+ */
+actions.SimilarGenreRun = {
+	title: _('Similar &Genre'),
+	icon: 'genre',
+	hotkeyAble: true,
+	visible: true,
+	disabled: uitools.notMediaListSelected,
+	execute: function() {
+		if (window.SimilarArtists && window.SimilarArtists.runSimilarArtists) {
+			window.SimilarArtists.runSimilarArtists(false, 'genre');
 		} else {
 			console.error('SimilarArtists: Add-on not loaded');
 		}
@@ -49,41 +78,25 @@ window.actions.SimilarArtistsRun = {
 
 /**
  * Toggle Auto-Mode action
- * 
- * Enables/disables automatic queuing of similar artists when Now Playing
- * reaches the end of the current playlist.
- * 
- * Accessible via:
- * - Tools menu ? Similar Artists: Auto On/Off (checkbox)
- * - Toolbar toggle button
- * - Configurable hotkey
- * 
- * Shows checked state when auto-mode is enabled.
  */
-window.actions.SimilarArtistsToggleAuto = {
-	title: () => _('Similar Artists: &Auto On/Off'),
+actions.SimilarArtistsToggleAuto = {
+	title: _('Similar Artists: &Auto On/Off'),
 	icon: 'script',
 	checkable: true,
 	hotkeyAble: true,
 	visible: true,
 	disabled: false,
 	
-	/**
-	 * Dynamic checked state - reads from SimilarArtists module
-	 */
 	checked: function() {
 		try {
-			return Boolean(window.SimilarArtists?.isAutoEnabled?.());
+			return Boolean(window.SimilarArtists && window.SimilarArtists.isAutoEnabled && window.SimilarArtists.isAutoEnabled());
 		} catch (e) {
 			return false;
 		}
 	},
 	
-	/**
-	 * Toggle the auto-mode on/off
-	 */
 	execute: function() {
-		if (window.SimilarArtists?.toggleAuto) {
+		if (window.SimilarArtists && window.SimilarArtists.toggleAuto) {
 			window.SimilarArtists.toggleAuto();
 		} else {
 			console.error('SimilarArtists: Add-on not loaded');
@@ -92,73 +105,76 @@ window.actions.SimilarArtistsToggleAuto = {
 };
 
 // ============================================================================
-// TOOLS MENU REGISTRATION
+// TOOLS MENU REGISTRATION - Using Submenu
 // ============================================================================
 
-/**
- * Add "Similar Artists" to Tools menu
- * 
- * Order 40 places it after most built-in tools.
- * Group order 10 groups related actions together.
- */
-window._menuItems.tools.action.submenu.push({
-	action: window.actions.SimilarArtistsRun,
+// Similar Artists submenu for Tools menu
+_menuItems.tools.action.submenu.push({
+	action: {
+		title: _('&Similar...'),
+		icon: 'script',
+		visible: true,
+		submenu: [
+			{ action: actions.SimilarArtistsRun, order: 10 },
+			{ action: actions.SimilarTracksRun, order: 20 },
+			{ action: actions.SimilarGenreRun, order: 30 },
+			{ separator: true, order: 40 },
+			{ action: actions.SimilarArtistsToggleAuto, order: 50 }
+		]
+	},
 	order: 40,
-	grouporder: 10,
-});
-
-/**
- * Add "Similar Artists: Auto On/Off" to Tools menu
- * 
- * Order 50 places it right after the main action.
- * Shows as a checkbox menu item due to checkable:true.
- */
-window._menuItems.tools.action.submenu.push({
-	action: window.actions.SimilarArtistsToggleAuto,
-	order: 50,
-	grouporder: 10,
+	grouporder: 10
 });
 
 // ============================================================================
 // CONTEXT MENU REGISTRATION (Right-click on tracks)
 // ============================================================================
 
-/**
- * Add "Similar Artists" to track context menu
- * 
- * Appears when right-clicking on selected tracks in any tracklist view.
- * Order 100 places it in a good position after standard actions.
- */
-if (window._menuItems.songsSelected) {
-	window._menuItems.songsSelected.action.submenu.push({
-		action: window.actions.SimilarArtistsRun,
+// Define the context submenu action
+var similarContextSubmenu = {
+	title: _('&Similar...'),
+	icon: 'script',
+	visible: true,
+	disabled: uitools.notMediaListSelected,
+	submenu: [
+		{ action: actions.SimilarArtistsRun, order: 10 },
+		{ action: actions.SimilarTracksRun, order: 20 },
+		{ action: actions.SimilarGenreRun, order: 30 }
+	]
+};
+
+// Add to track context menu (songsSelected)
+if (_menuItems.songsSelected && _menuItems.songsSelected.action && _menuItems.songsSelected.action.submenu) {
+	_menuItems.songsSelected.action.submenu.push({
+		action: similarContextSubmenu,
 		order: 100,
-		grouporder: 20,
+		grouporder: 20
 	});
 }
 
-/**
- * Add "Similar Artists" to album context menu
- * 
- * Appears when right-clicking on albums.
- */
-if (window._menuItems.albumsSelected) {
-	window._menuItems.albumsSelected.action.submenu.push({
-		action: window.actions.SimilarArtistsRun,
+// Add to album context menu
+if (_menuItems.albumsSelected && _menuItems.albumsSelected.action && _menuItems.albumsSelected.action.submenu) {
+	_menuItems.albumsSelected.action.submenu.push({
+		action: similarContextSubmenu,
 		order: 100,
-		grouporder: 20,
+		grouporder: 20
 	});
 }
 
-/**
- * Add "Similar Artists" to artist context menu
- * 
- * Appears when right-clicking on artists.
- */
-if (window._menuItems.artistsSelected) {
-	window._menuItems.artistsSelected.action.submenu.push({
-		action: window.actions.SimilarArtistsRun,
+// Add to artist context menu
+if (_menuItems.artistsSelected && _menuItems.artistsSelected.action && _menuItems.artistsSelected.action.submenu) {
+	_menuItems.artistsSelected.action.submenu.push({
+		action: similarContextSubmenu,
 		order: 100,
-		grouporder: 20,
+		grouporder: 20
+	});
+}
+
+// Add to Now Playing context menu
+if (_menuItems.nowplayingSelected && _menuItems.nowplayingSelected.action && _menuItems.nowplayingSelected.action.submenu) {
+	_menuItems.nowplayingSelected.action.submenu.push({
+		action: similarContextSubmenu,
+		order: 100,
+		grouporder: 20
 	});
 }

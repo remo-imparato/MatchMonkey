@@ -119,32 +119,27 @@ async function findLibraryTracks(artistName, trackTitles, limit = 100, options =
 		const tracklist = app.db.getTracklist(query, -1);
 		if (!tracklist) return [];
 
-		tracklist.autoUpdateDisabled = true;
-		tracklist.dontNotify = true;
-
 		await tracklist.whenLoaded();
 
-		// Extract results using locked() for thread-safe access (MM5 best practice)
+		// Return the tracklist directly - MM5 tracklists can be used for adding to playlists
+		// We need to return track objects that can be added to a playlist
 		const results = [];
 		if (typeof tracklist.locked === 'function') {
 			tracklist.locked(() => {
-				let tmp;
 				const count = tracklist.count || 0;
 				for (let i = 0; i < count; i++) {
-					tmp = tracklist.getFastObject(i, tmp);
-					if (tmp) results.push(tmp);
+					// Use getValue to get a persistent track reference
+					const track = tracklist.getValue(i);
+					if (track) results.push(track);
 				}
 			});
 		}
 
-		tracklist.autoUpdateDisabled = false;
-		tracklist.dontNotify = false;
-
 		if (results.length > 0) {
-			const summary = results.slice(0, 5).map(r => 
-				`"${r.SongTitle || r.title || ''}" by ${r.Artist || r.artist || ''}`
+			const summary = results.slice(0, 3).map(r => 
+				`"${r.title || r.SongTitle || ''}" by ${r.artist || r.Artist || ''}`
 			).join(', ');
-			console.log(`findLibraryTracks: Found ${results.length} track(s) for "${artistName}": ${summary}${results.length > 5 ? '...' : ''}`);
+			console.log(`findLibraryTracks: Found ${results.length} track(s) for "${artistName}": ${summary}${results.length > 3 ? '...' : ''}`);
 		}
 
 		return results;
@@ -293,22 +288,20 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 		const tl = app.db.getTracklist(query, -1);
 		if (!tl) return resultMap;
 
-		tl.autoUpdateDisabled = true;
-		tl.dontNotify = true;
-
 		await tl.whenLoaded();
 
 		// Extract results using locked() for thread-safe access (MM5 best practice)
+		// Use getValue() to get persistent track references
 		if (typeof tl.locked === 'function') {
 			tl.locked(() => {
-				let tmp;
 				const count = tl.count || 0;
 				for (let i = 0; i < count; i++) {
-					tmp = tl.getFastObject(i, tmp);
-					if (!tmp) continue;
+					// Use getValue to get a persistent track reference
+					const track = tl.getValue(i);
+					if (!track) continue;
 
 					// Match track to requested title
-					const trackTitle = tmp.SongTitle || tmp.title || '';
+					const trackTitle = track.title || track.SongTitle || '';
 					
 					// Try exact match first, then fuzzy match
 					for (const [reqTitle, arr] of resultMap.entries()) {
@@ -320,16 +313,13 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 						const trackNorm = stripName(trackTitle);
 						
 						if (trackUpper === reqUpper || trackNorm === reqNorm) {
-							arr.push(tmp);
+							arr.push(track);
 							break;
 						}
 					}
 				}
 			});
 		}
-
-		tl.autoUpdateDisabled = false;
-		tl.dontNotify = false;
 
 		// Log summary
 		let totalMatches = 0;
