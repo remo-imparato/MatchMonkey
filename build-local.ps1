@@ -34,7 +34,7 @@ $rootFiles = @(
 	"init.js",
 	"actions_add.js",
 	"matchMonkey.js",
-	"smiley_yellow_128.png",
+	"MatchMonkey.png",
 	"README.md"
 )
 

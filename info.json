@@ -6,6 +6,6 @@
 	"minAppVersion": "5.0.0",
 	"type": "general",
 	"author": "rimparato",
-	"icon": "smiley_yellow_128.png",
+	"icon": "MatchMonkey.png",
 	"updateURL": "https://raw.githubusercontent.com/remo-imparato/SimilarArtistsMM5/updateMatchMonkey/update.json"
 }
