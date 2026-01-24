@@ -290,8 +290,9 @@ async function discoverByGenre(modules, seeds, config) {
 	// Step 2: Get top artists for each tag
 	updateProgress('Finding artists in similar genres...', 0.3);
 
-	const numTags = Math.min(sortedTags.length, 3);
-	const artistsPerTag = Math.ceil((config.tracksPerArtist || 25) / numTags);
+	const numTags = Math.min(sortedTags.length, 10);
+	//const artistsPerTag = Math.ceil((config.tracksPerArtist || 25) / numTags);
+	const artistsPerTag = config.tracksPerArtist;
 
 	for (let i = 0; i < numTags; i++) {
 		const tag = sortedTags[i];

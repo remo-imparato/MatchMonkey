@@ -60,17 +60,17 @@ window.matchMonkeyOrchestration = {
 
 			// Load configuration
 			const config_ = {
-				seedLimit: autoMode ? 2 : intSetting('SeedLimit', 20),
+				seedLimit: autoMode ? 10 : intSetting('SeedLimit', 20),
 				similarLimit: autoMode ? 15 : intSetting('SimilarLimit', 30),
-				tracksPerArtist: autoMode ? 5 : intSetting('TPA', 30),
+				tracksPerArtist: autoMode ? 10 : intSetting('TPA', 30),
 				totalLimit: autoMode ? 10 : intSetting('TPL', 1000),
 				includeSeedArtist: boolSetting('Seed', false),
 				rankEnabled: boolSetting('Rank', true),
 				bestEnabled: boolSetting('Best', true),
-				randomize: !autoMode && boolSetting('Random', true),
+				randomize: autoMode || boolSetting('Random', true),
 				showConfirm: !autoMode && boolSetting('Confirm', false),
 				minRating: intSetting('Rating', 0),
-				allowUnknown: boolSetting('Unknown', true),
+				allowUnknown: autoMode || boolSetting('Unknown', true),
 				autoMode,
 				discoveryMode,
 			};
@@ -97,7 +97,7 @@ window.matchMonkeyOrchestration = {
 			// Step 2: Run discovery strategy
 			const discoveryFn = strategies.getDiscoveryStrategy(discoveryMode);
 			let candidates;
-			
+
 			try {
 				candidates = await discoveryFn(modules, seeds, config_);
 			} catch (discoveryError) {
@@ -126,7 +126,7 @@ window.matchMonkeyOrchestration = {
 			// Step 3: Match candidates to local library
 			updateProgress(`[${modeName}] Searching local library...`, 0.6);
 			let results;
-			
+
 			try {
 				results = await this.matchCandidatesToLibrary(modules, candidates, config_);
 			} catch (matchError) {
@@ -205,7 +205,7 @@ window.matchMonkeyOrchestration = {
 		} catch (e) {
 			console.error('generateSimilarPlaylist error:', e);
 			if (taskId) {
-				try { terminateProgressTask(taskId); } catch (_) {}
+				try { terminateProgressTask(taskId); } catch (_) { }
 			}
 			showToast(`Error: ${formatError(e)}`, 'error');
 			return {
@@ -267,7 +267,7 @@ window.matchMonkeyOrchestration = {
 				}
 
 				if (seeds.length > 0) {
-					console.log(`collectSeedTracks: Using ${seeds.length} selected artist(s)`);
+					console.log(`collectSeedTracks: Using ${seeds.length} selected artist(s): ${seeds.map((a) => a.name).join(', ')}`);
 					return seeds;
 				}
 			} catch (e) {
@@ -307,18 +307,18 @@ window.matchMonkeyOrchestration = {
 		// Helper to add track if not duplicate, or replace with better version
 		const addTrack = (track) => {
 			if (!track) return false;
-			
+
 			// Create key for deduplication: artist + title (ignore album)
 			const trackTitle = (track.SongTitle || track.songTitle || track.title || '').trim().toUpperCase();
 			const trackArtist = (track.Artist || track.artist || '').trim().toUpperCase();
-			
+
 			if (!trackTitle || !trackArtist) return false;
-			
+
 			const key = `${trackArtist}|${trackTitle}`;
-			
+
 			// Check if we already have this track
 			const existing = seenTrackKeys.get(key);
-			
+
 			if (!existing) {
 				// New track - add it
 				seenTrackKeys.set(key, track);
@@ -327,7 +327,7 @@ window.matchMonkeyOrchestration = {
 			} else {
 				// Duplicate - compare quality and replace if better
 				const shouldReplace = isTrackBetter(track, existing);
-				
+
 				if (shouldReplace) {
 					// Replace the existing track with the better version
 					const idx = allTracks.indexOf(existing);
@@ -339,24 +339,24 @@ window.matchMonkeyOrchestration = {
 				return false; // Still a duplicate, but we may have updated it
 			}
 		};
-		
+
 		// Helper function to determine if a track is better than another
 		// Priority: 1) Bitrate, 2) Rating, 3) First found
 		const isTrackBetter = (newTrack, existingTrack) => {
 			// Compare bitrates
 			const newBitrate = Number(newTrack.Bitrate || newTrack.bitrate || 0);
 			const existingBitrate = Number(existingTrack.Bitrate || existingTrack.bitrate || 0);
-			
+
 			if (newBitrate > existingBitrate) return true;
 			if (newBitrate < existingBitrate) return false;
-			
+
 			// Bitrates are equal, compare ratings
 			const newRating = Number(newTrack.Rating || newTrack.rating || -1);
 			const existingRating = Number(existingTrack.Rating || existingTrack.rating || -1);
-			
+
 			if (newRating > existingRating) return true;
 			if (newRating < existingRating) return false;
-			
+
 			// Both bitrate and rating are equal - keep existing
 			return false;
 		};
@@ -396,7 +396,7 @@ window.matchMonkeyOrchestration = {
 						Math.min(config.tracksPerArtist * 2, config.totalLimit * 2), // Get more to account for deduplication
 						queryOptions
 					);
-					
+
 					if (artistTracks && artistTracks.length > 0) {
 						for (const track of artistTracks) {
 							addTrack(track);
@@ -553,7 +553,7 @@ window.matchMonkeyOrchestration = {
 			console.log(`buildResultsPlaylist: Adding ${tracks.length} tracks`);
 
 			let addedCount = 0;
-			
+
 			try {
 				// Create a tracklist from our tracks array
 				const trackList = app.utils.createTracklist(true);
@@ -563,9 +563,9 @@ window.matchMonkeyOrchestration = {
 					}
 				}
 				await trackList.whenLoaded();
-				
+
 				console.log(`buildResultsPlaylist: Created tracklist with ${trackList.count} tracks`);
-				
+
 				// Use MM5's addTracksAsync method
 				if (typeof targetPlaylist.addTracksAsync === 'function') {
 					await targetPlaylist.addTracksAsync(trackList);
@@ -589,7 +589,7 @@ window.matchMonkeyOrchestration = {
 							}
 						}
 					}
-					
+
 					// Commit after adding all tracks
 					if (typeof targetPlaylist.commitAsync === 'function') {
 						await targetPlaylist.commitAsync();
@@ -758,7 +758,7 @@ window.matchMonkeyOrchestration = {
 					showNewPlaylist: false
 				});
 
-				dlg.whenClosed = function() {
+				dlg.whenClosed = function () {
 					if (dlg.modalResult !== 1) {
 						resolve(null);
 						return;
@@ -786,12 +786,12 @@ window.matchMonkeyOrchestration = {
 	 */
 	async findPlaylist(name) {
 		console.log(`findPlaylist: Looking for "${name}"`);
-		
+
 		if (!name) {
 			console.log('findPlaylist: No name provided');
 			return null;
 		}
-		
+
 		if (typeof app === 'undefined' || !app.playlists) {
 			console.log('findPlaylist: app.playlists not available');
 			return null;
@@ -815,10 +815,10 @@ window.matchMonkeyOrchestration = {
 			// Manual search through playlist tree
 			console.log('findPlaylist: Manual search');
 			const targetName = String(name).toLowerCase();
-			
+
 			function searchNode(node) {
 				if (!node) return null;
-				
+
 				// MM5 playlists use .name property, not .title
 				let nodeName = '';
 				try {
@@ -827,11 +827,11 @@ window.matchMonkeyOrchestration = {
 					// Some nodes may not have name property
 					return null;
 				}
-				
+
 				if (typeof nodeName === 'string' && nodeName.toLowerCase() === targetName) {
 					return node;
 				}
-				
+
 				// Search children
 				try {
 					if (node.childNodes) {
@@ -851,7 +851,7 @@ window.matchMonkeyOrchestration = {
 				} catch (childrenError) {
 					// Skip if can't access children
 				}
-				
+
 				return null;
 			}
 
@@ -870,13 +870,13 @@ window.matchMonkeyOrchestration = {
 	 */
 	async createPlaylist(name) {
 		console.log(`createPlaylist: Creating playlist "${name}"`);
-		
+
 		try {
 			if (typeof app === 'undefined') {
 				console.error('createPlaylist: app not available');
 				return null;
 			}
-			
+
 			if (!app.playlists) {
 				console.error('createPlaylist: app.playlists not available');
 				return null;
@@ -901,14 +901,14 @@ window.matchMonkeyOrchestration = {
 				console.error('createPlaylist: newPlaylist() threw:', newError);
 				return null;
 			}
-			
+
 			if (!playlist) {
 				console.error('createPlaylist: newPlaylist() returned null/undefined');
 				return null;
 			}
 
 			console.log('createPlaylist: Got playlist object, setting name');
-			
+
 			// MM5 playlists use .name property, NOT .title
 			try {
 				playlist.name = name;
