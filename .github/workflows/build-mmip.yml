@@ -59,30 +59,42 @@ jobs:
           MIN_APP=$(jq -r '.minAppVersion // "5.0.0"' info.json)
           echo "MM5 Minimum Version: $MIN_APP"
           
-          # Verify required files exist
-          REQUIRED_FILES=(
+          # Verify required files exist (match build-local.ps1)
+          ROOT_FILES=(
             "info.json"
             "init.js"
             "actions_add.js"
             "matchMonkey.js"
-            "modules/index.js"
-            "modules/config.js"
+            "MatchMonkey.png"
+            "README.md"
+          )
+
+          REQUIRED_DIRS=(
+            "modules"
+            "dialogs"
           )
           
           MISSING=0
-          for file in "${REQUIRED_FILES[@]}"; do
+          for file in "${ROOT_FILES[@]}"; do
             if [ ! -f "$file" ]; then
-              echo "ERROR: Required file missing: $file"
+              echo "ERROR: Required root file missing: $file"
+              MISSING=$((MISSING + 1))
+            fi
+          done
+
+          for dir in "${REQUIRED_DIRS[@]}"; do
+            if [ ! -d "$dir" ]; then
+              echo "ERROR: Required directory missing: $dir"
               MISSING=$((MISSING + 1))
             fi
           done
           
           if [ $MISSING -gt 0 ]; then
-            echo "Build failed: $MISSING required files missing"
+            echo "Build failed: $MISSING required files/directories missing"
             exit 1
           fi
           
-          echo "? All required files present"
+          echo "? All required files and directories present"
           echo "? MM5 API compatibility verified"
 
       - name: Generate update.json
@@ -123,13 +135,13 @@ jobs:
           # Create MMIP package from modular structure
           # MMIP files are ZIP archives with .mmip extension
           
-          # Core files
+          # Core files (include same root files as build-local.ps1)
           zip -r -q MatchMonkey-${{ steps.bump_version.outputs.version }}.mmip \
             info.json \
             init.js \
             actions_add.js \
             matchMonkey.js \
-            smiley_yellow_128.png \
+            MatchMonkey.png \
             README.md \
             dialogs/ \
             modules/ \
