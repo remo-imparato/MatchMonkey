@@ -257,7 +257,8 @@ window.matchMonkeyAutoMode = {
 	 * 1. Remaining entries check
 	 * 2. Threshold comparison (2 or fewer remaining)
 	 * 3. Rate limiting check
-	 * 4. Invocation of orchestration (Phase 5)
+	 * 4. Tries multiple discovery strategies if needed
+	 * 5. Invocation of orchestration (Phase 5)
 	 * 
 	 * @param {object} config - Configuration object
 	 * @param {Function} config.getSetting - Settings getter
@@ -352,21 +353,73 @@ window.matchMonkeyAutoMode = {
 				state.lastTriggerTime = now;
 
 				try {
-					log(`Auto-Mode [${modeName}]: Triggering auto-queue (remaining=${remaining})`);
-					showToast(`Queuing ${modeName.toLowerCase()}...`, 'info');
+					// Get the user's configured discovery mode
+					const configuredMode = getSetting('AutoMode', 'track');
+					log(`Auto-Mode [${modeName}]: User configured mode: ${configuredMode}`);
 
-					// Call Phase 5 orchestration with autoMode=true
-					// This applies conservative limits and forces enqueue behavior
-					const result = await generateSimilarPlaylist(true);
-
-					if (result && result.success) {
-						log(`Auto-Mode [${modeName}]: Successfully added ${result.tracksAdded} tracks`);
-						showToast(`Added ${result.tracksAdded} tracks (${modeName})`, 'success');
-					} else {
-						log(`Auto-Mode [${modeName}]: Orchestration failed`);
-						if (result?.error) {
-							showToast(`[${modeName}] Auto-queue failed: ${result.error}`, 'error');
+					// Define all discovery modes to try in order
+					const allModes = ['track', 'artist', 'genre'];
+					
+					// Start with user's preferred mode, then try others
+					const modesToTry = [configuredMode];
+					for (const mode of allModes) {
+						if (mode !== configuredMode) {
+							modesToTry.push(mode);
 						}
+					}
+
+					let totalTracksAdded = 0;
+					let successfulMode = null;
+
+					// Try each mode until we add at least 1 track
+					for (let i = 0; i < modesToTry.length; i++) {
+						const attemptMode = modesToTry[i];
+						const isRetry = i > 0;
+						const attemptModeName = getDiscoveryModeDisplayName(attemptMode);
+
+						if (isRetry) {
+							log(`Auto-Mode: Retry attempt ${i + 1}/${modesToTry.length} with ${attemptModeName}`);
+							showToast(`Retrying with ${attemptModeName.toLowerCase()}...`, 'info');
+						} else {
+							log(`Auto-Mode [${attemptModeName}]: Triggering auto-queue (remaining=${remaining})`);
+							showToast(`Queuing ${attemptModeName.toLowerCase()}...`, 'info');
+						}
+
+						try {
+							// Call Phase 5 orchestration with autoMode=true and specific discovery mode
+							const result = await generateSimilarPlaylist(true, attemptMode);
+
+							if (result && result.success && result.tracksAdded > 0) {
+								totalTracksAdded = result.tracksAdded;
+								successfulMode = attemptModeName;
+								log(`Auto-Mode [${attemptModeName}]: Successfully added ${result.tracksAdded} tracks`);
+								showToast(`Added ${result.tracksAdded} tracks (${attemptModeName})`, 'success');
+								break; // Success - stop trying
+							} else {
+								log(`Auto-Mode [${attemptModeName}]: No tracks added (${result?.error || 'no matches'})`);
+								
+								// If this was the last attempt, show error
+								if (i === modesToTry.length - 1) {
+									log(`Auto-Mode: All discovery modes exhausted, no tracks added`);
+									showToast(`Auto-queue failed: No matching tracks found`, 'warning');
+								}
+							}
+
+						} catch (attemptError) {
+							log(`Auto-Mode [${attemptModeName}]: Attempt failed with error: ${attemptError.toString()}`);
+							
+							// If this was the last attempt, show error
+							if (i === modesToTry.length - 1) {
+								showToast(`Auto-queue error: ${attemptError.message}`, 'error');
+							}
+						}
+					}
+
+					// Log final result
+					if (totalTracksAdded > 0) {
+						log(`Auto-Mode: Completed successfully - ${totalTracksAdded} tracks added via ${successfulMode}`);
+					} else {
+						log(`Auto-Mode: All attempts failed - no tracks were added`);
 					}
 
 				} finally {
@@ -381,6 +434,22 @@ window.matchMonkeyAutoMode = {
 				showToast(`Auto-queue error: ${e.message}`, 'error');
 			}
 		};
+		
+		/**
+		 * Helper to get display name for discovery mode
+		 */
+		function getDiscoveryModeDisplayName(mode) {
+			switch (mode) {
+				case 'track':
+					return 'Similar Tracks';
+				case 'artist':
+					return 'Similar Artists';
+				case 'genre':
+					return 'Similar Genre';
+				default:
+					return 'Similar Tracks';
+			}
+		}
 	},
 
 	/**
