@@ -60,10 +60,10 @@ window.matchMonkeyOrchestration = {
 
 			// Load configuration
 			const config_ = {
-				seedLimit: autoMode ? 10 : intSetting('SeedLimit', 20),
-				similarLimit: autoMode ? 15 : intSetting('SimilarLimit', 30),
-				tracksPerArtist: autoMode ? 10 : intSetting('TPA', 30),
-				totalLimit: autoMode ? 10 : intSetting('TPL', 1000),
+				seedLimit: autoMode ? 13 : intSetting('SeedLimit', 20),
+				similarLimit: autoMode ? 23 : intSetting('SimilarLimit', 30),
+				tracksPerArtist: autoMode ? 14 : intSetting('TPA', 30),
+				totalLimit: autoMode ? 51 : intSetting('TPL', 1000),
 				includeSeedArtist: boolSetting('Seed', false),
 				rankEnabled: boolSetting('Rank', true),
 				bestEnabled: boolSetting('Best', true),
