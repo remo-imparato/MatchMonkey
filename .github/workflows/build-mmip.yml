@@ -141,6 +141,8 @@ jobs:
             actions_add.js \
             matchMonkey.js \
             MatchMonkey.png \
+            license-commercial.txt \
+            license-mit.txt \
             README.md \
             dialogs/ \
             modules/ \
@@ -150,6 +152,10 @@ jobs:
             -x "*.mmip" \
             -x "bin/*" \
             -x "lastfm.txt" \
+            -x "*-source.zip" \
+            -x "*-source.tar.gz" \
+            -x "*.tar.gz" \
+            -x "*.tgz" \
 
           echo "? Package created: MatchMonkey-${{ steps.bump_version.outputs.version }}.mmip"
           echo "? Modular structure included (Phases 1-7)"
@@ -245,16 +251,33 @@ jobs:
 
           # Capture the generated file before switching branches (orphan checkout clears the working tree)
           UPDATE_JSON_CONTENT=$(cat update.json)
+          LICENSE_MIT_CONTENT=""
+          LICENSE_COMM_CONTENT=""
+          if [ -f license-mit.txt ]; then
+            LICENSE_MIT_CONTENT=$(cat license-mit.txt)
+          fi
+          if [ -f license-commercial.txt ]; then
+            LICENSE_COMM_CONTENT=$(cat license-commercial.txt)
+          fi
 
           # Create/checkout updateMatchMonkey branch without carrying repo history
           git checkout --orphan updateMatchMonkey
           git rm -rf . >/dev/null 2>&1 || true
 
-          # Recreate the file in the now-empty working tree
+          # Recreate the files in the now-empty working tree
           printf '%s\n' "$UPDATE_JSON_CONTENT" > update.json
+          if [ -n "$LICENSE_MIT_CONTENT" ]; then
+            printf '%s\n' "$LICENSE_MIT_CONTENT" > license-mit.txt
+          fi
+          if [ -n "$LICENSE_COMM_CONTENT" ]; then
+            printf '%s\n' "$LICENSE_COMM_CONTENT" > license-commercial.txt
+          fi
 
           git add update.json
-          git commit -m "Update update.json for ${{ github.ref_name }}"
+          if [ -f license-mit.txt ]; then git add license-mit.txt; fi
+          if [ -f license-commercial.txt ]; then git add license-commercial.txt; fi
+
+          git commit -m "Update update.json and license files for ${{ github.ref_name }}"
 
           # Force-push the single-file branch
           git push --force origin updateMatchMonkey

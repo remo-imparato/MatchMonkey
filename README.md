@@ -2,7 +2,6 @@
 
 **Automatically generate playlists or queue tracks from similar artists using Last.fm's powerful music recommendation engine.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![MediaMonkey](https://img.shields.io/badge/MediaMonkey-5.0%2B-green.svg)](https://www.mediamonkey.com/)
 
 ---
@@ -226,7 +225,21 @@ The add-on intelligently handles common artist name prefix patterns:
 
 ## 📝 License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+Match Monkey is dual-licensed:
+
+- **MIT License** — free for personal and non-commercial use  
+- **Commercial License** — required for business or revenue-generating use  
+
+If you plan to use Match Monkey commercially, please obtain a license:
+
+- **Email:** rimparato@hotmail.com  
+- **Ko‑fi:** https://ko-fi.com/remoimparato  
+- **GitHub:** https://github.com/remo-imparato/
+
+See the included **LICENSE** (MIT) and **license-commercial.txt** (Commercial EULA) for full terms.
+
+- MIT License (published): https://github.com/remo-imparato/SimilarArtistsMM5/blob/updateMatchMonkey/license-mit.txt
+- Commercial EULA (published): https://github.com/remo-imparato/SimilarArtistsMM5/blob/updateMatchMonkey/license-commercial.txt
 
 ---
 
@@ -234,22 +247,11 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 Found a bug or have a feature idea? Please open an issue on the [GitHub Issues](https://github.com/remo-imparato/SimilarArtistsMM5/issues) page.
 
-### Known Issues
-
-- None currently reported
-
-### Planned Features
-
-- [ ] Configurable track matching sensitivity
-- [ ] Integration with other music recommendation services
-- [ ] Track history to avoid repetition
-- [ ] Advanced Filtering: Filter by genre, rating, artist blacklist, and title exclusions
-
 ---
 
 ## 🔄 Changelog
 
-### Version 1.1 (Recent updates)
+### Version 2.0 (Recent updates)
 
 - ✨ New discovery modes: **Search by Title** and **Search by Genre**
 - ✨ Deduplication: avoid duplicate songs by `artist|title`, choose best bitrate then highest rating
@@ -287,9 +289,7 @@ Found a bug or have a feature idea? Please open an issue on the [GitHub Issues](
 ## 💡 Tips & Tricks
 
 1. **Use Auto-Queue Mode** - Enable it in settings for endless music discovery
-2. **Combine Filters** - Use genre exclusions + rating filters for curated results
 3. **Seed Multiple Tracks** - Select multiple tracks for more diverse recommendations
-4. **Parent Playlists** - Organize similar artist playlists under a parent folder
 5. **Ranking Mode** - Enable "Select highest ranked by Last.fm" for popular tracks
 
 ---
