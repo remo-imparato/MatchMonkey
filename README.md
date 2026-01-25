@@ -127,10 +127,6 @@ Access settings via **Tools → Options → Similar Artists**
 
 | Setting | Description |
 |---------|-------------|
-| **Parent playlist** | Place new playlists under a parent folder |
-| **Exclude artists** | Comma-separated list of artists to skip |
-| **Exclude genres** | Comma-separated list of genres to filter out |
-| **Exclude titles** | Skip tracks containing these words |
 | **Minimum rating** | Only include tracks with this rating or higher |
 | **Include unknown rating** | Allow tracks without ratings |
 
@@ -192,14 +188,6 @@ The add-on intelligently handles common artist name prefix patterns:
 - **Database**: Direct SQL queries against MediaMonkey's SQLite database
 - **Progress Tracking**: Real-time progress indicators via MM5's task system
 
-### Key Functions
-
-- `runMatchMonkey()` - Main entry point
-- `processSeedArtists()` - Fetch similar artists and match tracks
-- `findLibraryTracks()` - Multi-pass fuzzy matching engine
-- `addTracksToTarget()` - Unified track adding with MM5 best practices
-- `confirmPlaylist()` - Playlist selection dialog integration
-
 ---
 
 ## 🤝 Credits
@@ -253,15 +241,13 @@ Found a bug or have a feature idea? Please open an issue on the [GitHub Issues](
 
 ### Version 2.0 (Recent updates)
 
-- ✨ New discovery modes: **Search by Title** and **Search by Genre**
+- ✨ New discovery modes: **Search by Title,** **Search by Artist** and **Search by Genre**
 - ✨ Deduplication: avoid duplicate songs by `artist|title`, choose best bitrate then highest rating
-- 🐛 Fixed: context menu and Tools submenu registration for right-click and Tools menu
-- 🐛 Fixed: Now Playing enqueue behavior (tracks are correctly added to the queue)
-- 🐛 Fixed: Playlist creation now uses `addTracksAsync` and navigation uses MM5 `navigationHandlers`
-- ✅ Persistent track references: switched to MM5 `getValue()` for reliable track objects
-- ✅ Playlist naming consistency: mode suffix (e.g. `(Similar Artists)`) always appended
+- ✨ Menu: context menu and Tools submenu registration for right-click and Tools menu
+- ✨ Playlist: Create a new Playlist or add to Now Playing
+- ✨ Auto Queme: Auto queue new tracks based on Artist, Track, or Genre similarity
 
-### Version 1.0 (Initial MM5 rewrite)
+### Version 1.1 (Initial MM5 rewrite)
 
 - ✨ Complete rewrite for MediaMonkey 5
 - ✨ Modern async/await patterns throughout
@@ -272,7 +258,6 @@ Found a bug or have a feature idea? Please open an issue on the [GitHub Issues](
 - ✨ Auto-queue mode for continuous playback
 - ✨ Ranking system for popularity-based sorting
 - 🐛 Removed legacy MM4 fallback code
-- 🐛 Fixed playlist name uniqueness logic
 - 📚 Comprehensive code documentation
 
 ---
