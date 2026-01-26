@@ -1,0 +1,113 @@
+/**
+ * MatchMonkey Options Panel Styles
+ * 
+ * Custom styles for the MatchMonkey configuration panel
+ */
+
+/* Slider container for blend ratio */
+.sliderContainer {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5em;
+	width: 100%;
+}
+
+/* Slider labels row */
+.sliderLabels {
+	display: flex;
+	justify-content: space-between;
+	font-size: 0.85em;
+	color: var(--text-secondary, #888);
+	margin-top: -0.25em;
+	padding: 0 0.25em;
+}
+
+/* Individual slider labels */
+.sliderLabel {
+	flex: 0 0 auto;
+	white-space: nowrap;
+}
+
+.sliderLabel.left {
+	text-align: left;
+}
+
+.sliderLabel.center {
+	text-align: center;
+	flex: 1;
+}
+
+.sliderLabel.right {
+	text-align: right;
+}
+
+/* Slider track customization */
+[data-id="MoodActivityBlendRatio"] .ui-slider {
+	background: linear-gradient(to right, 
+		var(--accent-color-light, #4a9eff) 0%, 
+		var(--accent-color, #2979ff) 50%, 
+		var(--success-color, #4caf50) 100%);
+	height: 6px;
+	border-radius: 3px;
+}
+
+/* Slider handle */
+[data-id="MoodActivityBlendRatio"] .ui-slider-handle {
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	background: var(--surface-color, #fff);
+	border: 2px solid var(--accent-color, #2979ff);
+	box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+	cursor: pointer;
+	transition: transform 0.1s ease;
+}
+
+[data-id="MoodActivityBlendRatio"] .ui-slider-handle:hover {
+	transform: scale(1.1);
+	box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+}
+
+[data-id="MoodActivityBlendRatio"] .ui-slider-handle:active {
+	transform: scale(0.95);
+}
+
+/* Slider value display */
+[data-id="MoodActivityBlendRatio"] .sliderValue {
+	display: inline-block;
+	min-width: 3em;
+	text-align: center;
+	font-weight: 500;
+	color: var(--accent-color, #2979ff);
+}
+
+/* Fieldset styling enhancements */
+fieldset {
+	margin-bottom: 1em;
+	padding: 1em;
+	border: 1px solid var(--border-color, #ddd);
+	border-radius: 4px;
+}
+
+fieldset legend {
+	font-weight: 600;
+	color: var(--text-primary, #333);
+	padding: 0 0.5em;
+}
+
+/* Highlight for Mood & Activity section */
+fieldset:has([data-id="MoodDiscoveryEnabled"]) {
+	background: linear-gradient(to bottom, 
+		transparent 0%, 
+		rgba(41, 121, 255, 0.02) 100%);
+	border-color: var(--accent-color-light, #4a9eff);
+}
+
+fieldset:has([data-id="MoodDiscoveryEnabled"]) legend {
+	color: var(--accent-color, #2979ff);
+}
+
+/* Tooltip enhancement for blend ratio */
+[data-id="MoodActivityBlendRatio"][data-tip]::after {
+	max-width: 300px;
+}

@@ -1,36 +1,236 @@
-# ReccoBeats Integration - Quick Reference
+# MatchMonkey - Complete Quick Reference
+
+## Discovery Modes
+
+MatchMonkey supports **5 discovery modes**:
+
+### 1. Artist-Based Discovery
+```javascript
+window.matchMonkey.runMatchMonkey(false, 'artist');
+```
+- Uses Last.fm `artist.getSimilar`
+- Finds similar artists to your seeds
+- Gets top tracks for each artist
+- Best for: Genre exploration
+
+### 2. Track-Based Discovery
+```javascript
+window.matchMonkey.runMatchMonkey(false, 'track');
+```
+- Uses Last.fm `track.getSimilar`
+- Finds musically similar tracks
+- Crosses artist boundaries
+- Best for: Finding covers, versions, similar songs
+
+### 3. Genre-Based Discovery
+```javascript
+window.matchMonkey.runMatchMonkey(false, 'genre');
+```
+- Uses Last.fm `tag.getTopArtists`
+- Extracts genres from seeds
+- Gets top artists in those genres
+- Best for: Broad genre exploration
+
+### 4. Mood-Based Discovery (ReccoBeats AI)
+```javascript
+window.matchMonkey.runMoodActivityPlaylist('energetic', null);
+```
+- Uses ReccoBeats AI + Last.fm hybrid
+- Seed-aware (respects your taste)
+- Configurable blend ratio
+- Best for: Emotional context
+
+### 5. Activity-Based Discovery (ReccoBeats AI)
+```javascript
+window.matchMonkey.runMoodActivityPlaylist(null, 'workout');
+```
+- Uses ReccoBeats AI + Last.fm hybrid
+- Duration-aware
+- Activity-optimized
+- Best for: Specific use cases
+
+---
 
 ## Quick Start
 
 ### Enable Mood/Activity Discovery
 
 1. Open MediaMonkey 5
-2. Go to **Tools ? Options ? MatchMonkey**
-3. Set `MoodDiscoveryEnabled` = `true`
-4. Set `HybridMode` = `true` (recommended)
-5. Set `MoodActivityBlendRatio` = `0.5` (50% seed + 50% mood, balanced)
-6. Choose defaults:
-   - `DefaultMood` = 'energetic' (or 'relaxed', 'happy', 'sad', 'focused')
-   - `DefaultActivity` = 'workout' (or 'study', 'party', 'sleep', 'driving')
+2. Go to **Tools ? Options ? Library ? MatchMonkey**
+3. Enable "Mood/activity discovery"
+4. Set blend ratio to 50% (balanced)
+5. Choose default mood and activity
 
 ### Generate Playlists
 
-**Important**: Select tracks first to use as seeds for personalized results!
-
-Open JavaScript console (F12) and run:
-
+**Artist-Based**:
 ```javascript
-// 1. Select some tracks in MediaMonkey (e.g., Pink Floyd songs)
-
-// 2. Generate mood playlist (energetic tracks similar to Pink Floyd)
-window.matchMonkey.runMoodActivityPlaylist('energetic', null);
-
-// 3. Generate activity playlist (workout tracks in your style)
-window.matchMonkey.runMoodActivityPlaylist(null, 'workout');
-
-// 4. Use defaults from settings
-window.matchMonkey.runMoodActivityPlaylist();
+// Select artist tracks, then:
+window.matchMonkey.runMatchMonkey(false, 'artist');
 ```
+
+**Track-Based**:
+```javascript
+// Select specific tracks, then:
+window.matchMonkey.runMatchMonkey(false, 'track');
+```
+
+**Genre-Based**:
+```javascript
+// Select genre-tagged tracks, then:
+window.matchMonkey.runMatchMonkey(false, 'genre');
+```
+
+**Mood-Based**:
+```javascript
+// Select favorite tracks, then:
+window.matchMonkey.runMoodActivityPlaylist('happy', null);
+```
+
+**Activity-Based**:
+```javascript
+// Select appropriate tracks, then:
+window.matchMonkey.runMoodActivityPlaylist(null, 'workout');
+```
+
+---
+
+## Configuration Settings
+
+### Playlist Creation
+
+| Setting | Type | Default | Effect |
+|---------|------|---------|--------|
+| **PlaylistName** | String | `- Similar to %` | Template for playlist names (`%` = artist) |
+| **ParentPlaylist** | String | (empty) | Parent playlist for organization |
+| **PlaylistMode** | Dropdown | Create new | Create/Overwrite/Don't create |
+| **ShowConfirmDialog** | Boolean | false | Show dialog before creating |
+| **ShuffleResults** | Boolean | true | Randomize track order |
+| **IncludeSeedArtist** | Boolean | true | Include original artists |
+
+**Effects**:
+- **PlaylistName**: Customizes output playlist naming
+- **ParentPlaylist**: Organizes playlists hierarchically
+- **PlaylistMode**: Controls playlist creation behavior
+- **ShowConfirmDialog**: Allows manual playlist selection
+- **ShuffleResults**: Prevents clustered artist runs
+- **IncludeSeedArtist**: Includes/excludes seed tracks
+
+---
+
+### Discovery Limits
+
+| Setting | Type | Default | Effect |
+|---------|------|---------|--------|
+| **SimilarArtistsLimit** | Number | 20 | Max similar artists per seed |
+| **TrackSimilarLimit** | Number | 100 | Max similar tracks per seed |
+| **TracksPerArtist** | Number | 30 | Tracks to fetch per artist |
+| **MaxPlaylistTracks** | Number | 0 | Final playlist size (0=unlimited) |
+| **UseLastfmRanking** | Boolean | true | Sort by Last.fm popularity |
+| **PreferHighQuality** | Boolean | true | Choose higher bitrate/rating |
+
+**Effects**:
+- **SimilarArtistsLimit**: Higher = more variety, slower
+- **TrackSimilarLimit**: Higher = better matches (track mode)
+- **TracksPerArtist**: Higher = more tracks per artist
+- **MaxPlaylistTracks**: Caps final output size
+- **UseLastfmRanking**: Popular tracks appear first
+- **PreferHighQuality**: Selects best version when duplicates exist
+
+---
+
+### Rating Filter
+
+| Setting | Type | Default | Effect |
+|---------|------|---------|--------|
+| **MinRating** | Number | 0 | Minimum track rating (0-100) |
+| **IncludeUnrated** | Boolean | true | Allow tracks without ratings |
+
+**Effects**:
+- **MinRating**: Filters out low-rated tracks
+- **IncludeUnrated**: Includes/excludes unrated tracks
+
+---
+
+### Mood & Activity (ReccoBeats AI)
+
+| Setting | Type | Default | Effect |
+|---------|------|---------|--------|
+| **MoodDiscoveryEnabled** | Boolean | false | Enable ReccoBeats integration |
+| **DefaultMood** | Dropdown | energetic | Default mood preset |
+| **DefaultActivity** | Dropdown | workout | Default activity preset |
+| **PlaylistDuration** | Number | 60 | Target duration in minutes |
+| **HybridMode** | Boolean | true | Combine ReccoBeats + Last.fm |
+| **MoodActivityBlendRatio** | Slider | 0.5 | Seed vs mood balance (0.0-1.0) |
+
+**Mood Options**: energetic, relaxed, happy, sad, focused
+**Activity Options**: workout, study, party, sleep, driving
+
+**Effects**:
+- **MoodDiscoveryEnabled**: Unlocks mood/activity functions
+- **DefaultMood/Activity**: Used when not specified
+- **PlaylistDuration**: Targets specific length (activity mode)
+- **HybridMode**: Expands ReccoBeats results with Last.fm
+- **MoodActivityBlendRatio**: Controls personalization
+  - `0.0` = Pure mood discovery
+  - `0.5` = Balanced (recommended)
+  - `1.0` = Seed-based with mood filter
+
+---
+
+### Auto-Queue (Endless Playback)
+
+| Setting | Type | Default | Effect |
+|---------|------|---------|--------|
+| **AutoModeEnabled** | Boolean | false | Enable auto-queue |
+| **AutoModeDiscovery** | Dropdown | Track | Discovery mode for auto-queue |
+| **AutoModeSeedLimit** | Number | 2 | Seeds to process |
+| **AutoModeSimilarLimit** | Number | 10 | Similar artists per seed |
+| **AutoModeTracksPerArtist** | Number | 5 | Tracks per artist |
+| **AutoModeMaxTracks** | Number | 30 | Max tracks per trigger |
+| **SkipDuplicates** | Boolean | true | Skip tracks in queue |
+
+**AutoModeDiscovery Options**: Artist, Track, Genre
+
+**Effects**:
+- **AutoModeEnabled**: Automatically adds tracks when queue is low
+- **AutoModeDiscovery**: Determines discovery algorithm
+- **Limits**: Control auto-queue performance and size
+- **SkipDuplicates**: Prevents repeated tracks
+
+---
+
+### Queue Behavior
+
+| Setting | Type | Default | Effect |
+|---------|------|---------|--------|
+| **EnqueueMode** | Boolean | false | Add to Now Playing |
+| **ClearQueueFirst** | Boolean | false | Clear queue before adding |
+| **NavigateAfter** | Dropdown | Navigate to new | Where to navigate after |
+
+**NavigateAfter Options**: Navigate to new playlist, Navigate to now playing, Stay in current view
+
+**Effects**:
+- **EnqueueMode**: Bypasses playlist creation, adds to queue
+- **ClearQueueFirst**: Replaces current queue
+- **NavigateAfter**: Controls UI navigation post-generation
+
+---
+
+### Filters (Advanced)
+
+| Setting | Type | Default | Effect |
+|---------|------|---------|--------|
+| **ArtistBlacklist** | String | (empty) | Excluded artists (comma-separated) |
+| **GenreBlacklist** | String | (empty) | Excluded genres (comma-separated) |
+| **TitleExclusions** | String | (empty) | Excluded title words (comma-separated) |
+
+**Effects**:
+- **ArtistBlacklist**: Completely skips listed artists
+- **GenreBlacklist**: Skips tracks with listed genres
+- **TitleExclusions**: Skips tracks with words in title (e.g., "Live", "Remix")
+
+---
 
 ## Available Moods
 
@@ -42,6 +242,8 @@ window.matchMonkey.runMoodActivityPlaylist();
 | `sad` | Melancholic, emotional tracks | Emotional release, rainy days |
 | `focused` | Concentration-friendly music | Study, work, deep focus |
 
+---
+
 ## Available Activities
 
 | Activity | Description | Use Case |
@@ -52,163 +254,231 @@ window.matchMonkey.runMoodActivityPlaylist();
 | `sleep` | Soothing, ambient sounds | Bedtime, relaxation |
 | `driving` | Engaging road trip music | Long drives, commutes |
 
+---
+
+## Blend Ratio Guide
+
+| Value | Seed % | Mood % | Behavior | Use When |
+|-------|--------|--------|----------|----------|
+| 0.0 | 0% | 100% | Pure mood discovery | Want completely new music |
+| 0.2 | 20% | 80% | Mostly mood-based | Adventurous discovery |
+| 0.3 | 30% | 70% | More discovery | Expand beyond comfort zone |
+| 0.5 | 50% | 50% | **Balanced (default)** | **Most users** |
+| 0.7 | 70% | 30% | More familiar | Your taste with mood |
+| 0.8 | 80% | 20% | Mostly seeds | Safe exploration |
+| 1.0 | 100% | 0% | Seed-based filter | Minimal discovery |
+
+---
+
 ## Code Examples
 
-### Basic Usage (Seed-Aware)
-
+### Basic Artist Discovery
 ```javascript
-// Step 1: Select tracks you like (seeds)
-// Example: Select Pink Floyd tracks in MediaMonkey
-
-// Step 2: Run mood/activity playlist
-window.matchMonkey.runMoodActivityPlaylist('happy', null);    // Happy + Pink Floyd style
-window.matchMonkey.runMoodActivityPlaylist(null, 'workout');  // Workout + your taste
-window.matchMonkey.runMoodActivityPlaylist();                  // Use defaults
-
-// Result: Personalized playlists matching both your taste AND the mood/activity
+// Select Pink Floyd tracks
+window.matchMonkey.runMatchMonkey(false, 'artist');
+// Result: Progressive rock artists
 ```
 
-### Advanced Usage
-
+### Track-Based Discovery
 ```javascript
-// Access modules directly
-const mm = window.matchMonkey;
-const modules = mm.modules;
+// Select "Bohemian Rhapsody"
+window.matchMonkey.runMatchMonkey(false, 'track');
+// Result: Similar epic rock songs
+```
 
-// Custom context
-const enrichedModules = {
-    ...modules,
-    _moodActivityContext: {
-        context: 'mood',
-        value: 'energetic',
-        duration: 90  // 90 minutes
-    }
-};
+### Genre Exploration
+```javascript
+// Select jazz tracks
+window.matchMonkey.runMatchMonkey(false, 'genre');
+// Result: Top jazz artists
+```
 
-// Run with custom context
-await mm.modules.core.orchestration.generateSimilarPlaylist(
-    enrichedModules,
-    false,  // not auto-mode
-    'mood'  // discovery mode
-);
+### Mood Playlist (Seed-Aware)
+```javascript
+// Select favorite rock tracks
+window.matchMonkey.runMoodActivityPlaylist('energetic', null);
+// Result: Energetic rock (50% similar + 50% energetic)
+```
+
+### Activity Playlist
+```javascript
+// Select metal tracks
+window.matchMonkey.runMoodActivityPlaylist(null, 'workout');
+// Result: 60-minute heavy workout mix
 ```
 
 ### Adjust Blend Ratio
-
 ```javascript
-// Pure mood discovery (ignore current listening)
+// Pure mood discovery
 app.setValue('MatchMonkey', {
     ...app.getValue('MatchMonkey', {}),
-    MoodActivityBlendRatio: 0.0  // 0% seed, 100% mood
+    MoodActivityBlendRatio: 0.0
 });
-window.matchMonkey.runMoodActivityPlaylist('relaxed', null);
 
 // Balanced (default)
 app.setValue('MatchMonkey', {
     ...app.getValue('MatchMonkey', {}),
-    MoodActivityBlendRatio: 0.5  // 50% seed, 50% mood
+    MoodActivityBlendRatio: 0.5
 });
-window.matchMonkey.runMoodActivityPlaylist('energetic', null);
 
 // Your taste, mood-enhanced
 app.setValue('MatchMonkey', {
     ...app.getValue('MatchMonkey', {}),
-    MoodActivityBlendRatio: 0.7  // 70% seed, 30% mood
+    MoodActivityBlendRatio: 0.7
 });
-window.matchMonkey.runMoodActivityPlaylist('happy', null);
 ```
 
-### Check Status
-
+### Configure Limits
 ```javascript
-// Check if ReccoBeats is loaded
-console.log(window.matchMonkeyReccoBeatsAPI ? 'Loaded' : 'Not loaded');
+// Faster, more focused
+app.setValue('MatchMonkey', {
+    ...app.getValue('MatchMonkey', {}),
+    SimilarArtistsLimit: 10,
+    TracksPerArtist: 15,
+    MaxPlaylistTracks: 50
+});
 
-// Check discovery modes
-console.log(window.matchMonkeyDiscoveryStrategies.DISCOVERY_MODES);
-
-// Get MatchMonkey state
-console.log(window.matchMonkey.getState());
+// Slower, more variety
+app.setValue('MatchMonkey', {
+    ...app.getValue('MatchMonkey', {}),
+    SimilarArtistsLimit: 30,
+    TracksPerArtist: 40,
+    MaxPlaylistTracks: 0  // Unlimited
+});
 ```
 
-## Configuration Quick Reference
+---
 
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `MoodDiscoveryEnabled` | boolean | false | Enable mood playlists |
-| `DefaultMood` | string | 'energetic' | Default mood |
-| `DefaultActivity` | string | 'workout' | Default activity |
-| `PlaylistDuration` | number | 60 | Target minutes |
-| `HybridMode` | boolean | true | ReccoBeats + Last.fm |
-| `MoodActivityBlendRatio` | number | 0.5 | Seed vs mood balance |
-| `SimilarArtistsLimit` | number | 20 | Max similar artists |
-| `TracksPerArtist` | number | 30 | Tracks per artist |
-| `MaxPlaylistTracks` | number | 0 | Final limit (0=unlimited) |
+## Effect of Settings on Results
 
-### Blend Ratio Guide
+### High Similar Artists Limit (30+)
+- ? More variety
+- ? Broader discovery
+- ? Slower generation
+- ? Less focused results
 
-| Value | Seed % | Mood % | Behavior |
-|-------|--------|--------|----------|
-| 0.0 | 0% | 100% | Pure mood discovery |
-| 0.3 | 30% | 70% | Mostly mood-based |
-| 0.5 | 50% | 50% | **Balanced (default)** |
-| 0.7 | 70% | 30% | Your taste, mood-enhanced |
-| 1.0 | 100% | 0% | Seed-based, mood-filtered |
+### Low Similar Artists Limit (5-10)
+- ? Faster generation
+- ? More focused results
+- ? Less variety
+- ? May repeat artists
+
+### High Tracks Per Artist (40+)
+- ? Deep artist coverage
+- ? More album tracks
+- ? Slower generation
+- ? May cluster artists
+
+### Low Tracks Per Artist (5-10)
+- ? Faster generation
+- ? Only top tracks
+- ? Limited coverage
+- ? Misses deep cuts
+
+### UseLastfmRanking = true
+- ? Popular tracks first
+- ? Crowd-pleasing
+- ? Misses hidden gems
+- ? Less diversity
+
+### UseLastfmRanking = false
+- ? Includes deep cuts
+- ? More diversity
+- ? May include obscure tracks
+- ? Less consistent quality
+
+### PreferHighQuality = true
+- ? Best versions selected
+- ? Higher bitrate preference
+- ? May skip some versions
+
+### PreferHighQuality = false
+- ? All versions considered
+- ? May get lower quality
+- ? Random version selection
+
+---
 
 ## Troubleshooting
 
 ### No Results
 
-**Problem**: `runMoodActivityPlaylist()` returns no tracks
+**Problem**: Playlist has no tracks
 
-**Solutions**:
-1. **Select seed tracks first** - The algorithm works best with seeds
-2. Check internet connection
-3. Verify ReccoBeats API is accessible
-4. Try different mood/activity
-5. Adjust blend ratio (try 0.5 for balanced)
-6. Lower `MinRating` setting
-7. Enable `IncludeUnrated`
+**Causes & Solutions**:
+1. **No internet**: APIs require online access
+2. **No seeds selected**: Select tracks first (except genre/mood pure discovery)
+3. **Rating filter too high**: Lower MinRating or enable IncludeUnrated
+4. **Blacklist too restrictive**: Check ArtistBlacklist and GenreBlacklist
+5. **No library matches**: Try different seeds or discovery mode
 
-### Poor Match Quality
+### Results Too Random
 
-**Problem**: Results don't match your taste or mood
+**Problem**: Tracks don't match your taste
 
-**Solutions**:
-1. **Adjust blend ratio**:
-   - Too random? Increase ratio (more seed-based)
-   - Too similar to seeds? Decrease ratio (more mood-based)
-2. **Better seed selection**:
-   - Select multiple tracks from preferred artists
-   - Use diverse seeds for variety
-3. **Check mood/activity name**: Some work better than others
+**Causes & Solutions**:
+1. **Blend ratio too low**: Increase to 0.7 (mood/activity mode)
+2. **Poor seed selection**: Select consistent genre seeds
+3. **Genre mode too broad**: Use artist or track mode instead
+4. **Similar limit too high**: Lower to 10-15 for focus
 
-### Module Not Loaded
+### Results Too Similar
 
-**Problem**: `window.matchMonkeyReccoBeatsAPI is undefined`
+**Problem**: All tracks from same artists
 
-**Solutions**:
-1. Check console for loading errors
-2. Verify `modules/api/reccobeats.js` exists
-3. Check `init.js` includes `localRequirejs('modules/api/reccobeats')`
-4. Restart MediaMonkey
+**Causes & Solutions**:
+1. **Blend ratio too high**: Decrease to 0.3 (mood/activity mode)
+2. **Similar limit too low**: Increase to 25-30
+3. **Tracks per artist too high**: Lower to 10-15
+4. **Try different mode**: Switch from artist to track mode
+5. **Enable shuffle**: Check ShuffleResults
 
-### API Errors
+### Slow Performance
 
-**Problem**: HTTP errors or API failures
+**Problem**: Takes too long to generate
 
-**Solutions**:
-1. Check ReccoBeats API status
-2. Verify API endpoints are correct
-3. Check browser console for detailed errors
-4. Try with `HybridMode` = false (Last.fm only)
+**Causes & Solutions**:
+1. **Similar limit too high**: Lower to 10-15
+2. **Tracks per artist too high**: Lower to 10-20
+3. **Track similar limit too high**: Lower to 50 (track mode)
+4. **Use artist mode**: Fastest discovery mode
+5. **Reduce max tracks**: Set MaxPlaylistTracks to 50-100
+
+### Auto-Queue Not Working
+
+**Problem**: No tracks added automatically
+
+**Causes & Solutions**:
+1. **Not enabled**: Check AutoModeEnabled
+2. **Queue not low enough**: Needs 2 or fewer tracks left
+3. **Limits too restrictive**: Check AutoModeSeedLimit, AutoModeSimilarLimit
+4. **No seeds available**: Needs tracks in Now Playing history
+5. **Check console**: F12 for error messages
+
+---
 
 ## Performance Tips
 
-1. **First Run**: Slower (API queries)
-2. **Cached Runs**: Much faster (same mood/activity)
-3. **Reduce Limits**: Lower `SimilarArtistsLimit` for speed
-4. **Use Defaults**: Pre-configured moods/activities are optimized
+1. **First Run**: Slower (API queries, no cache)
+2. **Cached Runs**: Much faster (same seeds/mood)
+3. **Artist Mode**: Fastest discovery mode
+4. **Track Mode**: Slower (more API calls)
+5. **Mood/Activity**: Medium speed (hybrid approach)
+6. **Reduce Limits**: Lower for speed, higher for variety
+
+---
+
+## Keyboard Shortcuts
+
+**In Options Panel** (Slider focused):
+- **Left Arrow**: Decrease blend ratio 10%
+- **Right Arrow**: Increase blend ratio 10%
+- **Home**: Jump to 0% (all mood)
+- **End**: Jump to 100% (all seeds)
+- **Page Up**: Jump to 75%
+- **Page Down**: Jump to 25%
+
+---
 
 ## Module Locations
 
@@ -216,32 +486,47 @@ console.log(window.matchMonkey.getState());
 modules/
 ??? api/
 ?   ??? lastfm.js          # Last.fm API
-?   ??? reccobeats.js      # ReccoBeats API (NEW)
+?   ??? reccobeats.js      # ReccoBeats API
 ?   ??? cache.js           # API caching
 ??? core/
-?   ??? discoveryStrategies.js  # Discovery modes (UPDATED)
-?   ??? orchestration.js        # Workflow (UPDATED)
-??? ...
+?   ??? discoveryStrategies.js  # 5 discovery modes
+?   ??? orchestration.js        # Workflow
+??? db/
+?   ??? library.js         # Library matching
+?   ??? playlist.js        # Playlist creation
+?   ??? queue.js           # Queue management
+??? settings/
+?   ??? storage.js         # Settings management
+??? ui/
+    ??? notifications.js   # Progress tracking
 
-matchMonkey.js              # Main entry point (UPDATED)
-init.js                     # Initialization (UPDATED)
+dialogs/dlgOptions/
+??? pnl_MatchMonkey.html   # Options UI
+??? pnl_MatchMonkey.js     # Options logic
+??? pnl_MatchMonkey.css    # Options styling
 ```
+
+---
 
 ## API Endpoints
 
 ### ReccoBeats
-
 ```
-https://api.reccobeats.com/v1/recommendations/mood?mood={mood}&limit={limit}
-https://api.reccobeats.com/v1/recommendations/activity?activity={activity}&duration={duration}
+https://api.reccobeats.com/v1/recommendations/mood
+https://api.reccobeats.com/v1/recommendations/activity
 ```
 
 ### Last.fm
+```
+https://ws.audioscrobbler.com/2.0/
+  ?method=artist.getSimilar
+  ?method=track.getSimilar
+  ?method=tag.getTopArtists
+  ?method=artist.getInfo
+  ?method=artist.getTopTracks
+```
 
-```
-https://ws.audioscrobbler.com/2.0/?method=artist.getSimilar&artist={artist}&api_key={key}
-https://ws.audioscrobbler.com/2.0/?method=artist.getTopTracks&artist={artist}&api_key={key}
-```
+---
 
 ## Testing
 
@@ -250,12 +535,17 @@ Run test script:
 localRequirejs('test/test_reccobeats')
 ```
 
+---
+
 ## Documentation
 
+- **Quick Start**: `docs/QUICKSTART.md`
 - **Full Guide**: `docs/RECCOBEATS_INTEGRATION.md`
+- **Examples**: `docs/EXAMPLES_TUTORIAL.md`
+- **UI Guide**: `docs/UI_CONFIGURATION_GUIDE.md`
 - **Implementation**: `docs/IMPLEMENTATION_SUMMARY.md`
-- **ReccoBeats API**: https://reccobeats.com/docs/apis/reccobeats-api
-- **GitHub**: https://github.com/remo-imparato/SimilarArtistsMM5
+
+---
 
 ## Support
 
