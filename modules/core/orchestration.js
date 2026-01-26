@@ -246,6 +246,9 @@ window.matchMonkeyOrchestration = {
 			if (selectedTracks && selectedTracks.count > 0) {
 				console.log(`Match Monkey: Using ${selectedTracks.count} selected track(s) as seeds`);
 				
+				// Wait for the tracklist to load before accessing it
+				await selectedTracks.whenLoaded();
+				
 				if (typeof selectedTracks.locked === 'function') {
 					selectedTracks.locked(() => {
 						const count = Math.min(selectedTracks.count, 50);
@@ -266,6 +269,7 @@ window.matchMonkeyOrchestration = {
 			// Priority 2: Currently playing track
 			if (seeds.length === 0 && app.player?.currentTrack) {
 				const track = app.player.currentTrack;
+				console.log(`Match Monkey: Using current track as seed: "${track.artist} - ${track.title}"`);
 				seeds.push({
 					artist: track.artist || track.artistName || '',
 					title: track.title || track.songTitle || '',
@@ -277,6 +281,10 @@ window.matchMonkeyOrchestration = {
 			if (seeds.length === 0 && app.player?.playlist?.count > 0) {
 				const np = app.player.playlist;
 				const count = Math.min(np.count, 10);
+				console.log(`Match Monkey: Using ${count} track(s) from Now Playing as seeds`);
+				
+				// Wait for the playlist to load before accessing it
+				await np.whenLoaded();
 				
 				if (typeof np.locked === 'function') {
 					np.locked(() => {
@@ -475,12 +483,32 @@ window.matchMonkeyOrchestration = {
 		const playlistMode = stringSetting('PlaylistMode', 'Create new playlist');
 		const navigateAfter = stringSetting('NavigateAfter', 'Navigate to new playlist');
 
-		// Build playlist name from template
-		let playlistName = playlistTemplate.replace('%', config.seedName || 'Selection');
+		// Get the discovery mode name (e.g., "Similar Artists", "Similar Tracks", "Similar Genre", "Mood: Energetic", "Activity: Workout")
+		const modeName = config.modeName || 'Similar Artists';
+		const seedName = config.seedName || 'Selection';
+
+		// Build playlist name from template with discovery mode indicator
+		let playlistName;
 		
-		// Add mode indicator if not artist mode
-		if (config.modeName && config.modeName !== 'Similar Artists') {
-			playlistName = playlistName.replace('Similar to', config.modeName + ' -');
+		// If template contains %, replace it with seed name
+		if (playlistTemplate.indexOf('%') >= 0) {
+			playlistName = playlistTemplate.replace('%', seedName);
+		} else {
+			playlistName = `${playlistTemplate} ${seedName}`;
+		}
+
+		// Append discovery mode indicator in parentheses
+		// Examples:
+		// "- Similar to The Beatles (Similar Artists)"
+		// "- Similar to Shape of You (Similar Tracks)"
+		// "- Similar to Rock (Similar Genre)"
+		// "- Similar to The Beatles (Mood: Energetic)"
+		// "- Similar to The Beatles (Activity: Workout)"
+		playlistName = `${playlistName} (${modeName})`;
+
+		// Truncate if too long
+		if (playlistName.length > 100) {
+			playlistName = playlistName.substring(0, 97) + '...';
 		}
 
 		console.log(`Match Monkey: Building playlist "${playlistName}" (mode: ${playlistMode})`);
