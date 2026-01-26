@@ -267,38 +267,25 @@ window.matchMonkeyOrchestration = {
 			}
 
 			// Priority 2: Currently playing track
-			if (seeds.length === 0 && app.player?.currentTrack) {
-				const track = app.player.currentTrack;
-				console.log(`Match Monkey: Using current track as seed: "${track.artist} - ${track.title}"`);
-				seeds.push({
-					artist: track.artist || track.artistName || '',
-					title: track.title || track.songTitle || '',
-					genre: track.genre || '',
-				});
-			}
+			if (seeds.length === 0) {
+				try {
+					let track = null;
+					if (typeof app.player?.getCurrentTrack === 'function') {
+						// Prefer async getter if provided by MM5
+						track = await app.player.getCurrentTrack();
+					}
 
-			// Priority 3: Now Playing list
-			if (seeds.length === 0 && app.player?.playlist?.count > 0) {
-				const np = app.player.playlist;
-				const count = Math.min(np.count, 10);
-				console.log(`Match Monkey: Using ${count} track(s) from Now Playing as seeds`);
-				
-				// Wait for the playlist to load before accessing it
-				await np.whenLoaded();
-				
-				if (typeof np.locked === 'function') {
-					np.locked(() => {
-						for (let i = 0; i < count; i++) {
-							const track = np.getValue(i);
-							if (track) {
-								seeds.push({
-									artist: track.artist || track.artistName || '',
-									title: track.title || track.songTitle || '',
-									genre: track.genre || '',
-								});
-							}
-						}
-					});
+					if (track) {
+						console.log(`Match Monkey: Using current track as seed: "${track.artist} - ${track.title}"`);
+						seeds.push({
+							artist: track.artist || track.artistName || '',
+							title: track.title || track.songTitle || '',
+							genre: track.genre || '',
+						});
+					}
+				} catch (e) {
+					// If async call fails, ignore and continue to next source
+					console.warn('Match Monkey: Failed to get current track via getCurrentTrack():', e);
 				}
 			}
 
