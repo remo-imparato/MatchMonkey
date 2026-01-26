@@ -22,7 +22,9 @@
 const DISCOVERY_MODES = {
 	ARTIST: 'artist',
 	TRACK: 'track',
-	GENRE: 'genre'
+	GENRE: 'genre',
+	MOOD: 'mood',
+	ACTIVITY: 'activity'
 };
 
 /**
@@ -461,6 +463,191 @@ async function discoverByGenre(modules, seeds, config) {
 	return candidates;
 }
 
+/**
+ * Mood/Activity-based discovery strategy (ReccoBeats + Last.fm hybrid).
+ * 
+ * Uses ReccoBeats API to get mood/activity-appropriate tracks, then
+ * combines with Last.fm similar artists for better library matching.
+ * 
+ * ENHANCEMENT: Now blends seed artists with mood/activity recommendations
+ * for personalized, context-aware playlists that respect your musical taste.
+ * 
+ * @param {object} modules - Module dependencies
+ * @param {Array} seeds - Seed objects [{artist, title, genre}, ...]
+ * @param {object} config - Configuration settings with mood/activity context
+ * @returns {Promise<Array>} Array of {artist, tracks[]} candidates
+ */
+async function discoverByMoodActivity(modules, seeds, config) {
+	const { api: { lastfmApi }, settings: { prefixes }, ui: { notifications } } = modules;
+	const { fetchSimilarArtists } = lastfmApi;
+	const { fixPrefixes } = prefixes;
+	const { updateProgress } = notifications;
+	const reccobeatsApi = window.matchMonkeyReccoBeatsAPI;
+	
+	if (!reccobeatsApi) {
+		console.error('discoverByMoodActivity: ReccoBeats API not loaded');
+		return [];
+	}
+	
+	const candidates = [];
+	const seenArtists = new Set();
+	const blacklist = buildBlacklist(modules);
+	
+	// Extract context from config
+	const context = config.moodActivityContext || 'mood';
+	const value = config.moodActivityValue || 'energetic';
+	const blendRatio = config.moodActivityBlendRatio || 0.5; // 50% seeds, 50% mood by default
+	
+	console.log(`discoverByMoodActivity: Starting ${context}="${value}" discovery with ${seeds.length} seeds`);
+	console.log(`discoverByMoodActivity: Blend ratio - ${Math.round(blendRatio * 100)}% seed artists, ${Math.round((1 - blendRatio) * 100)}% mood artists`);
+	
+	updateProgress(`Finding tracks for ${context}: ${value}...`, 0.1);
+	
+	// STEP 1: Extract unique seed artists
+	const seedArtistSet = new Set();
+	for (const seed of seeds) {
+		if (seed.artist) {
+			const artists = seed.artist.split(';').map(a => a.trim()).filter(Boolean);
+			for (const artist of artists) {
+				seedArtistSet.add(artist);
+			}
+		}
+	}
+	
+	const seedArtists = Array.from(seedArtistSet);
+	console.log(`discoverByMoodActivity: Extracted ${seedArtists.length} unique seed artists`);
+	
+	// STEP 2: Get similar artists to seeds using Last.fm (seed-based component)
+	const seedSimilarArtists = [];
+	
+	if (seedArtists.length > 0 && blendRatio > 0) {
+		updateProgress(`Analyzing your listening context (${seedArtists.length} seed artists)...`, 0.15);
+		
+		// Include seed artists if configured
+		if (config.includeSeedArtist) {
+			console.log(`discoverByMoodActivity: Including ${seedArtists.length} seed artists in results`);
+			seedSimilarArtists.push(...seedArtists);
+		}
+		
+		// Limit seed artists to process (avoid too many API calls)
+		const seedLimit = Math.min(seedArtists.length, config.seedLimit || 5);
+		
+		for (let i = 0; i < seedLimit; i++) {
+			const artistName = seedArtists[i];
+			const progress = 0.15 + ((i + 1) / seedLimit) * 0.15;
+			updateProgress(`Finding artists similar to "${artistName}"...`, progress);
+			
+			try {
+				const fixedName = fixPrefixes(artistName);
+				const similar = await fetchSimilarArtists(fixedName, 10);
+				
+				for (const s of similar) {
+					if (s?.name) {
+						seedSimilarArtists.push(s.name);
+					}
+				}
+				
+				console.log(`discoverByMoodActivity: Found ${similar.length} similar artists to "${artistName}"`);
+				
+			} catch (e) {
+				console.error(`discoverByMoodActivity: Error fetching similar for "${artistName}":`, e);
+			}
+		}
+		
+		console.log(`discoverByMoodActivity: Total seed-based artists: ${seedSimilarArtists.length}`);
+	}
+	
+	// STEP 3: Get mood/activity-appropriate artists using ReccoBeats (mood-based component)
+	const moodArtists = [];
+	
+	if (blendRatio < 1) {
+		updateProgress(`Fetching ${context}-appropriate recommendations...`, 0.35);
+		
+		const hybridResults = await reccobeatsApi.fetchHybridRecommendations(
+			context,
+			value,
+			{
+				genres: extractGenresFromSeeds(seeds),
+				duration: config.playlistDuration || 60,
+				limit: Math.ceil((config.similarLimit || 20) * (1 - blendRatio) * 2) // Extra for filtering
+			}
+		);
+		
+		for (const result of hybridResults) {
+			if (result.artist) {
+				moodArtists.push(result.artist);
+			}
+		}
+		
+		console.log(`discoverByMoodActivity: ReccoBeats provided ${moodArtists.length} mood-appropriate artists`);
+	}
+	
+	// STEP 4: Blend both approaches based on ratio
+	updateProgress(`Blending ${seedSimilarArtists.length} seed artists with ${moodArtists.length} mood artists...`, 0.5);
+	
+	const targetLimit = config.similarLimit || 20;
+	const seedCount = Math.ceil(targetLimit * blendRatio);
+	const moodCount = targetLimit - seedCount;
+	
+	console.log(`discoverByMoodActivity: Target ${seedCount} seed-based + ${moodCount} mood-based = ${targetLimit} total`);
+	
+	// Deduplicate seed artists
+	const uniqueSeedArtists = Array.from(new Set(seedSimilarArtists));
+	const uniqueMoodArtists = Array.from(new Set(moodArtists));
+	
+	// Take proportional amounts from each source
+	const selectedSeedArtists = uniqueSeedArtists.slice(0, seedCount);
+	const selectedMoodArtists = uniqueMoodArtists.slice(0, moodCount);
+	
+	// Interleave both lists for better mixing
+	const blendedArtists = [];
+	const maxLength = Math.max(selectedSeedArtists.length, selectedMoodArtists.length);
+	
+	for (let i = 0; i < maxLength; i++) {
+		if (i < selectedSeedArtists.length) {
+			blendedArtists.push(selectedSeedArtists[i]);
+		}
+		if (i < selectedMoodArtists.length) {
+			blendedArtists.push(selectedMoodArtists[i]);
+		}
+	}
+	
+	console.log(`discoverByMoodActivity: Blended list contains ${blendedArtists.length} artists (${selectedSeedArtists.length} seed + ${selectedMoodArtists.length} mood)`);
+	
+	// STEP 5: Build candidates from blended list
+	updateProgress(`Building candidate list from ${blendedArtists.length} artists...`, 0.6);
+	
+	for (const artist of blendedArtists) {
+		if (!artist) continue;
+		addArtistCandidate(artist, seenArtists, blacklist, candidates);
+	}
+	
+	console.log(`discoverByMoodActivity: Found ${candidates.length} candidate artists for ${context} "${value}" (after blacklist filtering)`);
+	
+	// STEP 6: Fetch top tracks for each artist
+	if (candidates.length > 0) {
+		updateProgress(`Fetching tracks for ${context}-matched artists...`, 0.65);
+		await fetchTracksForCandidates(modules, candidates, config);
+	}
+	
+	return candidates;
+}
+
+/**
+ * Extract genres from seed tracks for ReccoBeats recommendations.
+ * @param {Array} seeds - Seed objects [{artist, title, genre}, ...]
+ * @returns {string[]} Array of genre names
+ */
+function extractGenresFromSeeds(seeds) {
+	const genres = new Set();
+	for (const seed of seeds) {
+		if (seed.genre) {
+			const genreList = seed.genre.split(';').map(g => g.trim()).filter(Boolean);
+			for (const g of genreList) genres.add(g);
+		}
+	}
+	return Array.from(genres).slice(0, 5); // Top 5 genres
+}
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -555,7 +742,7 @@ async function fetchTracksForCandidates(modules, candidates, config) {
 /**
  * Get the appropriate discovery function for a mode.
  * 
- * @param {string} mode - Discovery mode ('artist', 'track', 'genre')
+ * @param {string} mode - Discovery mode ('artist', 'track', 'genre', 'mood', 'activity')
  * @returns {Function} Discovery function
  */
 function getDiscoveryStrategy(mode) {
@@ -564,6 +751,9 @@ function getDiscoveryStrategy(mode) {
 			return discoverByTrack;
 		case DISCOVERY_MODES.GENRE:
 			return discoverByGenre;
+		case DISCOVERY_MODES.MOOD:
+		case DISCOVERY_MODES.ACTIVITY:
+			return discoverByMoodActivity;
 		case DISCOVERY_MODES.ARTIST:
 		default:
 			return discoverByArtist;
@@ -582,6 +772,10 @@ function getDiscoveryModeName(mode) {
 			return 'Similar Tracks';
 		case DISCOVERY_MODES.GENRE:
 			return 'Similar Genre';
+		case DISCOVERY_MODES.MOOD:
+			return 'Mood';
+		case DISCOVERY_MODES.ACTIVITY:
+			return 'Activity';
 		case DISCOVERY_MODES.ARTIST:
 		default:
 			return 'Similar Artists';
@@ -594,6 +788,7 @@ window.matchMonkeyDiscoveryStrategies = {
 	discoverByArtist,
 	discoverByTrack,
 	discoverByGenre,
+	discoverByMoodActivity,
 	getDiscoveryStrategy,
 	getDiscoveryModeName,
 	buildBlacklist,

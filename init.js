@@ -41,6 +41,7 @@ localRequirejs('modules/ui/notifications');
 // API (depend on utils and settings)
 localRequirejs('modules/api/cache');
 localRequirejs('modules/api/lastfm');
+localRequirejs('modules/api/reccobeats');  // NEW: ReccoBeats API integration
 	
 // Database individual modules FIRST
 localRequirejs('modules/db/library');
@@ -112,6 +113,14 @@ localRequirejs('modules/core/mm5Integration');
 		ClearQueueFirst: false,         // Clear queue before adding
 		SkipDuplicates: true,           // Skip tracks already in queue
 		NavigateAfter: 'Navigate to new playlist', // Navigation after completion
+
+		// === Mood/Activity Discovery (ReccoBeats) ===
+		MoodDiscoveryEnabled: false,    // Enable mood-based discovery
+		DefaultMood: 'energetic',        // Default mood: energetic, relaxed, happy, sad, focused
+		DefaultActivity: 'workout',      // Default activity: workout, study, party, sleep, driving
+		PlaylistDuration: 60,            // Target playlist duration in minutes
+		HybridMode: true,                // Combine ReccoBeats + Last.fm (recommended)
+		MoodActivityBlendRatio: 0.5,    // Blend ratio: 0.5 = 50% seeds + 50% mood (0=all mood, 1=all seeds)
 
 		// === Filters ===
 		ArtistBlacklist: '',            // Comma-separated blacklisted artists

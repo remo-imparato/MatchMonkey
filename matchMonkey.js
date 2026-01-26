@@ -91,11 +91,15 @@
 		 * - 'artist': Use artist.getSimilar to find similar artists
 		 * - 'track': Use track.getSimilar to find musically similar tracks
 		 * - 'genre': Use tag.getTopArtists to find artists in same genre
+		 * - 'mood': Use ReccoBeats mood API + Last.fm hybrid
+		 * - 'activity': Use ReccoBeats activity API + Last.fm hybrid
 		 */
 		const DISCOVERY_MODES = {
 			ARTIST: 'artist',
 			TRACK: 'track',
-			GENRE: 'genre'
+			GENRE: 'genre',
+			MOOD: 'mood',
+			ACTIVITY: 'activity'
 		};
 
 		// ============================================================================
@@ -194,6 +198,82 @@
 				return autoMode.isAutoModeEnabled(getSetting);
 			} catch (e) {
 				return false;
+			}
+		}
+
+		/**
+		 * Run mood/activity-based playlist generation.
+		 * 
+		 * Uses ReccoBeats API for mood/activity recommendations combined with
+		 * Last.fm for similar artist expansion and library matching.
+		 * 
+		 * @param {string} [mood] - Target mood (e.g., 'energetic', 'relaxed', 'happy', 'sad')
+		 * @param {string} [activity] - Target activity (e.g., 'workout', 'study', 'party', 'sleep')
+		 * @returns {Promise<object>} Result from orchestration
+		 */
+		async function runMoodActivityPlaylist(mood, activity) {
+			try {
+				const { getSetting } = storage;
+				
+				// Determine context and value
+				let context, value;
+				
+				if (mood) {
+					context = 'mood';
+					value = mood;
+				} else if (activity) {
+					context = 'activity';
+					value = activity;
+				} else {
+					// Use defaults from settings
+					const moodEnabled = getSetting('MoodDiscoveryEnabled', false);
+					if (moodEnabled) {
+						context = 'mood';
+						value = getSetting('DefaultMood', 'energetic');
+					} else {
+						context = 'activity';
+						value = getSetting('DefaultActivity', 'workout');
+					}
+				}
+				
+				const hybridMode = getSetting('HybridMode', true);
+				
+				console.log(`Match Monkey: Running ${context}-based playlist (${value}, hybrid=${hybridMode})`);
+				
+				if (!hybridMode) {
+					console.warn('Match Monkey: Hybrid mode disabled - mood/activity requires hybrid mode for best results');
+				}
+				
+				// Use mood/activity discovery mode
+				const discoveryMode = context === 'mood' ? DISCOVERY_MODES.MOOD : DISCOVERY_MODES.ACTIVITY;
+				
+				// Add context to modules for discovery strategy
+				const enrichedModules = {
+					...modules,
+					_moodActivityContext: {
+						context,
+						value,
+						duration: getSetting('PlaylistDuration', 60)
+					}
+				};
+				
+				const result = await orchestration.generateSimilarPlaylist(enrichedModules, false, discoveryMode);
+				
+				if (result.success) {
+					console.log(`Match Monkey: ${context} playlist success - added ${result.tracksAdded} tracks`);
+				} else {
+					console.log(`Match Monkey: ${context} playlist completed - ${result.error}`);
+				}
+				
+				return result;
+				
+			} catch (e) {
+				console.error(`Match Monkey: Error in runMoodActivityPlaylist: ${e.toString()}`);
+				return {
+					success: false,
+					error: e.message || String(e),
+					tracksAdded: 0,
+				};
 			}
 		}
 
@@ -425,6 +505,7 @@
 			start,
 			shutdown,
 			runMatchMonkey,
+			runMoodActivityPlaylist,  // NEW: Mood/activity playlist generation
 			toggleAuto,
 			isAutoEnabled,
 

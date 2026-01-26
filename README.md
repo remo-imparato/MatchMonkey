@@ -15,6 +15,8 @@ MatchMonkey is a MediaMonkey 5 add-on that leverages the Last.fm API to discover
 - 🎵 **Smart Discovery**: Query Last.fm for similar artists based on selected tracks or currently playing music
 - 🔎 **Search by Title & Genre**: Discover tracks by matching track titles or by genre seeds in addition to artist-based discovery
 - 🎯 **Intelligent Matching**: Advanced multi-pass fuzzy matching finds tracks in your local library with high accuracy
+- 🎭 **Mood & Activity Playlists** *(NEW)*: Create context-aware playlists using ReccoBeats AI for moods (energetic, relaxed, happy) or activities (workout, study, party)
+- 🤝 **Hybrid Discovery** *(NEW)*: Combine ReccoBeats recommendations with Last.fm similarity for optimal results
 - 📋 **Flexible Output**: Create new playlists, overwrite existing ones, or queue tracks directly to Now Playing
 - 🤖 **Auto-Queue / Endless music**: Automatically queue similar tracks when approaching the end of your playlist; in auto-mode the add-on can continuously add tracks near the end to keep playback going
 - ⭐ **Ranking System**: Prioritize popular tracks using Last.fm's popularity rankings
@@ -50,11 +52,43 @@ MatchMonkey is a MediaMonkey 5 add-on that leverages the Last.fm API to discover
 
 ### Discovery Modes (new and existing)
 
-- Artist-based (default): discover similar artists for seed artist(s)
-- Track title search (new): use a seed title (or titles) to find matching tracks across your library and related artists
-- Genre search (new): discover artists and tracks matching a chosen genre
+- **Artist-based** (default): discover similar artists for seed artist(s)
+- **Track title search**: use a seed title (or titles) to find matching tracks across your library and related artists
+- **Genre search**: discover artists and tracks matching a chosen genre
+- **Mood-based** *(NEW)*: AI-powered mood playlists (energetic, relaxed, happy, sad, focused)
+- **Activity-based** *(NEW)*: Context-aware activity playlists (workout, study, party, sleep, driving)
 
 These discovery modes can be selected from the UI or context menu when invoking the add-on.
+
+### Mood & Activity Playlists *(NEW)*
+
+Generate playlists tailored to your current mood or activity:
+
+```javascript
+// Generate workout playlist
+window.matchMonkey.runMoodActivityPlaylist(null, 'workout');
+
+// Generate happy mood playlist
+window.matchMonkey.runMoodActivityPlaylist('happy', null);
+
+// Use defaults from settings
+window.matchMonkey.runMoodActivityPlaylist();
+```
+
+The hybrid mode combines:
+1. **Your Listening Context** - Artists similar to what you're playing (seed-based)
+2. **ReccoBeats AI** - Mood/activity-appropriate track recommendations
+3. **Last.fm** - Similar artist expansion and popularity data
+4. **Your Library** - Local track matching with quality filters
+
+**Blend Ratio**: Configure how much of your current listening vs mood recommendations (default 50/50)
+- `0.0` = Pure mood discovery
+- `0.5` = Balanced (your taste + mood)
+- `1.0` = Your taste with mood filtering
+
+**Example**: Select Pink Floyd tracks → Run "energetic" mood → Get energetic progressive rock!
+
+For detailed documentation, see [ReccoBeats Integration Guide](docs/RECCOBEATS_INTEGRATION.md).
 
 ### Usage guide & examples
 
@@ -109,7 +143,18 @@ Access settings via **Tools → Options → Similar Artists**
 | **Randomise playlists** | Shuffle the final track list |
 | **Include seed artist** | Include tracks from the original artist |
 | **Include seed track** | Include the original seed track (single seed only) |
-| **Discovery mode** | Choose Artist / Title / Genre discovery |
+| **Discovery mode** | Choose Artist / Title / Genre / Mood / Activity |
+
+### Mood & Activity Options *(NEW)*
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| **MoodDiscoveryEnabled** | Enable mood-based discovery | ☐ |
+| **DefaultMood** | Default mood (energetic, relaxed, happy, sad, focused) | energetic |
+| **DefaultActivity** | Default activity (workout, study, party, sleep, driving) | workout |
+| **PlaylistDuration** | Target playlist duration in minutes | 60 |
+| **HybridMode** | Combine ReccoBeats + Last.fm (recommended) | ☑ |
+| **MoodActivityBlendRatio** | Seed vs mood balance (0=all mood, 0.5=balanced, 1=all seed) | 0.5 |
 
 ### Playlist Creation
 
@@ -179,7 +224,8 @@ The add-on intelligently handles common artist name prefix patterns:
 
 - **MediaMonkey 5.0+**
 - **Last.fm API Key** (default included)
-- **Internet Connection** (for Last.fm queries)
+- **Internet Connection** (for Last.fm and ReccoBeats queries)
+- **ReccoBeats API** (optional, for mood/activity playlists)
 
 ### Architecture
 
@@ -207,6 +253,7 @@ The add-on intelligently handles common artist name prefix patterns:
 
 - **Ventis Media** - MediaMonkey 5 platform and API
 - **Last.fm** - Music recommendation API
+- **ReccoBeats** - AI-powered mood and activity recommendations
 - **MediaMonkey Community** - Testing and feedback
 
 ---
@@ -239,6 +286,18 @@ Found a bug or have a feature idea? Please open an issue on the [GitHub Issues](
 
 ## 🔄 Changelog
 
+### Version 2.1 (ReccoBeats Integration) *(NEW)*
+
+- ✨ **ReccoBeats API Integration**: AI-powered mood and activity-based playlists
+- ✨ **Mood Playlists**: Generate playlists for energetic, relaxed, happy, sad, focused moods
+- ✨ **Activity Playlists**: Create context-aware playlists for workout, study, party, sleep, driving
+- ✨ **Seed-Aware Discovery**: Blends your current listening with mood/activity recommendations
+- ✨ **Configurable Blend Ratio**: Control balance between seed artists and mood recommendations (0.0-1.0)
+- ✨ **Intelligent Mixing**: Interleaves seed-based and mood-based artists for optimal variety
+- ✨ **Hybrid Discovery**: Combine ReccoBeats recommendations with Last.fm artist expansion
+- ✨ **Intelligent Caching**: ReccoBeats responses cached for faster subsequent queries
+- 📚 **Documentation**: Comprehensive [ReccoBeats Integration Guide](docs/RECCOBEATS_INTEGRATION.md)
+
 ### Version 2.0 (Recent updates)
 
 - ✨ New discovery modes: **Search by Title,** **Search by Artist** and **Search by Genre**
@@ -266,16 +325,21 @@ Found a bug or have a feature idea? Please open an issue on the [GitHub Issues](
 
 - [MediaMonkey 5 Download](https://www.mediamonkey.com/)
 - [Last.fm API Documentation](https://www.last.fm/api)
+- [ReccoBeats API Documentation](https://reccobeats.com/docs/apis/reccobeats-api)
 - [MediaMonkey Forums](https://www.mediamonkey.com/forum/)
 - [GitHub Repository](https://github.com/remo-imparato/SimilarArtistsMM5)
+- [ReccoBeats Integration Guide](docs/RECCOBEATS_INTEGRATION.md)
 
 ---
 
 ## 💡 Tips & Tricks
 
 1. **Use Auto-Queue Mode** - Enable it in settings for endless music discovery
-3. **Seed Multiple Tracks** - Select multiple tracks for more diverse recommendations
+2. **Mood Playlists** *(NEW)* - Try `runMoodActivityPlaylist('energetic', null)` for instant workout mixes
+3. **Activity Context** *(NEW)* - Use activity-based discovery for studying, working, or relaxing
+4. **Seed Multiple Tracks** - Select multiple tracks for more diverse recommendations
 5. **Ranking Mode** - Enable "Select highest ranked by Last.fm" for popular tracks
+6. **Hybrid Mode** *(NEW)* - Keep HybridMode enabled for best mood/activity recommendations
 
 ---
 
