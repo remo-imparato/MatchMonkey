@@ -507,6 +507,67 @@ async function discoverByMoodActivity(modules, seeds, config) {
 // ============================================================================
 
 /**
+ * Get trackid from roccobeats
+ */
+async function getReccoTrackId(artist, title, apiKey) {
+	// Normalize helper
+	const normalize = (s) =>
+		s.toLowerCase().replace(/[\s\-\_\(\)\[\]\.]+/g, "").trim();
+
+	// Shared headers
+	const myHeaders = new Headers();
+	myHeaders.append("Accept", "application/json");
+	myHeaders.append("x-api-key", apiKey);
+
+	const requestOptions = {
+		method: "GET",
+		headers: myHeaders,
+		redirect: "follow"
+	};
+
+	// 1?? Search for artist
+	const artistSearchUrl =
+		"https://api.reccobeats.com/v1/search/artist?q=" +
+		encodeURIComponent(artist);
+
+	const artistRes = await fetch(artistSearchUrl, requestOptions);
+	const artistJson = await artistRes.json();
+
+	if (!artistJson?.data?.length) {
+		console.error("Artist not found:", artist);
+		return null;
+	}
+
+	const artistId = artistJson.data[0].id;
+
+	// 2?? Get tracks for that artist
+	const tracksUrl =
+		`https://api.reccobeats.com/v1/artist/${artistId}/tracks`;
+
+	const tracksRes = await fetch(tracksUrl, requestOptions);
+	const tracksJson = await tracksRes.json();
+
+	if (!tracksJson?.data?.length) {
+		console.error("No tracks found for artist:", artist);
+		return null;
+	}
+
+	// 3?? Match title
+	const normalizedTitle = normalize(title);
+
+	const match = tracksJson.data.find(
+		(t) => normalize(t.trackTitle) === normalizedTitle
+	);
+
+	if (!match) {
+		console.error("Track title not found:", title);
+		return null;
+	}
+
+	return match.id; // This is the trackId
+}
+
+/**
  * Build blacklist set from user settings.
  */
 function buildBlacklist(modules) {
