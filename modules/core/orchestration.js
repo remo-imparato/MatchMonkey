@@ -469,7 +469,7 @@ window.matchMonkeyOrchestration = {
 	 */
 	async buildResultsPlaylist(modules, tracks, config) {
 		const { db, settings: { storage }, ui: { notifications } } = modules;
-		const { stringSetting, boolSetting } = storage;
+		const { stringSetting } = storage;
 		const { showToast } = notifications;
 
 		const playlistTemplate = stringSetting('PlaylistName', '- Similar to %');
@@ -487,19 +487,20 @@ window.matchMonkeyOrchestration = {
 
 		console.log(`Match Monkey: Creating playlist "${playlistName}" with ${tracks.length} tracks`);
 
-		let playlist;
+		let playlist = null;
+		let shouldClearTracks = false;
 
 		try {
-			// Handle playlist mode
+			// Step 1: Handle overwrite mode - find existing playlist and mark for clearing
 			if (playlistMode === 'Overwrite existing playlist') {
 				playlist = db.findPlaylist(playlistName);
 				if (playlist) {
-					// Clear existing tracks
-					playlist.clear?.();
+					console.log(`Match Monkey: Found existing playlist "${playlistName}", will clear tracks`);
+					shouldClearTracks = true;
 				}
 			}
 
-			// Create or get playlist
+			// Step 2: If no playlist found (or not in overwrite mode), create new one
 			if (!playlist) {
 				playlist = await db.createPlaylist(playlistName, parentName);
 			}
@@ -508,15 +509,27 @@ window.matchMonkeyOrchestration = {
 				throw new Error('Failed to create playlist');
 			}
 
-			// Add tracks to playlist
+			// Step 3: Clear tracks if in overwrite mode
+			if (shouldClearTracks) {
+				console.log(`Match Monkey: Clearing tracks from existing playlist`);
+				try {
+					if (typeof playlist.clear === 'function') {
+						playlist.clear();
+					}
+				} catch (clearError) {
+					console.warn(`Match Monkey: Error clearing playlist:`, clearError);
+				}
+			}
+
+			// Step 4: Add tracks to playlist
 			await db.addTracksToPlaylist(playlist, tracks);
 
-			// Commit changes
+			// Step 5: Commit changes
 			if (typeof playlist.commitAsync === 'function') {
 				await playlist.commitAsync();
 			}
 
-			// Navigate if requested
+			// Step 6: Navigate if requested
 			if (navigateAfter === 'Navigate to new playlist' && playlist) {
 				try {
 					app.uiTools?.showNode?.(playlist);

@@ -31,7 +31,7 @@ actions.similarArtistsRun = {
 	hotkeyAble: true,
 	visible: true,
 	disabled: uitools.notMediaListSelected,
-	execute: function() {
+	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
 			window.matchMonkey.runMatchMonkey(false, 'artist');
 		} else {
@@ -50,7 +50,7 @@ actions.similarTracksRun = {
 	hotkeyAble: true,
 	visible: true,
 	disabled: uitools.notMediaListSelected,
-	execute: function() {
+	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
 			window.matchMonkey.runMatchMonkey(false, 'track');
 		} else {
@@ -69,9 +69,47 @@ actions.similarGenreRun = {
 	hotkeyAble: true,
 	visible: true,
 	disabled: uitools.notMediaListSelected,
-	execute: function() {
+	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
 			window.matchMonkey.runMatchMonkey(false, 'genre');
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	},
+	getTracklist: uitools.getSelectedTracklist
+};
+
+/**
+ * Run Mood action
+ */
+actions.similarMoodRun = {
+	title: _('Similar &Mood'),
+	icon: 'actor',
+	hotkeyAble: true,
+	visible: true,
+	disabled: uitools.notMediaListSelected,
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'mood');
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	},
+	getTracklist: uitools.getSelectedTracklist
+};
+
+/**
+ * Run Activity action
+ */
+actions.similarActivityRun = {
+	title: _('Similar &Activity'),
+	icon: 'mediamonkey',
+	hotkeyAble: true,
+	visible: true,
+	disabled: uitools.notMediaListSelected,
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity');
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
@@ -89,16 +127,16 @@ actions.matchMonkeyToggleAuto = {
 	hotkeyAble: true,
 	visible: true,
 	disabled: false,
-	
-	checked: function() {
+
+	checked: function () {
 		try {
 			return Boolean(window.matchMonkey && window.matchMonkey.isAutoEnabled && window.matchMonkey.isAutoEnabled());
 		} catch (e) {
 			return false;
 		}
 	},
-	
-	execute: function() {
+
+	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.toggleAuto) {
 			window.matchMonkey.toggleAuto();
 		} else {
@@ -121,8 +159,10 @@ _menuItems.tools.action.submenu.push({
 			{ action: actions.similarArtistsRun, order: 10 },
 			{ action: actions.similarTracksRun, order: 20 },
 			{ action: actions.similarGenreRun, order: 30 },
-			{ separator: true, order: 40 },
-			{ action: actions.matchMonkeyToggleAuto, order: 50 }
+			{ action: actions.similarMoodRun, order: 40 },
+			{ action: actions.similarActivityRun, order: 45 },
+			{ separator: true, order: 50 },
+			{ action: actions.matchMonkeyToggleAuto, order: 60 }
 		]
 	},
 	order: 40,
@@ -139,7 +179,7 @@ if (!window.menus) {
 }
 
 // Wait for tracklistMenuItems to be initialized, then add our items
-(function() {
+(function () {
 	var matchMonkeyMenuItem = {
 		action: {
 			title: _('&Match Monkey...'),
@@ -149,28 +189,29 @@ if (!window.menus) {
 			submenu: [
 				{ action: actions.similarArtistsRun, order: 10 },
 				{ action: actions.similarTracksRun, order: 20 },
-				{ action: actions.similarGenreRun, order: 30 }
+				{ action: actions.similarGenreRun, order: 30 },
+				{ action: actions.similarMoodRun, order: 40 }
 			]
 		},
 		order: 100,
 		grouporder: 50
 	};
-	
+
 	// Check if tracklistMenuItems is already initialized
 	if (window.menus.tracklistMenuItems && Array.isArray(window.menus.tracklistMenuItems)) {
 		// Already initialized, add our item
 		window.menus.tracklistMenuItems.push(matchMonkeyMenuItem);
 	} else {
 		// Not yet initialized, wait for it
-		var checkInterval = setInterval(function() {
+		var checkInterval = setInterval(function () {
 			if (window.menus.tracklistMenuItems && Array.isArray(window.menus.tracklistMenuItems)) {
 				clearInterval(checkInterval);
 				window.menus.tracklistMenuItems.push(matchMonkeyMenuItem);
 			}
 		}, 100);
-		
+
 		// Fallback: if it never initializes (shouldn't happen), create it
-		setTimeout(function() {
+		setTimeout(function () {
 			if (!window.menus.tracklistMenuItems) {
 				clearInterval(checkInterval);
 				console.warn('MatchMonkey: tracklistMenuItems never initialized, creating array');
