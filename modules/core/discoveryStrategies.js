@@ -5,8 +5,10 @@
  * - Artist-based: Use Last.fm artist.getSimilar API
  * - Track-based: Use Last.fm track.getSimilar API  
  * - Genre-based: Use Last.fm tag.getTopArtists API
+ * - Mood/Activity: Use ReccoBeats AI + Last.fm hybrid
  * 
  * Each strategy returns a list of artist/track candidates to search in the local library.
+ * All strategies respect user-configured limits and preferences.
  * 
  * MediaMonkey 5 API Only
  * 
@@ -27,16 +29,20 @@ const DISCOVERY_MODES = {
 	ACTIVITY: 'activity'
 };
 
+// ============================================================================
+// ARTIST-BASED DISCOVERY
+// ============================================================================
+
 /**
  * Artist-based discovery strategy.
  * 
  * Uses Last.fm artist.getSimilar to find similar artists, then gets their top tracks.
  * For tracks with multiple artists (separated by ';'), makes separate API calls for each.
- * This is the original/classic approach.
+ * This is the original/classic approach - best for discovering new artists in same genre.
  * 
  * @param {object} modules - Module dependencies
  * @param {Array} seeds - Seed objects [{artist, title, genre}, ...]
- * @param {object} config - Configuration settings
+ * @param {object} config - Configuration settings from user preferences
  * @returns {Promise<Array>} Array of {artist, tracks[]} candidates
  */
 async function discoverByArtist(modules, seeds, config) {
@@ -47,89 +53,71 @@ async function discoverByArtist(modules, seeds, config) {
 
 	const candidates = [];
 	const seenArtists = new Set();
-
-	// Build blacklist
 	const blacklist = buildBlacklist(modules);
 
-	// Limit number of seeds to process
-	const seedLimit = Math.min(seeds.length, config.seedLimit || 20);
+	// Extract unique artists from seeds (respecting seedLimit)
+	const uniqueArtists = extractSeedArtists(seeds, config.seedLimit || 20);
+	const artistCount = uniqueArtists.length;
 
-	// Collect all unique artists from seeds (splitting by ';')
-	const uniqueArtists = new Set();
-	for (let i = 0; i < seedLimit; i++) {
-		const seed = seeds[i];
-		if (seed.artist) {
-			const artists = seed.artist.split(';').map(a => a.trim()).filter(Boolean);
-			for (const artist of artists) {
-				uniqueArtists.add(artist);
-			}
-		}
-	}
+	console.log(`discoverByArtist: Processing ${artistCount} seed artist(s), max ${config.similarLimit} similar each`);
 
-	const artistList = Array.from(uniqueArtists);
-	const artistLimit = Math.min(artistList.length, config.seedLimit || 20);
-
-	console.log(`discoverByArtist: Processing ${artistLimit} seed artists, fetching up to ${config.similarLimit} similar each`);
-
-	for (let i = 0; i < artistLimit; i++) {
-		const artistName = artistList[i];
-		const progress = (i + 1) / artistLimit;
-		updateProgress(`Finding similar artists to "${artistName}"...`, progress * 0.3);
+	for (let i = 0; i < artistCount; i++) {
+		const artistName = uniqueArtists[i];
+		const progress = 0.1 + ((i + 1) / artistCount) * 0.3;
+		updateProgress(`Finding artists similar to "${artistName}" (${i + 1}/${artistCount})...`, progress);
 
 		try {
-			// Fetch similar artists from Last.fm
 			const fixedName = fixPrefixes(artistName);
-			const similar = await fetchSimilarArtists(
-				fixedName,
-				config.similarLimit || 20
-			);
+			const similar = await fetchSimilarArtists(fixedName, config.similarLimit || 20);
 
 			if (!similar || similar.length === 0) {
-				console.log(`discoverByArtist: No similar artists found for "${artistName}"`);
+				console.log(`discoverByArtist: No similar artists for "${artistName}"`);
 				continue;
 			}
 
-			// Optionally include seed artist
-			console.log(`discoverByArtist: Include seed artist = ${config.includeSeedArtist}`);
+			// Include seed artist if configured
 			if (config.includeSeedArtist) {
 				addArtistCandidate(artistName, seenArtists, blacklist, candidates);
 			}
 
-			// Add similar artists (respect similarLimit)
-			const limitedSimilar = similar.slice(0, config.similarLimit || 20);
-			for (const artist of limitedSimilar) {
+			// Add similar artists
+			for (const artist of similar.slice(0, config.similarLimit || 20)) {
 				if (artist?.name) {
 					addArtistCandidate(artist.name, seenArtists, blacklist, candidates);
 				}
 			}
 
 		} catch (e) {
-			console.error(`discoverByArtist: Error processing seed "${artistName}": ${e.toString()}`);
+			console.error(`discoverByArtist: Error for "${artistName}": ${e.message}`);
 		}
 	}
 
 	console.log(`discoverByArtist: Found ${candidates.length} candidate artists`);
 
-	// Fetch top tracks for each candidate artist
+	// Fetch top tracks for all candidates
 	if (candidates.length > 0) {
-		updateProgress('Fetching top tracks for similar artists...', 0.4);
+		updateProgress(`Fetching top tracks for ${candidates.length} artists...`, 0.4);
 		await fetchTracksForCandidates(modules, candidates, config);
 	}
 
 	return candidates;
 }
 
+// ============================================================================
+// TRACK-BASED DISCOVERY
+// ============================================================================
+
 /**
  * Track-based discovery strategy.
  * 
  * Uses Last.fm track.getSimilar to find musically similar tracks across different artists.
  * This can discover music from artists you might not have found via artist.getSimilar.
- * For tracks with multiple artists (separated by ';'), makes separate API calls for each.
+ * Best for finding different versions, covers, and musically similar tracks.
  * 
  * @param {object} modules - Module dependencies
  * @param {Array} seeds - Seed objects [{artist, title, genre}, ...]
  * @param {object} config - Configuration settings
- * @returns {Promise<Array>}
+ * @returns {Promise<Array>} Array of {artist, tracks[]} candidates
  */
 async function discoverByTrack(modules, seeds, config) {
 	const { api: { lastfmApi }, settings: { prefixes }, ui: { notifications } } = modules;
@@ -140,96 +128,41 @@ async function discoverByTrack(modules, seeds, config) {
 	const candidates = [];
 	const seenArtists = new Set();
 	const tracksByArtist = new Map(); // artist -> {artistName, tracks[]}
-
-	// Build blacklist
 	const blacklist = buildBlacklist(modules);
 
 	// Limit seeds for track-based discovery (more API-intensive)
 	const seedLimit = Math.min(seeds.length, config.seedLimit || 5);
+	const trackSimilarLimit = config.trackSimilarLimit || 100;
 
-	// Use the user's configured track similar limit from settings
-	// This allows users to configure how many similar tracks to fetch per seed
-	const trackSimilarLimit = config.trackSimilarLimit || config.TrackSimilarLimit || 100;
-
-	// If includeSeedArtist is enabled, add seed artists first
-	console.log(`discoverByTrack: Include seed artist = ${config.includeSeedArtist}`);
+	// If includeSeedArtist is enabled, add seed tracks first
 	if (config.includeSeedArtist) {
-		for (let i = 0; i < seedLimit; i++) {
-			const seed = seeds[i];
-			if (!seed.artist || !seed.title) continue;
-
-			const artists = seed.artist.split(';').map(a => a.trim()).filter(Boolean);
-
-			for (const artistName of artists) {
-				const artKey = artistName.toUpperCase();
-				if (blacklist.has(artKey)) continue;
-				if (seenArtists.has(artKey)) continue;
-
-				seenArtists.add(artKey);
-
-				// Add seed track for this seed artist
-				if (!tracksByArtist.has(artKey)) {
-					tracksByArtist.set(artKey, {
-						artistName: artistName,
-						tracks: []
-					});
-				}
-
-				const entry = tracksByArtist.get(artKey);
-				const trackKey = seed.title.toUpperCase();
-				const exists = entry.tracks.some(t => t.title.toUpperCase() === trackKey);
-				if (!exists) {
-					entry.tracks.push({
-						title: seed.title,
-						match: 1.0, // Seed tracks get perfect match score
-						playcount: 0
-					});
-				}
-			}
-		}
-		console.log(`discoverByTrack: Added ${seenArtists.size} seed artists`);
+		addSeedTracksToResults(seeds, seedLimit, blacklist, seenArtists, tracksByArtist);
 	}
 
-	console.log(`discoverByTrack: Processing ${seedLimit} seed tracks, fetching up to ${trackSimilarLimit} similar tracks each`);
+	console.log(`discoverByTrack: Processing ${seedLimit} seed tracks, max ${trackSimilarLimit} similar each`);
 
 	for (let i = 0; i < seedLimit; i++) {
 		const seed = seeds[i];
-		const trackTitle = seed.title;
+		if (!seed?.artist || !seed?.title) continue;
 
-		if (!trackTitle) {
-			console.log(`discoverByTrack: Seed ${i} has no track title, skipping`);
-			continue;
-		}
+		const progress = 0.1 + ((i + 1) / seedLimit) * 0.4;
+		updateProgress(`Finding tracks similar to "${seed.title}" (${i + 1}/${seedLimit})...`, progress);
 
-		if (!seed.artist) {
-			console.log(`discoverByTrack: Seed ${i} has no artist, skipping`);
-			continue;
-		}
-
-		// Split artists by ';' and make separate API calls for each
+		// Split artists by ';' and query each separately
 		const artists = seed.artist.split(';').map(a => a.trim()).filter(Boolean);
-
-		const progress = (i + 1) / seedLimit;
-		updateProgress(`Finding tracks similar to "${trackTitle}"...`, progress * 0.5);
 
 		for (const artistName of artists) {
 			const fixedArtistName = fixPrefixes(artistName);
 
 			try {
-				// Fetch similar tracks from Last.fm for this artist/track combination
-				// Use the user's configured limit
-				const similarTracks = await fetchSimilarTracks(
-					fixedArtistName,
-					trackTitle,
-					trackSimilarLimit
-				);
+				const similarTracks = await fetchSimilarTracks(fixedArtistName, seed.title, trackSimilarLimit);
 
 				if (!similarTracks || similarTracks.length === 0) {
-					console.log(`discoverByTrack: No similar tracks found for "${fixedArtistName} - ${trackTitle}"`);
+					console.log(`discoverByTrack: No similar tracks for "${fixedArtistName} - ${seed.title}"`);
 					continue;
 				}
 
-				console.log(`discoverByTrack: Found ${similarTracks.length} similar tracks for "${fixedArtistName} - ${trackTitle}"`);
+				console.log(`discoverByTrack: Found ${similarTracks.length} similar to "${fixedArtistName} - ${seed.title}"`);
 
 				// Group by artist
 				for (const simTrack of similarTracks) {
@@ -246,11 +179,10 @@ async function discoverByTrack(modules, seeds, config) {
 					}
 
 					const entry = tracksByArtist.get(artKey);
-
-					// Check if we already have this track
 					const trackKey = simTrack.title.toUpperCase();
-					const exists = entry.tracks.some(t => t.title.toUpperCase() === trackKey);
-					if (!exists) {
+					
+					// Avoid duplicate tracks
+					if (!entry.tracks.some(t => t.title.toUpperCase() === trackKey)) {
 						entry.tracks.push({
 							title: simTrack.title,
 							match: simTrack.match || 0,
@@ -260,12 +192,12 @@ async function discoverByTrack(modules, seeds, config) {
 				}
 
 			} catch (e) {
-				console.error(`discoverByTrack: Error processing seed track "${fixedArtistName} - ${trackTitle}": ${e.toString()}`);
+				console.error(`discoverByTrack: Error for "${fixedArtistName} - ${seed.title}": ${e.message}`);
 			}
 		}
 	}
 
-	// Convert to candidate format
+	// Convert to candidate format, sorted by match score
 	for (const [artKey, data] of tracksByArtist) {
 		if (seenArtists.has(artKey)) continue;
 		seenArtists.add(artKey);
@@ -273,7 +205,6 @@ async function discoverByTrack(modules, seeds, config) {
 		// Sort tracks by match score (highest first)
 		data.tracks.sort((a, b) => (b.match || 0) - (a.match || 0));
 
-		// Limit tracks per artist
 		candidates.push({
 			artist: data.artistName,
 			tracks: data.tracks.slice(0, config.tracksPerArtist || 10)
@@ -285,14 +216,15 @@ async function discoverByTrack(modules, seeds, config) {
 	return candidates;
 }
 
+// ============================================================================
+// GENRE-BASED DISCOVERY
+// ============================================================================
+
 /**
  * Genre-based discovery strategy.
  * 
  * Uses Last.fm artist.getInfo to get genres/tags, then tag.getTopArtists to find
- * popular artists in those genres. Also uses genre from seed tracks if available.
- * For tracks with multiple genres (separated by ';'), processes each genre.
- * 
- * IMPORTANT: This strategy respects config limits to prevent collecting too many artists.
+ * popular artists in those genres. Best for exploring a genre more broadly.
  * 
  * @param {object} modules - Module dependencies
  * @param {Array} seeds - Seed objects [{artist, title, genre}, ...]
@@ -308,40 +240,26 @@ async function discoverByGenre(modules, seeds, config) {
 	const candidates = [];
 	const seenArtists = new Set();
 	const collectedTags = new Map(); // tag -> count (to prioritize common tags)
-
-	// Build blacklist
 	const blacklist = buildBlacklist(modules);
 
-	// IMPORTANT: Apply config limits to prevent over-collection
-	const maxCandidates = config.similarLimit || 20; // Total similar artists to collect
-	const maxTagsToSearch = Math.min(5, Math.ceil(maxCandidates / 5)); // Search up to 5 tags
-	const artistsPerTag = Math.ceil(maxCandidates / maxTagsToSearch); // Distribute across tags
+	// Apply limits
+	const maxCandidates = config.similarLimit || 20;
+	const maxTagsToSearch = Math.min(5, Math.ceil(maxCandidates / 5));
+	const artistsPerTag = Math.ceil(maxCandidates / maxTagsToSearch);
 
-	console.log(`discoverByGenre: Target ${maxCandidates} candidates from ${maxTagsToSearch} tags (${artistsPerTag} per tag)`);
+	console.log(`discoverByGenre: Target ${maxCandidates} candidates from up to ${maxTagsToSearch} tags`);
 
-	// Step 1: Collect genres/tags from seed tracks and their artists
+	// Step 1: Collect genres from seed tracks
 	updateProgress('Analyzing seed genres...', 0.1);
 
 	const seedLimit = Math.min(seeds.length, config.seedLimit || 5);
 
-	// If includeSeedArtist is enabled, add seed artists first
-	console.log(`discoverByGenre: Include seed artist = ${config.includeSeedArtist}`);
+	// Include seed artists if configured
 	if (config.includeSeedArtist) {
-		const uniqueSeedArtists = new Set();
-		for (let i = 0; i < seedLimit; i++) {
-			const seed = seeds[i];
-			if (seed.artist) {
-				const artists = seed.artist.split(';').map(a => a.trim()).filter(Boolean);
-				for (const artist of artists) {
-					uniqueSeedArtists.add(artist);
-				}
-			}
-		}
-
-		for (const artistName of uniqueSeedArtists) {
+		const seedArtists = extractSeedArtists(seeds, seedLimit);
+		for (const artistName of seedArtists) {
 			addArtistCandidate(artistName, seenArtists, blacklist, candidates);
 		}
-		console.log(`discoverByGenre: Added ${candidates.length} seed artists`);
 	}
 
 	// First, collect genres directly from seed tracks (highest priority)
@@ -356,105 +274,74 @@ async function discoverByGenre(modules, seeds, config) {
 		}
 	}
 
-	// Then, fetch additional tags from artists via Last.fm (if we don't have enough)
+	// Fetch additional tags from artists via Last.fm if needed
 	if (collectedTags.size < maxTagsToSearch) {
-		const uniqueArtists = new Set();
-		for (let i = 0; i < seedLimit; i++) {
-			const seed = seeds[i];
-			if (seed.artist) {
-				const artists = seed.artist.split(';').map(a => a.trim()).filter(Boolean);
-				for (const artist of artists) {
-					uniqueArtists.add(artist);
-				}
-			}
-		}
-
-		const artistList = Array.from(uniqueArtists);
-		// Only fetch from a few artists to keep it quick
-		const artistLimit = Math.min(artistList.length, 3);
-
-		for (let i = 0; i < artistLimit; i++) {
-			const artistName = artistList[i];
-			const fixedName = fixPrefixes(artistName);
-
+		const uniqueArtists = extractSeedArtists(seeds, 3); // Only query first 3
+		
+		for (const artistName of uniqueArtists) {
 			try {
-				const artistInfo = await fetchArtistInfo(fixedName);
+				updateProgress(`Getting genre tags for "${artistName}"...`, 0.15);
+				const artistInfo = await fetchArtistInfo(fixPrefixes(artistName));
 
 				if (artistInfo?.tags && artistInfo.tags.length > 0) {
-					console.log(`discoverByGenre: "${artistName}" has tags: ${artistInfo.tags.slice(0, 3).join(', ')}`);
-
-					// Count tag occurrences (top 3 tags per artist)
 					for (const tag of artistInfo.tags.slice(0, 3)) {
 						const tagKey = tag.toLowerCase();
 						collectedTags.set(tagKey, (collectedTags.get(tagKey) || 0) + 1);
 					}
 				}
-
 			} catch (e) {
-				console.error(`discoverByGenre: Error getting info for "${artistName}": ${e.toString()}`);
+				console.warn(`discoverByGenre: Error getting tags for "${artistName}": ${e.message}`);
 			}
 		}
 	}
 
 	if (collectedTags.size === 0) {
-		console.log('discoverByGenre: No tags found for seed artists');
+		console.log('discoverByGenre: No tags found');
 		return candidates;
 	}
 
-	// Sort tags by frequency (most common first)
+	// Sort tags by frequency
 	const sortedTags = Array.from(collectedTags.entries())
 		.sort((a, b) => b[1] - a[1])
 		.map(([tag]) => tag);
 
 	console.log(`discoverByGenre: Top tags: ${sortedTags.slice(0, maxTagsToSearch).join(', ')}`);
 
-	// Step 2: Get top artists for each tag (with limits)
-	updateProgress('Finding artists in similar genres...', 0.3);
-
+	// Step 2: Get top artists for each tag
 	const numTags = Math.min(sortedTags.length, maxTagsToSearch);
 
 	for (let i = 0; i < numTags; i++) {
-		// Stop early if we have enough candidates
 		if (candidates.length >= maxCandidates) {
-			console.log(`discoverByGenre: Reached candidate limit (${maxCandidates}), stopping tag search`);
+			console.log(`discoverByGenre: Reached limit of ${maxCandidates} candidates`);
 			break;
 		}
 
 		const tag = sortedTags[i];
 		const progress = 0.3 + ((i + 1) / numTags) * 0.3;
-		updateProgress(`Searching "${tag}" genre...`, progress);
+		updateProgress(`Searching "${tag}" genre (${i + 1}/${numTags})...`, progress);
 
 		try {
-			// Only fetch as many artists as we need
 			const remainingNeeded = maxCandidates - candidates.length;
 			const fetchLimit = Math.min(artistsPerTag, remainingNeeded);
 
 			const tagArtists = await fetchArtistsByTag(tag, fetchLimit);
 
-			if (!tagArtists || tagArtists.length === 0) {
-				console.log(`discoverByGenre: No artists found for tag "${tag}"`);
-				continue;
-			}
-
-			console.log(`discoverByGenre: Found ${tagArtists.length} artists for tag "${tag}"`);
-
-			for (const artist of tagArtists) {
-				// Stop if we have enough
-				if (candidates.length >= maxCandidates) break;
-
-				if (artist?.name) {
-					addArtistCandidate(artist.name, seenArtists, blacklist, candidates);
+			if (tagArtists && tagArtists.length > 0) {
+				for (const artist of tagArtists) {
+					if (candidates.length >= maxCandidates) break;
+					if (artist?.name) {
+						addArtistCandidate(artist.name, seenArtists, blacklist, candidates);
+					}
 				}
 			}
-
 		} catch (e) {
-			console.error(`discoverByGenre: Error fetching artists for tag "${tag}": ${e.toString()}`);
+			console.warn(`discoverByGenre: Error for tag "${tag}": ${e.message}`);
 		}
 	}
 
-	console.log(`discoverByGenre: Found ${candidates.length} candidate artists from genre search (limit was ${maxCandidates})`);
+	console.log(`discoverByGenre: Found ${candidates.length} candidate artists`);
 
-	// Step 3: Fetch top tracks for candidates (with limit)
+	// Step 3: Fetch top tracks
 	if (candidates.length > 0) {
 		updateProgress('Fetching top tracks from genre artists...', 0.7);
 		await fetchTracksForCandidates(modules, candidates, config);
@@ -463,14 +350,20 @@ async function discoverByGenre(modules, seeds, config) {
 	return candidates;
 }
 
+// ============================================================================
+// MOOD/ACTIVITY-BASED DISCOVERY (ReccoBeats + Last.fm Hybrid)
+// ============================================================================
+
 /**
  * Mood/Activity-based discovery strategy (ReccoBeats + Last.fm hybrid).
  * 
  * Uses ReccoBeats API to get mood/activity-appropriate tracks, then
  * combines with Last.fm similar artists for better library matching.
  * 
- * ENHANCEMENT: Now blends seed artists with mood/activity recommendations
- * for personalized, context-aware playlists that respect your musical taste.
+ * The blendRatio controls the mix:
+ * - 0.0 = 100% mood-based (pure discovery)
+ * - 0.5 = 50% seed artists + 50% mood artists (balanced, default)
+ * - 1.0 = 100% seed-based with mood filtering
  * 
  * @param {object} modules - Module dependencies
  * @param {Array} seeds - Seed objects [{artist, title, genre}, ...]
@@ -496,45 +389,34 @@ async function discoverByMoodActivity(modules, seeds, config) {
 	// Extract context from config
 	const context = config.moodActivityContext || 'mood';
 	const value = config.moodActivityValue || 'energetic';
-	const blendRatio = config.moodActivityBlendRatio || 0.5; // 50% seeds, 50% mood by default
+	const blendRatio = config.moodActivityBlendRatio ?? 0.5;
+	const targetLimit = config.similarLimit || 20;
 	
-	console.log(`discoverByMoodActivity: Starting ${context}="${value}" discovery with ${seeds.length} seeds`);
-	console.log(`discoverByMoodActivity: Blend ratio - ${Math.round(blendRatio * 100)}% seed artists, ${Math.round((1 - blendRatio) * 100)}% mood artists`);
+	console.log(`discoverByMoodActivity: ${context}="${value}", blend=${Math.round(blendRatio * 100)}% seeds`);
 	
-	updateProgress(`Finding tracks for ${context}: ${value}...`, 0.1);
+	// Calculate how many artists to get from each source
+	const seedCount = Math.ceil(targetLimit * blendRatio);
+	const moodCount = targetLimit - seedCount;
 	
-	// STEP 1: Extract unique seed artists
-	const seedArtistSet = new Set();
-	for (const seed of seeds) {
-		if (seed.artist) {
-			const artists = seed.artist.split(';').map(a => a.trim()).filter(Boolean);
-			for (const artist of artists) {
-				seedArtistSet.add(artist);
-			}
-		}
-	}
+	updateProgress(`Analyzing ${context}: ${value}...`, 0.1);
 	
-	const seedArtists = Array.from(seedArtistSet);
-	console.log(`discoverByMoodActivity: Extracted ${seedArtists.length} unique seed artists`);
-	
-	// STEP 2: Get similar artists to seeds using Last.fm (seed-based component)
+	// -------------------------------------------------------------------------
+	// STEP 1: Get seed-based similar artists (from Last.fm)
+	// -------------------------------------------------------------------------
 	const seedSimilarArtists = [];
 	
-	if (seedArtists.length > 0 && blendRatio > 0) {
-		updateProgress(`Analyzing your listening context (${seedArtists.length} seed artists)...`, 0.15);
+	if (blendRatio > 0 && seeds.length > 0) {
+		const seedArtists = extractSeedArtists(seeds, config.seedLimit || 5);
 		
-		// Include seed artists if configured
+		// Include original seed artists if configured
 		if (config.includeSeedArtist) {
-			console.log(`discoverByMoodActivity: Including ${seedArtists.length} seed artists in results`);
 			seedSimilarArtists.push(...seedArtists);
 		}
 		
-		// Limit seed artists to process (avoid too many API calls)
-		const seedLimit = Math.min(seedArtists.length, config.seedLimit || 5);
-		
-		for (let i = 0; i < seedLimit; i++) {
+		// Expand with Last.fm similar artists
+		for (let i = 0; i < seedArtists.length; i++) {
 			const artistName = seedArtists[i];
-			const progress = 0.15 + ((i + 1) / seedLimit) * 0.15;
+			const progress = 0.1 + ((i + 1) / seedArtists.length) * 0.15;
 			updateProgress(`Finding artists similar to "${artistName}"...`, progress);
 			
 			try {
@@ -542,26 +424,23 @@ async function discoverByMoodActivity(modules, seeds, config) {
 				const similar = await fetchSimilarArtists(fixedName, 10);
 				
 				for (const s of similar) {
-					if (s?.name) {
-						seedSimilarArtists.push(s.name);
-					}
+					if (s?.name) seedSimilarArtists.push(s.name);
 				}
-				
-				console.log(`discoverByMoodActivity: Found ${similar.length} similar artists to "${artistName}"`);
-				
 			} catch (e) {
-				console.error(`discoverByMoodActivity: Error fetching similar for "${artistName}":`, e);
+				console.warn(`discoverByMoodActivity: Error for seed "${artistName}": ${e.message}`);
 			}
 		}
 		
-		console.log(`discoverByMoodActivity: Total seed-based artists: ${seedSimilarArtists.length}`);
+		console.log(`discoverByMoodActivity: ${seedSimilarArtists.length} artists from seeds`);
 	}
 	
-	// STEP 3: Get mood/activity-appropriate artists using ReccoBeats (mood-based component)
+	// -------------------------------------------------------------------------
+	// STEP 2: Get mood/activity-based artists (from ReccoBeats)
+	// -------------------------------------------------------------------------
 	const moodArtists = [];
 	
 	if (blendRatio < 1) {
-		updateProgress(`Fetching ${context}-appropriate recommendations...`, 0.35);
+		updateProgress(`Fetching ${context} recommendations...`, 0.3);
 		
 		const hybridResults = await reccobeatsApi.fetchHybridRecommendations(
 			context,
@@ -569,84 +448,58 @@ async function discoverByMoodActivity(modules, seeds, config) {
 			{
 				genres: extractGenresFromSeeds(seeds),
 				duration: config.playlistDuration || 60,
-				limit: Math.ceil((config.similarLimit || 20) * (1 - blendRatio) * 2) // Extra for filtering
+				limit: Math.max(moodCount * 2, 20) // Request extra for filtering
 			}
 		);
 		
 		for (const result of hybridResults) {
-			if (result.artist) {
-				moodArtists.push(result.artist);
-			}
+			if (result.artist) moodArtists.push(result.artist);
 		}
 		
-		console.log(`discoverByMoodActivity: ReccoBeats provided ${moodArtists.length} mood-appropriate artists`);
+		console.log(`discoverByMoodActivity: ${moodArtists.length} artists from ReccoBeats`);
 	}
 	
-	// STEP 4: Blend both approaches based on ratio
-	updateProgress(`Blending ${seedSimilarArtists.length} seed artists with ${moodArtists.length} mood artists...`, 0.5);
+	// -------------------------------------------------------------------------
+	// STEP 3: Blend both sources based on ratio
+	// -------------------------------------------------------------------------
+	updateProgress(`Blending results (${Math.round(blendRatio * 100)}% seeds)...`, 0.5);
 	
-	const targetLimit = config.similarLimit || 20;
-	const seedCount = Math.ceil(targetLimit * blendRatio);
-	const moodCount = targetLimit - seedCount;
+	// Deduplicate each list
+	const uniqueSeedArtists = [...new Set(seedSimilarArtists)];
+	const uniqueMoodArtists = [...new Set(moodArtists)];
 	
-	console.log(`discoverByMoodActivity: Target ${seedCount} seed-based + ${moodCount} mood-based = ${targetLimit} total`);
-	
-	// Deduplicate seed artists
-	const uniqueSeedArtists = Array.from(new Set(seedSimilarArtists));
-	const uniqueMoodArtists = Array.from(new Set(moodArtists));
-	
-	// Take proportional amounts from each source
+	// Take proportional amounts
 	const selectedSeedArtists = uniqueSeedArtists.slice(0, seedCount);
 	const selectedMoodArtists = uniqueMoodArtists.slice(0, moodCount);
 	
-	// Interleave both lists for better mixing
+	// Interleave for better variety
 	const blendedArtists = [];
 	const maxLength = Math.max(selectedSeedArtists.length, selectedMoodArtists.length);
 	
 	for (let i = 0; i < maxLength; i++) {
-		if (i < selectedSeedArtists.length) {
-			blendedArtists.push(selectedSeedArtists[i]);
-		}
-		if (i < selectedMoodArtists.length) {
-			blendedArtists.push(selectedMoodArtists[i]);
-		}
+		if (i < selectedSeedArtists.length) blendedArtists.push(selectedSeedArtists[i]);
+		if (i < selectedMoodArtists.length) blendedArtists.push(selectedMoodArtists[i]);
 	}
 	
-	console.log(`discoverByMoodActivity: Blended list contains ${blendedArtists.length} artists (${selectedSeedArtists.length} seed + ${selectedMoodArtists.length} mood)`);
+	console.log(`discoverByMoodActivity: Blended ${blendedArtists.length} artists (${selectedSeedArtists.length} seed + ${selectedMoodArtists.length} ${context})`);
 	
-	// STEP 5: Build candidates from blended list
-	updateProgress(`Building candidate list from ${blendedArtists.length} artists...`, 0.6);
+	// -------------------------------------------------------------------------
+	// STEP 4: Build candidates and fetch tracks
+	// -------------------------------------------------------------------------
+	updateProgress(`Building candidate list...`, 0.6);
 	
 	for (const artist of blendedArtists) {
-		if (!artist) continue;
-		addArtistCandidate(artist, seenArtists, blacklist, candidates);
+		if (artist) addArtistCandidate(artist, seenArtists, blacklist, candidates);
 	}
 	
-	console.log(`discoverByMoodActivity: Found ${candidates.length} candidate artists for ${context} "${value}" (after blacklist filtering)`);
+	console.log(`discoverByMoodActivity: ${candidates.length} candidates after blacklist filtering`);
 	
-	// STEP 6: Fetch top tracks for each artist
 	if (candidates.length > 0) {
-		updateProgress(`Fetching tracks for ${context}-matched artists...`, 0.65);
+		updateProgress(`Fetching tracks for ${candidates.length} artists...`, 0.65);
 		await fetchTracksForCandidates(modules, candidates, config);
 	}
 	
 	return candidates;
-}
-
-/**
- * Extract genres from seed tracks for ReccoBeats recommendations.
- * @param {Array} seeds - Seed objects [{artist, title, genre}, ...]
- * @returns {string[]} Array of genre names
- */
-function extractGenresFromSeeds(seeds) {
-	const genres = new Set();
-	for (const seed of seeds) {
-		if (seed.genre) {
-			const genreList = seed.genre.split(';').map(g => g.trim()).filter(Boolean);
-			for (const g of genreList) genres.add(g);
-		}
-	}
-	return Array.from(genres).slice(0, 5); // Top 5 genres
 }
 
 // ============================================================================
@@ -654,8 +507,7 @@ function extractGenresFromSeeds(seeds) {
 // ============================================================================
 
 /**
- * Build blacklist set from settings.
- * Supports both old and new property names.
+ * Build blacklist set from user settings.
  */
 function buildBlacklist(modules) {
 	const { settings: { storage }, utils: { helpers } } = modules;
@@ -665,20 +517,81 @@ function buildBlacklist(modules) {
 	const blacklist = new Set();
 
 	try {
-		// Try new property name first, fall back to old
-		const blacklistRaw = getSetting('ArtistBlacklist', '') || getSetting('Black', '');
+		const blacklistRaw = getSetting('ArtistBlacklist', '');
 		const items = parseListSetting(blacklistRaw);
 
 		for (const item of items) {
-			if (item) {
-				blacklist.add(String(item).trim().toUpperCase());
-			}
+			if (item) blacklist.add(String(item).trim().toUpperCase());
 		}
 	} catch (e) {
-		console.error('buildBlacklist error: ' + e.toString());
+		console.error('buildBlacklist error:', e.message);
 	}
 
 	return blacklist;
+}
+
+/**
+ * Extract unique artists from seeds, splitting by ';'.
+ */
+function extractSeedArtists(seeds, limit) {
+	const uniqueArtists = new Set();
+	
+	for (const seed of seeds) {
+		if (seed.artist) {
+			const artists = seed.artist.split(';').map(a => a.trim()).filter(Boolean);
+			for (const artist of artists) {
+				uniqueArtists.add(artist);
+			}
+		}
+	}
+	
+	return Array.from(uniqueArtists).slice(0, limit);
+}
+
+/**
+ * Extract genres from seed tracks.
+ */
+function extractGenresFromSeeds(seeds) {
+	const genres = new Set();
+	for (const seed of seeds) {
+		if (seed.genre) {
+			const genreList = seed.genre.split(';').map(g => g.trim()).filter(Boolean);
+			for (const g of genreList) genres.add(g);
+		}
+	}
+	return Array.from(genres).slice(0, 5);
+}
+
+/**
+ * Add seed tracks to results for track-based discovery.
+ */
+function addSeedTracksToResults(seeds, seedLimit, blacklist, seenArtists, tracksByArtist) {
+	for (let i = 0; i < seedLimit; i++) {
+		const seed = seeds[i];
+		if (!seed?.artist || !seed?.title) continue;
+
+		const artists = seed.artist.split(';').map(a => a.trim()).filter(Boolean);
+
+		for (const artistName of artists) {
+			const artKey = artistName.toUpperCase();
+			if (blacklist.has(artKey)) continue;
+			if (seenArtists.has(artKey)) continue;
+
+			seenArtists.add(artKey);
+
+			if (!tracksByArtist.has(artKey)) {
+				tracksByArtist.set(artKey, { artistName, tracks: [] });
+			}
+
+			const entry = tracksByArtist.get(artKey);
+			const trackKey = seed.title.toUpperCase();
+			
+			if (!entry.tracks.some(t => t.title.toUpperCase() === trackKey)) {
+				entry.tracks.push({ title: seed.title, match: 1.0, playcount: 0 });
+			}
+		}
+	}
+	console.log(`addSeedTracksToResults: Added ${seenArtists.size} seed artists`);
 }
 
 /**
@@ -691,15 +604,11 @@ function addArtistCandidate(artistName, seenArtists, blacklist, candidates) {
 	if (!key || seenArtists.has(key) || blacklist.has(key)) return;
 
 	seenArtists.add(key);
-	candidates.push({
-		artist: artistName,
-		tracks: [] // Will be filled later
-	});
+	candidates.push({ artist: artistName, tracks: [] });
 }
 
 /**
  * Fetch top tracks for candidate artists.
- * Respects tracksPerArtist limit from config.
  */
 async function fetchTracksForCandidates(modules, candidates, config) {
 	const { api: { lastfmApi }, settings: { prefixes }, ui: { notifications } } = modules;
@@ -718,8 +627,11 @@ async function fetchTracksForCandidates(modules, candidates, config) {
 		// Skip if already has tracks (e.g., from track-based discovery)
 		if (candidate.tracks && candidate.tracks.length > 0) continue;
 
-		const progress = 0.5 + ((i + 1) / totalCandidates) * 0.3;
-		updateProgress(`Fetching tracks for "${candidate.artist}"...`, progress);
+		// Update progress every 5 artists
+		if (i % 5 === 0) {
+			const progress = 0.5 + ((i + 1) / totalCandidates) * 0.3;
+			updateProgress(`Getting tracks for "${candidate.artist}" (${i + 1}/${totalCandidates})...`, progress);
+		}
 
 		try {
 			const fixedName = fixPrefixes(candidate.artist);
@@ -730,20 +642,16 @@ async function fetchTracksForCandidates(modules, candidates, config) {
 					title: typeof t === 'string' ? t : (t.title || ''),
 					playcount: typeof t === 'object' ? (t.playcount || 0) : 0,
 					rank: typeof t === 'object' ? (t.rank || 0) : 0
-				})).filter(t => t.title); // Filter out empty titles
+				})).filter(t => t.title);
 			}
-
 		} catch (e) {
-			console.error(`fetchTracksForCandidates: Error for "${candidate.artist}": ${e.toString()}`);
+			console.warn(`fetchTracksForCandidates: Error for "${candidate.artist}": ${e.message}`);
 		}
 	}
 }
 
 /**
  * Get the appropriate discovery function for a mode.
- * 
- * @param {string} mode - Discovery mode ('artist', 'track', 'genre', 'mood', 'activity')
- * @returns {Function} Discovery function
  */
 function getDiscoveryStrategy(mode) {
 	switch (mode) {
@@ -761,24 +669,16 @@ function getDiscoveryStrategy(mode) {
 }
 
 /**
- * Get human-readable name for discovery mode (for playlist naming).
- * 
- * @param {string} mode - Discovery mode
- * @returns {string} Human-readable mode name
+ * Get human-readable name for discovery mode.
  */
 function getDiscoveryModeName(mode) {
 	switch (mode) {
-		case DISCOVERY_MODES.TRACK:
-			return 'Similar Tracks';
-		case DISCOVERY_MODES.GENRE:
-			return 'Similar Genre';
-		case DISCOVERY_MODES.MOOD:
-			return 'Mood';
-		case DISCOVERY_MODES.ACTIVITY:
-			return 'Activity';
+		case DISCOVERY_MODES.TRACK: return 'Similar Tracks';
+		case DISCOVERY_MODES.GENRE: return 'Similar Genre';
+		case DISCOVERY_MODES.MOOD: return 'Mood';
+		case DISCOVERY_MODES.ACTIVITY: return 'Activity';
 		case DISCOVERY_MODES.ARTIST:
-		default:
-			return 'Similar Artists';
+		default: return 'Similar Artists';
 	}
 }
 

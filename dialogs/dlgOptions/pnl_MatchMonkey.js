@@ -125,9 +125,30 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function (sett, 
 		UI.PlaylistDuration.controlClass.value = cfg.PlaylistDuration || 60;
 		UI.HybridMode.controlClass.checked = cfg.HybridMode !== false; // Default true
 		
-		// Blend ratio as percentage (0-100)
-		const blendRatioPercent = Math.round((cfg.MoodActivityBlendRatio || 0.5) * 100);
+		// Blend ratio: stored as 0.0-1.0, displayed as 0-100%
+		const blendRatioPercent = Math.round((cfg.MoodActivityBlendRatio ?? 0.5) * 100);
 		UI.MoodActivityBlendRatio.controlClass.value = blendRatioPercent;
+
+		// === Auto-Mode Settings ===
+		this._setupAutoModeCheckbox(UI.AutoModeEnabled);
+		UI.AutoModeDiscovery.controlClass.value = cfg.AutoModeDiscovery || 'Track';
+		UI.AutoModeSeedLimit.controlClass.value = cfg.AutoModeSeedLimit || 2;
+		UI.AutoModeSimilarLimit.controlClass.value = cfg.AutoModeSimilarLimit || 10;
+		UI.AutoModeTracksPerArtist.controlClass.value = cfg.AutoModeTracksPerArtist || 5;
+		UI.AutoModeMaxTracks.controlClass.value = cfg.AutoModeMaxTracks || 30;
+		UI.SkipDuplicates.controlClass.checked = cfg.SkipDuplicates !== false; // Default true
+
+		// === Queue Behavior ===
+		UI.EnqueueMode.controlClass.checked = Boolean(cfg.EnqueueMode);
+		UI.ClearQueueFirst.controlClass.checked = Boolean(cfg.ClearQueueFirst);
+		UI.NavigateAfter.controlClass.value = cfg.NavigateAfter || 'Navigate to new playlist';
+
+		// === Filters (Advanced) ===
+		UI.ArtistBlacklist.controlClass.value = cfg.ArtistBlacklist || '';
+		UI.GenreBlacklist.controlClass.value = cfg.GenreBlacklist || '';
+		UI.TitleExclusions.controlClass.value = cfg.TitleExclusions || '';
+
+		console.log('Match Monkey Options: Settings loaded successfully');
 
 	} catch (e) {
 		console.error('Match Monkey Options: load error:', e.toString());
@@ -171,7 +192,7 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setRatingControl = function 
  * Helper to setup auto-mode checkbox with change listener.
  */
 optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setupAutoModeCheckbox = function (uiCheckbox) {
-	// Set initial state
+	// Set initial state from addon if available, otherwise from config
 	try {
 		if (window.matchMonkey?.isAutoEnabled) {
 			uiCheckbox.controlClass.checked = Boolean(window.matchMonkey.isAutoEnabled());
@@ -182,13 +203,13 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setupAutoModeCheckbox = func
 		uiCheckbox.controlClass.checked = Boolean(this.config.AutoModeEnabled);
 	}
 
-	// Change handler
+	// Change handler - syncs with addon
 	const onCheckboxChanged = () => {
 		try {
 			const desired = Boolean(uiCheckbox.controlClass.checked);
 			setSetting('AutoModeEnabled', desired);
 
-			// Sync with addon
+			// Sync with addon if available
 			if (window.matchMonkey?.toggleAuto) {
 				const current = Boolean(window.matchMonkey.isAutoEnabled?.());
 				if (current !== desired) {
@@ -214,7 +235,7 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setupAutoModeCheckbox = func
 		}
 	}
 
-	// Listen for auto-mode changes from other sources
+	// Listen for auto-mode changes from other sources (toolbar button, etc.)
 	const onAutoModeChanged = (event) => {
 		try {
 			if (event.detail?.enabled !== undefined) {
@@ -312,7 +333,7 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 		// Save all settings
 		try {
 			app.setValue(SCRIPT_ID, this.config);
-			console.log('Match Monkey Options: Settings saved');
+			console.log('Match Monkey Options: Settings saved successfully');
 		} catch (e) {
 			console.error('Match Monkey Options: Failed to save:', e.toString());
 		}
