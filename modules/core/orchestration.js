@@ -105,12 +105,26 @@ window.matchMonkeyOrchestration = {
 				};
 			}
 			
-			// Add mood/activity context if present
+			// Add mood/activity context if present or from settings
 			if (_moodActivityContext) {
+				// Context explicitly provided (from runMoodActivityPlaylist)
 				config_.moodActivityContext = _moodActivityContext.context;
 				config_.moodActivityValue = _moodActivityContext.value;
 				config_.playlistDuration = _moodActivityContext.duration;
 				config_.moodActivityBlendRatio = intSetting('MoodActivityBlendRatio', 50) / 100.0;
+			} else if (discoveryMode === 'mood' || discoveryMode === 'activity') {
+				// Context not provided, read from settings
+				if (discoveryMode === 'mood') {
+					config_.moodActivityContext = 'mood';
+					config_.moodActivityValue = stringSetting('DefaultMood', 'energetic');
+				} else {
+					config_.moodActivityContext = 'activity';
+					config_.moodActivityValue = stringSetting('DefaultActivity', 'workout');
+				}
+				config_.playlistDuration = intSetting('PlaylistDuration', 60);
+				config_.moodActivityBlendRatio = intSetting('MoodActivityBlendRatio', 50) / 100.0;
+				
+				console.log(`Match Monkey: Using ${config_.moodActivityContext} "${config_.moodActivityValue}" from settings`);
 			}
 
 			console.log(`Match Monkey: Starting ${modeName} (auto=${autoMode})`);
@@ -491,8 +505,14 @@ window.matchMonkeyOrchestration = {
 		// "- Similar to Rock (Similar Genre)"
 		// "- Similar to The Beatles (Mood: Energetic)"
 		// "- Similar to The Beatles (Activity: Workout)"
-		playlistName = `${playlistName} (${modeName})`;
-
+		if (config.moodActivityValue && (config.discoveryMode === 'mood' || config.discoveryMode === 'activity')) {
+			// Capitalize first letter of mood/activity value
+			const capitalizedValue = config.moodActivityValue.charAt(0).toUpperCase() + config.moodActivityValue.slice(1);
+			const contextLabel = config.moodActivityContext === 'mood' ? 'Mood' : 'Activity';
+			playlistName = `${playlistName} (${contextLabel}: ${capitalizedValue})`;
+		} else {
+			playlistName = `${playlistName} (${modeName})`;
+		}
 		// Truncate if too long
 		if (playlistName.length > 100) {
 			playlistName = playlistName.substring(0, 97) + '...';

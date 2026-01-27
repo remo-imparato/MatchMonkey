@@ -440,15 +440,17 @@ async function discoverByMoodActivity(modules, seeds, config) {
 	const moodArtists = [];
 	
 	if (blendRatio < 1) {
-		updateProgress(`Fetching ${context} recommendations...`, 0.3);
+		updateProgress(`Fetching ${context} recommendations from ReccoBeats...`, 0.3);
 		
+		// Pass seeds to fetchHybridRecommendations for track-based recommendations
 		const hybridResults = await reccobeatsApi.fetchHybridRecommendations(
 			context,
 			value,
 			{
 				genres: extractGenresFromSeeds(seeds),
 				duration: config.playlistDuration || 60,
-				limit: Math.max(moodCount * 2, 20) // Request extra for filtering
+				limit: Math.max(moodCount * 2, 20), // Request extra for filtering
+				seeds: seeds.slice(0, 5), // Pass seed tracks for ReccoBeats track/recommendation API
 			}
 		);
 		

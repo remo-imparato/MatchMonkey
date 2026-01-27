@@ -112,10 +112,12 @@
 		 * Main entry point for all action handlers.
 		 * 
 		 * @param {boolean} [autoModeFlag=false] - Whether running in auto-mode
-		 * @param {string} [discoveryMode='artist'] - Discovery mode: 'artist', 'track', or 'genre'
+		 * @param {string} [discoveryMode='artist'] - Discovery mode: 'artist', 'track', 'genre', 'mood', or 'activity'
+		 * @param {object} [options={}] - Additional options
+		 * @param {string} [options.moodActivityValue] - Specific mood or activity value to use
 		 * @returns {Promise<object>} Result from orchestration
 		 */
-		async function runMatchMonkey(autoModeFlag = false, discoveryMode = DISCOVERY_MODES.ARTIST) {
+		async function runMatchMonkey(autoModeFlag = false, discoveryMode = DISCOVERY_MODES.ARTIST, options = {}) {
 			try {
 				// Validate discovery mode
 				const validModes = Object.values(DISCOVERY_MODES);
@@ -124,9 +126,28 @@
 					discoveryMode = DISCOVERY_MODES.ARTIST;
 				}
 				
-				console.log(`Match Monkey: Running (autoMode=${autoModeFlag}, discoveryMode=${discoveryMode})`);
+				console.log(`Match Monkey: Running (autoMode=${autoModeFlag}, discoveryMode=${discoveryMode}, options=${JSON.stringify(options)})`);
 				
-				const result = await orchestration.generateSimilarPlaylist(modules, autoModeFlag, discoveryMode);
+				// Build enriched modules with mood/activity context if specified
+				let enrichedModules = modules;
+				
+				if ((discoveryMode === DISCOVERY_MODES.MOOD || discoveryMode === DISCOVERY_MODES.ACTIVITY) && options.moodActivityValue) {
+					const { getSetting } = storage;
+					const context = discoveryMode === DISCOVERY_MODES.MOOD ? 'mood' : 'activity';
+					
+					enrichedModules = {
+						...modules,
+						_moodActivityContext: {
+							context,
+							value: options.moodActivityValue,
+							duration: getSetting('PlaylistDuration', 60)
+						}
+					};
+					
+					console.log(`Match Monkey: Using ${context} "${options.moodActivityValue}" from action`);
+				}
+				
+				const result = await orchestration.generateSimilarPlaylist(enrichedModules, autoModeFlag, discoveryMode);
 				
 				if (result.success) {
 					console.log(`Match Monkey: Success - added ${result.tracksAdded} tracks`);
