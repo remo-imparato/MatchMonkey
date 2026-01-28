@@ -224,8 +224,8 @@ strategies.DISCOVERY_MODES.ARTIST    // 'artist'
 strategies.DISCOVERY_MODES.TRACK     // 'track'
 strategies.DISCOVERY_MODES.GENRE     // 'genre'
 strategies.DISCOVERY_MODES.RECCO     // 'recco' (ReccoBeats AI with seeds)
-strategies.DISCOVERY_MODES.MOOD      // 'mood' (preset profiles, no seeds)
-strategies.DISCOVERY_MODES.ACTIVITY  // 'activity' (preset profiles, no seeds)
+strategies.DISCOVERY_MODES.MOOD      // 'mood' (preset profiles with seeds)
+strategies.DISCOVERY_MODES.ACTIVITY  // 'activity' (preset profiles with seeds)
 
 // Get human-readable name
 strategies.getDiscoveryModeName('track');    // 'Similar Tracks'

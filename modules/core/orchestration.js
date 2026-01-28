@@ -127,9 +127,9 @@ window.matchMonkeyOrchestration = {
 
 			console.log(`Match Monkey: Starting ${modeName} (auto=${autoMode})`);
 
-			// Step 1: Collect seed tracks (not required for mood/activity modes)
+			// Step 1: Collect seed tracks
 			let seeds = [];
-			const seedsRequired = !['mood', 'activity'].includes(discoveryMode);
+			const seedsRequired = true;// !['mood', 'activity'].includes(discoveryMode);
 
 			if (seedsRequired) {
 				updateProgress(`Collecting seed tracks...`, 0.05);
@@ -296,10 +296,10 @@ window.matchMonkeyOrchestration = {
 							for (let i = 0; i < count; i++) {
 								track = selectedList.getFastObject(i, track);
 								seeds.push({
-									artist: track.artist || '',
-									title: matchMonkeyHelpers.cleanTrackName(track.title) || '',
+									artist: matchMonkeyHelpers.cleanArtistName(track.artist || ''),
+									title: matchMonkeyHelpers.cleanTrackName(track.title || ''),
+									album: matchMonkeyHelpers.cleanAlbumName(track.album || ''),
 									genre: track.genre || '',
-									album: matchMonkeyHelpers.cleanAlbumName(track.album) || '',
 								});
 							}
 						});
@@ -326,10 +326,10 @@ window.matchMonkeyOrchestration = {
 						);
 
 						seeds.push({
-							artist: track.artist || '',
-							title: matchMonkeyHelpers.cleanTrackName(track.title) || '',
+							artist: matchMonkeyHelpers.cleanArtistName(track.artist || ''),
+							title: matchMonkeyHelpers.cleanTrackName(track.title || ''),
+							album: matchMonkeyHelpers.cleanAlbumName(track.album || ''),
 							genre: track.genre || '',
-							album: matchMonkeyHelpers.cleanAlbumName(track.album) || '',
 						});
 					}
 				} catch (e) {

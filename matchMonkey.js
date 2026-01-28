@@ -7,8 +7,8 @@
  * - Track-based: Find similar tracks (Last.fm track.getSimilar API)
  * - Genre-based: Find artists in same genre (Last.fm tag.getTopArtists API)
  * - Recco-based: Find similar tracks using ReccoBeats AI (requires seed tracks)
- * - Mood-based: Find tracks matching mood profiles (no seeds needed)
- * - Activity-based: Find tracks matching activity profiles (no seeds needed)
+ * - Mood-based: Find tracks matching mood profiles
+ * - Activity-based: Find tracks matching activity profiles
  * 
  * @author Remo Imparato
  * @version 2.2.0
@@ -96,8 +96,8 @@
 		 * - 'track': Use Last.fm track.getSimilar to find musically similar tracks
 		 * - 'genre': Use Last.fm tag.getTopArtists to find artists in same genre
 		 * - 'recco': Use ReccoBeats AI to find recommendations based on seed tracks
-		 * - 'mood': Use predefined mood audio profiles (no seeds needed)
-		 * - 'activity': Use predefined activity audio profiles (no seeds needed)
+		 * - 'mood': Use predefined mood audio profiles
+		 * - 'activity': Use predefined activity audio profiles
 		 */
 		const DISCOVERY_MODES = {
 			ARTIST: 'artist',

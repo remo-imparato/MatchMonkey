@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MatchMonkey Action Registration
  * 
  * Registers actions and menu items with MediaMonkey 5 following MM5 standards.
@@ -11,8 +11,8 @@
  * - SimilarTracksRun: Find similar tracks (Last.fm track.getSimilar API)
  * - SimilarGenreRun: Find artists in same genre (Last.fm tag.getTopArtists API)
  * - SimilarReccoRun: Find similar tracks using ReccoBeats AI (requires seed tracks)
- * - SimilarMood*: Find tracks by mood preset (no seeds needed)
- * - SimilarActivity*: Find tracks by activity preset (no seeds needed)
+ * - SimilarMood*: Find tracks by mood preset
+ * - SimilarActivity*: Find tracks by activity preset
  * - SimilarArtistsToggleAuto: Toggle auto-queue mode on/off
  * 
  * @author Remo Imparato
@@ -106,8 +106,9 @@ actions.similarReccoRun = {
 	getTracklist: uitools.getSelectedTracklist
 };
 
+/*
 // ============================================================================
-// MOOD ACTIONS - Use predefined audio profiles (no seeds needed)
+// MOOD ACTIONS - Use predefined audio profiles
 // ============================================================================
 
 actions.similarMoodEnergetic = {
@@ -215,8 +216,38 @@ actions.similarMoodRomantic = {
 	}
 };
 
+actions.similarMoodUplifting = {
+	title: _('&Uplifting'),
+	icon: 'actor',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'mood', { moodActivityValue: 'uplifting' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarMoodDark = {
+	title: _('&Dark'),
+	icon: 'actor',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'mood', { moodActivityValue: 'dark' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
 // ============================================================================
-// ACTIVITY ACTIONS - Use predefined audio profiles (no seeds needed)
+// ACTIVITY ACTIONS - Use predefined audio profiles
 // ============================================================================
 
 actions.similarActivityWorkout = {
@@ -324,6 +355,387 @@ actions.similarActivityCooking = {
 	}
 };
 
+actions.similarActivityCleaning = {
+	title: _('&Cleaning'),
+	icon: 'mediamonkey',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'cleaning' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarActivityWalking = {
+	title: _('&Walking'),
+	icon: 'mediamonkey',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'walking' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarActivityCoding = {
+	title: _('&Coding'),
+	icon: 'mediamonkey',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'coding' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarMoodEnergetic.tooltip = _('Find upbeat, high‑energy tracks');
+actions.similarMoodRelaxed.tooltip = _('Find calm, mellow, laid‑back music');
+actions.similarMoodHappy.tooltip = _('Find bright, cheerful, feel‑good songs');
+actions.similarMoodSad.tooltip = _('Find emotional, soft, slower tracks');
+actions.similarMoodFocused.tooltip = _('Find steady, minimal, focus‑friendly music');
+actions.similarMoodAngry.tooltip = _('Find intense, high-energy tracks');
+actions.similarMoodRomantic.tooltip = _('Find warm, smooth, intimate songs');
+actions.similarMoodUplifting.tooltip = _('Find inspiring, positive, feel‑good music');
+actions.similarMoodDark.tooltip = _('Find moody, atmospheric, brooding tracks');
+
+actions.similarActivityWorkout.tooltip = _('Find fast, high‑energy workout music');
+actions.similarActivityStudy.tooltip = _('Find calm, instrumental study tracks');
+actions.similarActivityParty.tooltip = _('Find fun, dance‑ready party songs');
+actions.similarActivitySleep.tooltip = _('Find soft, quiet, sleep‑friendly music');
+actions.similarActivityDriving.tooltip = _('Find steady, melodic driving tracks');
+actions.similarActivityMeditation.tooltip = _('Find peaceful, ambient meditation music');
+actions.similarActivityCooking.tooltip = _('Find pleasant, upbeat cooking music');
+actions.similarActivityCleaning.tooltip = _('Find rhythmic, motivating cleaning tracks');
+actions.similarActivityWalking.tooltip = _('Find smooth, mid‑tempo walking music');
+actions.similarActivityCoding.tooltip = _('Find minimal, electronic, focus music');
+
+/*/
+// ============================================================================
+// MOOD ACTIONS - Use predefined audio profiles
+// ============================================================================
+
+actions.similarMoodEnergetic = {
+	title: _('&Energetic'),
+	icon: 'actor',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('Find upbeat, high‑energy tracks'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'mood', { moodActivityValue: 'energetic' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarMoodRelaxed = {
+	title: _('&Relaxed'),
+	icon: 'actor',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('Find calm, mellow, laid‑back music'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'mood', { moodActivityValue: 'relaxed' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarMoodHappy = {
+	title: _('&Happy'),
+	icon: 'actor',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('Find bright, cheerful, feel‑good songs'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'mood', { moodActivityValue: 'happy' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarMoodSad = {
+	title: _('&Sad'),
+	icon: 'actor',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('Find emotional, soft, slower tracks'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'mood', { moodActivityValue: 'sad' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarMoodFocused = {
+	title: _('&Focused'),
+	icon: 'actor',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('Find steady, minimal, focus‑friendly music'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'mood', { moodActivityValue: 'focused' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarMoodAngry = {
+	title: _('&Angry'),
+	icon: 'actor',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('Find intense, high‑energy tracks'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'mood', { moodActivityValue: 'angry' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarMoodRomantic = {
+	title: _('R&omantic'),
+	icon: 'actor',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('Find warm, smooth, intimate songs'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'mood', { moodActivityValue: 'romantic' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarMoodUplifting = {
+	title: _('&Uplifting'),
+	icon: 'actor',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('Find inspiring, positive, feel‑good music'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'mood', { moodActivityValue: 'uplifting' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarMoodDark = {
+	title: _('&Dark'),
+	icon: 'actor',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('Find moody, atmospheric, brooding tracks'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'mood', { moodActivityValue: 'dark' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+// ============================================================================
+// ACTIVITY ACTIONS - Use predefined audio profiles
+// ============================================================================
+
+actions.similarActivityWorkout = {
+	title: _('&Workout'),
+	icon: 'mediamonkey',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('Find fast, high‑energy workout music'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'workout' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarActivityStudy = {
+	title: _('&Study'),
+	icon: 'mediamonkey',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('Find calm, instrumental study tracks'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'study' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarActivityParty = {
+	title: _('&Party'),
+	icon: 'mediamonkey',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('Find fun, dance‑ready party songs'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'party' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarActivitySleep = {
+	title: _('S&leep'),
+	icon: 'mediamonkey',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('Find soft, quiet, sleep‑friendly music'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'sleep' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarActivityDriving = {
+	title: _('&Driving'),
+	icon: 'mediamonkey',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('Find steady, melodic driving tracks'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'driving' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarActivityMeditation = {
+	title: _('&Meditation'),
+	icon: 'mediamonkey',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('Find peaceful, ambient meditation music'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'meditation' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarActivityCooking = {
+	title: _('&Cooking'),
+	icon: 'mediamonkey',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('Find pleasant, upbeat cooking music'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'cooking' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarActivityCleaning = {
+	title: _('&Cleaning'),
+	icon: 'mediamonkey',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('Find rhythmic, motivating cleaning tracks'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'cleaning' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarActivityWalking = {
+	title: _('&Walking'),
+	icon: 'mediamonkey',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('Find smooth, mid‑tempo walking music'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'walking' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarActivityCoding = {
+	title: _('&Coding'),
+	icon: 'mediamonkey',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('Find minimal, electronic, focus music'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'coding' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+//*/
+
 // ============================================================================
 // AUTO-MODE ACTION
 // ============================================================================
@@ -360,26 +772,31 @@ actions.matchMonkeyToggleAuto = {
 // TOOLS MENU REGISTRATION - Using Submenu
 // ============================================================================
 
-// Mood submenu items (no track selection required)
+// Mood submenu items
 var moodSubmenuItems = [
-	{ action: actions.similarMoodEnergetic, order: 10 },
+	{ action: actions.similarMoodHappy, order: 10 },
 	{ action: actions.similarMoodRelaxed, order: 20 },
-	{ action: actions.similarMoodHappy, order: 30 },
+	{ action: actions.similarMoodEnergetic, order: 30 },
 	{ action: actions.similarMoodSad, order: 40 },
 	{ action: actions.similarMoodFocused, order: 50 },
-	{ action: actions.similarMoodAngry, order: 60 },
-	{ action: actions.similarMoodRomantic, order: 70 }
+	{ action: actions.similarMoodRomantic, order: 60 },
+	{ action: actions.similarMoodDark, order: 70 },
+	{ action: actions.similarMoodUplifting, order: 80 },
+	{ action: actions.similarMoodAngry, order: 90 }
 ];
 
-// Activity submenu items (no track selection required)
+// Activity submenu items
 var activitySubmenuItems = [
 	{ action: actions.similarActivityWorkout, order: 10 },
 	{ action: actions.similarActivityStudy, order: 20 },
-	{ action: actions.similarActivityParty, order: 30 },
-	{ action: actions.similarActivitySleep, order: 40 },
-	{ action: actions.similarActivityDriving, order: 50 },
-	{ action: actions.similarActivityMeditation, order: 60 },
-	{ action: actions.similarActivityCooking, order: 70 }
+	{ action: actions.similarActivityDriving, order: 30 },
+	{ action: actions.similarActivityWalking, order: 40 },
+	{ action: actions.similarActivityCooking, order: 50 },
+	{ action: actions.similarActivityCleaning, order: 60 },
+	{ action: actions.similarActivityParty, order: 70 },
+	{ action: actions.similarActivityMeditation, order: 80 },
+	{ action: actions.similarActivitySleep, order: 90 },
+	{ action: actions.similarActivityCoding, order: 100 }
 ];
 
 // Match Monkey submenu for Tools menu
@@ -442,6 +859,25 @@ if (!window.menus) {
 				{ action: actions.similarTracksRun, order: 20 },
 				{ action: actions.similarArtistsRun, order: 30 },
 				{ action: actions.similarGenreRun, order: 35 },
+				{ separator: true, order: 38 },
+				{
+					action: {
+						title: _('&Mood'),
+						icon: 'actor',
+						visible: true,
+						submenu: moodSubmenuItems
+					},
+					order: 40
+				},
+				{
+					action: {
+						title: _('&Activity'),
+						icon: 'mediamonkey',
+						visible: true,
+						submenu: activitySubmenuItems
+					},
+					order: 45
+				}
 			]
 		},
 		order: 100,
