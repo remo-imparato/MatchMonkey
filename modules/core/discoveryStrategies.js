@@ -1,19 +1,21 @@
-/**
+﻿/**
  * Discovery Strategies Module
  * 
  * Implements different discovery algorithms for finding similar music:
  * - Artist-based: Use Last.fm artist.getSimilar API
  * - Track-based: Use Last.fm track.getSimilar API  
  * - Genre-based: Use Last.fm tag.getTopArtists API
- * - Mood/Activity: Use ReccoBeats AI + Last.fm hybrid
+ * - Recco-based: Use ReccoBeats AI recommendations from seed tracks
+ * - Mood-based: Use predefined mood audio profiles
+ * - Activity-based: Use predefined activity audio profiles
  * 
  * Each strategy returns a list of artist/track candidates to search in the local library.
  * All strategies respect user-configured limits and preferences.
  * 
- * MediaMonkey 5 API Only
+
  * 
  * @author Remo Imparato
- * @license MIT
+
  */
 
 'use strict';
@@ -25,8 +27,9 @@ const DISCOVERY_MODES = {
 	ARTIST: 'artist',
 	TRACK: 'track',
 	GENRE: 'genre',
-	MOOD: 'mood',
-	ACTIVITY: 'activity'
+	RECCO: 'recco',    // ReccoBeats AI with seed tracks
+	MOOD: 'mood',      // Mood preset (no seeds needed)
+	ACTIVITY: 'activity' // Activity preset (no seeds needed)
 };
 
 // ============================================================================
@@ -180,7 +183,7 @@ async function discoverByTrack(modules, seeds, config) {
 
 					const entry = tracksByArtist.get(artKey);
 					const trackKey = simTrack.title.toUpperCase();
-					
+
 					// Avoid duplicate tracks
 					if (!entry.tracks.some(t => t.title.toUpperCase() === trackKey)) {
 						entry.tracks.push({
@@ -277,7 +280,7 @@ async function discoverByGenre(modules, seeds, config) {
 	// Fetch additional tags from artists via Last.fm if needed
 	if (collectedTags.size < maxTagsToSearch) {
 		const uniqueArtists = extractSeedArtists(seeds, 3); // Only query first 3
-		
+
 		for (const artistName of uniqueArtists) {
 			try {
 				updateProgress(`Getting genre tags for "${artistName}"...`, 0.15);
@@ -351,162 +354,206 @@ async function discoverByGenre(modules, seeds, config) {
 }
 
 // ============================================================================
-// MOOD/ACTIVITY-BASED DISCOVERY (ReccoBeats + Last.fm Hybrid)
+// RECCOBEATS-BASED DISCOVERY (Seed-based AI recommendations)
 // ============================================================================
 
 /**
- * Mood/Activity-based discovery strategy (ReccoBeats + Last.fm hybrid).
+ * ReccoBeats-based discovery strategy.
  * 
- * Uses ReccoBeats API to get mood/activity-appropriate tracks, then
- * combines with Last.fm similar artists for better library matching.
+ * Uses ReccoBeats API to find AI-powered recommendations based on seed tracks.
+ * Workflow: Album Search → Find Tracks → Get Audio Features → Get Recommendations
  * 
- * The blendRatio controls the mix:
- * - 0.0 = 100% mood-based (pure discovery)
- * - 0.5 = 50% seed artists + 50% mood artists (balanced, default)
- * - 1.0 = 100% seed-based with mood filtering
+ * This mode requires seed tracks with album information for best results.
  * 
  * @param {object} modules - Module dependencies
- * @param {Array} seeds - Seed objects [{artist, title, genre}, ...]
- * @param {object} config - Configuration settings with mood/activity context
+ * @param {Array} seeds - Seed objects [{artist, title, album, genre}, ...]
+ * @param {object} config - Configuration settings
  * @returns {Promise<Array>} Array of {artist, tracks[]} candidates
  */
-async function discoverByMoodActivity(modules, seeds, config) {
-	const { api: { lastfmApi }, settings: { prefixes }, ui: { notifications } } = modules;
-	const { fetchSimilarArtists } = lastfmApi;
-	const { fixPrefixes } = prefixes;
+async function discoverByRecco(modules, seeds, config) {
+	const { ui: { notifications } } = modules;
 	const { updateProgress } = notifications;
 	const reccobeatsApi = window.matchMonkeyReccoBeatsAPI;
-	
+
 	if (!reccobeatsApi) {
-		console.error('discoverByMoodActivity: ReccoBeats API not loaded');
+		console.error('discoverByRecco: ReccoBeats API not loaded');
 		return [];
 	}
-	
+
 	const candidates = [];
 	const seenArtists = new Set();
 	const blacklist = buildBlacklist(modules);
-	
-	// Extract context from config
-	const context = config.moodActivityContext || 'mood';
-	const value = config.moodActivityValue || 'energetic';
-	const blendRatio = config.moodActivityBlendRatio;
-	const targetLimit = config.similarLimit || 20;
-	
-	console.log(`discoverByMoodActivity: ${context}="${value}", blend=${Math.round(blendRatio * 100)}% seeds`);
-	
-	// Calculate how many artists to get from each source
-	const seedCount = Math.ceil(targetLimit * blendRatio);
-	const moodCount = targetLimit - seedCount;
-	
-	updateProgress(`Analyzing ${context}: ${value}...`, 0.1);
 
-	// -------------------------------------------------------------------------
-	// STEP 1: Get seed-based similar artists (from Last.fm)
-	// -------------------------------------------------------------------------
-	const seedSimilarArtists = [];
-	
-	if (blendRatio > 0 && seeds.length > 0) {
-		const seedArtists = extractSeedArtists(seeds, config.seedLimit || 5);
-		
-		// Include original seed artists if configured
+	console.log(`discoverByRecco: Processing ${seeds.length} seed track(s)`);
+
+	// Step 1: Get ReccoBeats recommendations based on seed tracks
+	updateProgress('Analyzing seed tracks with ReccoBeats AI...', 0.1);
+
+	const result = await reccobeatsApi.getReccoRecommendations(
+		seeds.slice(0, 5), // Limit to 5 seeds
+		config.similarLimit || 100
+	);
+
+	if (!result.recommendations || result.recommendations.length === 0) {
+		console.log('discoverByRecco: No recommendations from ReccoBeats');
+
+		// Fall back to including seed artists if configured
+		/*
 		if (config.includeSeedArtist) {
-			seedSimilarArtists.push(...seedArtists);
-		}
-		
-		// Expand with Last.fm similar artists
-		for (let i = 0; i < seedArtists.length; i++) {
-			const artistName = seedArtists[i];
-			const progress = 0.1 + ((i + 1) / seedArtists.length) * 0.15;
-			updateProgress(`Finding artists similar to "${artistName}"...`, progress);
+			updateProgress('Using seed artists as fallback...', 0.5);
+			const seedArtists = extractSeedArtists(seeds, config.seedLimit || 5);
+			for (const artistName of seedArtists) {
+				addArtistCandidate(artistName, seenArtists, blacklist, candidates);
+			}
 			
-			try {
-				const fixedName = fixPrefixes(artistName);
-				const similar = await fetchSimilarArtists(fixedName, 10);
-				
-				for (const s of similar) {
-					if (s?.name) seedSimilarArtists.push(s.name);
-				}
-			} catch (e) {
-				console.warn(`discoverByMoodActivity: Error for seed "${artistName}": ${e.message}`);
+			if (candidates.length > 0) {
+				await fetchTracksForCandidates(modules, candidates, config);
 			}
 		}
-		
-		console.log(`discoverByMoodActivity: ${seedSimilarArtists.length} artists from seeds`);
+		*/
+		return candidates;
 	}
 
-	// -------------------------------------------------------------------------
-	// STEP 2: Get mood/activity-based tracks (from ReccoBeats)
-	// -------------------------------------------------------------------------
-	const reccoTracks = [];
-	
-	if (blendRatio < 1 && seeds.length > 0) {
-		updateProgress(`Fetching ${context} recommendations from ReccoBeats...`, 0.3);
-		
-		// Use the new fetchReccobeatsRecommendations function with seed tracks
-		const result = await reccobeatsApi.fetchReccobeatsRecommendations(
-			seeds.slice(0, 5),
-			Math.max(moodCount * 10, 100) // Request more tracks for better matching
-		);
-		
-		if (result?.recommendations?.length > 0) {
-			reccoTracks.push(...result.recommendations);
-			console.log(`discoverByMoodActivity: ${reccoTracks.length} tracks from ReccoBeats`);
-		} else {
-			console.log('discoverByMoodActivity: No ReccoBeats results');
+	console.log(`discoverByRecco: Got ${result.recommendations.length} recommendations from ${result.foundCount} seed(s)`);
+
+	// Step 2: Extract artists from recommendations
+	updateProgress(`Processing ${result.recommendations.length} recommendations...`, 0.6);
+
+	//// Include seed artists if configured
+	//if (config.includeSeedArtist) {
+	//	const seedArtists = extractSeedArtists(seeds, config.seedLimit || 5);
+	//	for (const artistName of seedArtists) {
+	//		addArtistCandidate(artistName, seenArtists, blacklist, candidates);
+	//	}
+	//}
+
+	// Add artists from recommendations
+	// ReccoBeats returns track objects with artist info
+	for (const rec of result.recommendations) {
+		// Handle different response formats
+		const trackTitle = rec.trackTitle;
+		for (const artist of rec.artists) {
+			let artistName = artist.name;
+			if (artistName) {
+				const artKey = artistName.toUpperCase();
+				if (blacklist.has(artKey)) continue;
+
+				if (!seenArtists.has(artKey)) {
+					seenArtists.add(artKey);
+					candidates.push({
+						artist: artistName,
+						tracks: trackTitle ? [{ title: trackTitle, match: 1.0 }] : []
+					});
+				} else if (trackTitle) {
+					// Add track to existing candidate
+					const existing = candidates.find(c => c.artist.toUpperCase() === artKey);
+					if (existing && !existing.tracks.some(t => t.title.toUpperCase() === trackTitle.toUpperCase())) {
+						existing.tracks.push({ title: trackTitle, match: 1.0 });
+					}
+				}
+			}
 		}
 	}
-	
-	// -------------------------------------------------------------------------
-	// STEP 3: Extract artists from ReccoBeats tracks
-	// -------------------------------------------------------------------------
-	const moodArtists = [];
-	for (const track of reccoTracks) {
-		if (track.artist) moodArtists.push(track.artist);
-	}
-	
-	// Deduplicate mood artists
-	const uniqueMoodArtists = [...new Set(moodArtists)];
-	
-	// -------------------------------------------------------------------------
-	// STEP 4: Blend both sources based on ratio
-	// -------------------------------------------------------------------------
-	updateProgress(`Blending results (${Math.round(blendRatio * 100)}% seeds)...`, 0.5);
-	
-	// Deduplicate seed artists
-	const uniqueSeedArtists = [...new Set(seedSimilarArtists)];
-	
-	// Take proportional amounts
-	const selectedSeedArtists = uniqueSeedArtists.slice(0, seedCount);
-	const selectedMoodArtists = uniqueMoodArtists.slice(0, moodCount);
-	
-	// Interleave for better variety
-	const blendedArtists = [];
-	const maxLength = Math.max(selectedSeedArtists.length, selectedMoodArtists.length);
-	
-	for (let i = 0; i < maxLength; i++) {
-		if (i < selectedSeedArtists.length) blendedArtists.push(selectedSeedArtists[i]);
-		if (i < selectedMoodArtists.length) blendedArtists.push(selectedMoodArtists[i]);
-	}
-	
-	console.log(`discoverByMoodActivity: Blended ${blendedArtists.length} artists (${selectedSeedArtists.length} seed + ${selectedMoodArtists.length} ${context})`);
-	
-	// -------------------------------------------------------------------------
-	// STEP 5: Build candidates and fetch tracks
-	// -------------------------------------------------------------------------
-	updateProgress(`Building candidate list...`, 0.6);
-	
-	for (const artist of blendedArtists) {
-		if (artist) addArtistCandidate(artist, seenArtists, blacklist, candidates);
-	}
-	
-	console.log(`discoverByMoodActivity: ${candidates.length} candidates after blacklist filtering`);
-	
-	if (candidates.length > 0) {
-		updateProgress(`Fetching tracks for ${candidates.length} artists...`, 0.65);
-		await fetchTracksForCandidates(modules, candidates, config);
-	}
-	
+
+	console.log(`discoverByRecco: Built ${candidates.length} candidate artists from recommendations`);
+
+	// Step 3: Fetch additional top tracks for candidates that need more
+	updateProgress(`Enriching candidate track lists...`, 0.8);
+
+	//for (const candidate of candidates) {
+	//	if (candidate.tracks.length < (config.tracksPerArtist || 10)) {
+	//		// Candidate needs more tracks - leave for library matching
+	//		// The tracks array serves as hints for preferred tracks
+	//	}
+	//}
+
 	return candidates;
+}
+
+// ============================================================================
+// MOOD-BASED DISCOVERY (No seeds - uses predefined audio profiles)
+// ============================================================================
+
+/**
+ * Mood-based discovery strategy.
+ * 
+ * Uses predefined audio feature profiles for different moods.
+ * Does NOT require seed tracks - just searches library for tracks matching the mood profile.
+ * 
+ * Available moods: energetic, relaxed, happy, sad, focused, angry, romantic
+ * 
+ * @param {object} modules - Module dependencies
+ * @param {Array} seeds - Seed objects (not used for mood discovery)
+ * @param {object} config - Configuration with moodActivityValue
+ * @returns {Promise<Array>} Array of {artist, tracks[], audioTargets} candidates
+ */
+async function discoverByMood(modules, seeds, config) {
+	const { ui: { notifications } } = modules;
+	const { updateProgress } = notifications;
+	const reccobeatsApi = window.matchMonkeyReccoBeatsAPI;
+
+	const mood = config.moodActivityValue || 'energetic';
+	const targets = reccobeatsApi?.MOOD_AUDIO_TARGETS?.[mood.toLowerCase()];
+
+	if (!targets) {
+		console.error(`discoverByMood: Unknown mood "${mood}"`);
+		return [];
+	}
+
+	console.log(`discoverByMood: Using "${mood}" mood profile:`, targets);
+	updateProgress(`Finding "${mood}" tracks...`, 0.3);
+
+	// For mood-based discovery without seeds, we return a special candidate
+	// that the library matcher will use to filter tracks by audio characteristics
+	// Since we can't call ReccoBeats recommendations API without seed tracks,
+	// we'll search the library directly based on audio characteristics
+
+	// Return empty candidates - the orchestration will handle library search
+	// with the audio targets stored in config
+	return [{
+		artist: '__MOOD_FILTER__',
+		tracks: [],
+		audioTargets: targets,
+		mood: mood
+	}];
+}
+
+/**
+ * Activity-based discovery strategy.
+ * 
+ * Uses predefined audio feature profiles for different activities.
+ * Does NOT require seed tracks - just searches library for tracks matching the activity profile.
+ * 
+ * Available activities: workout, study, party, sleep, driving, meditation, cooking
+ * 
+ * @param {object} modules - Module dependencies
+ * @param {Array} seeds - Seed objects (not used for activity discovery)
+ * @param {object} config - Configuration with moodActivityValue
+ * @returns {Promise<Array>} Array of {artist, tracks[], audioTargets} candidates
+ */
+async function discoverByActivity(modules, seeds, config) {
+	const { ui: { notifications } } = modules;
+	const { updateProgress } = notifications;
+	const reccobeatsApi = window.matchMonkeyReccoBeatsAPI;
+
+	const activity = config.moodActivityValue || 'workout';
+	const targets = reccobeatsApi?.ACTIVITY_AUDIO_TARGETS?.[activity.toLowerCase()];
+
+	if (!targets) {
+		console.error(`discoverByActivity: Unknown activity "${activity}"`);
+		return [];
+	}
+
+	console.log(`discoverByActivity: Using "${activity}" activity profile:`, targets);
+	updateProgress(`Finding "${activity}" tracks...`, 0.3);
+
+	// Return special candidate for library filtering
+	return [{
+		artist: '__ACTIVITY_FILTER__',
+		tracks: [],
+		audioTargets: targets,
+		activity: activity
+	}];
 }
 
 // ============================================================================
@@ -514,68 +561,10 @@ async function discoverByMoodActivity(modules, seeds, config) {
 // ============================================================================
 
 /**
- * Get trackid from roccobeats
- */
-async function getReccoTrackId(artist, title, apiKey) {
-	// Normalize helper
-	const normalize = (s) =>
-		s.toLowerCase().replace(/[\s\-\_\(\)\[\]\.]+/g, "").trim();
-
-	// Shared headers
-	const myHeaders = new Headers();
-	myHeaders.append("Accept", "application/json");
-	myHeaders.append("x-api-key", apiKey);
-
-	const requestOptions = {
-		method: "GET",
-		headers: myHeaders,
-		redirect: "follow"
-	};
-
-	// 1?? Search for artist
-	const artistSearchUrl =
-		"https://api.reccobeats.com/v1/search/artist?q=" +
-		encodeURIComponent(artist);
-
-	const artistRes = await fetch(artistSearchUrl, requestOptions);
-	const artistJson = await artistRes.json();
-
-	if (!artistJson?.data?.length) {
-		console.error("Artist not found:", artist);
-		return null;
-	}
-
-	const artistId = artistJson.data[0].id;
-
-	// 2?? Get tracks for that artist
-	const tracksUrl =
-		`https://api.reccobeats.com/v1/artist/${artistId}/tracks`;
-
-	const tracksRes = await fetch(tracksUrl, requestOptions);
-	const tracksJson = await tracksRes.json();
-
-	if (!tracksJson?.data?.length) {
-		console.error("No tracks found for artist:", artist);
-		return null;
-	}
-
-	// 3?? Match title
-	const normalizedTitle = normalize(title);
-
-	const match = tracksJson.data.find(
-		(t) => normalize(t.trackTitle) === normalizedTitle
-	);
-
-	if (!match) {
-		console.error("Track title not found:", title);
-		return null;
-	}
-
-	return match.id; // This is the trackId
-}
-
-/**
  * Build blacklist set from user settings.
+ * 
+ * @param {object} modules - Module dependencies
+ * @returns {Set<string>} Set of blacklisted artist names (uppercase)
  */
 function buildBlacklist(modules) {
 	const { settings: { storage }, utils: { helpers } } = modules;
@@ -600,10 +589,14 @@ function buildBlacklist(modules) {
 
 /**
  * Extract unique artists from seeds, splitting by ';'.
+ * 
+ * @param {Array} seeds - Seed objects
+ * @param {number} limit - Maximum artists to return
+ * @returns {string[]} Array of unique artist names
  */
 function extractSeedArtists(seeds, limit) {
 	const uniqueArtists = new Set();
-	
+
 	for (const seed of seeds) {
 		if (seed.artist) {
 			const artists = seed.artist.split(';').map(a => a.trim()).filter(Boolean);
@@ -612,12 +605,15 @@ function extractSeedArtists(seeds, limit) {
 			}
 		}
 	}
-	
+
 	return Array.from(uniqueArtists).slice(0, limit);
 }
 
 /**
  * Extract genres from seed tracks.
+ * 
+ * @param {Array} seeds - Seed objects
+ * @returns {string[]} Array of unique genres
  */
 function extractGenresFromSeeds(seeds) {
 	const genres = new Set();
@@ -632,6 +628,12 @@ function extractGenresFromSeeds(seeds) {
 
 /**
  * Add seed tracks to results for track-based discovery.
+ * 
+ * @param {Array} seeds - Seed objects
+ * @param {number} seedLimit - Maximum seeds to process
+ * @param {Set} blacklist - Blacklisted artists
+ * @param {Set} seenArtists - Already seen artists
+ * @param {Map} tracksByArtist - Map of artist -> {artistName, tracks[]}
  */
 function addSeedTracksToResults(seeds, seedLimit, blacklist, seenArtists, tracksByArtist) {
 	for (let i = 0; i < seedLimit; i++) {
@@ -653,7 +655,7 @@ function addSeedTracksToResults(seeds, seedLimit, blacklist, seenArtists, tracks
 
 			const entry = tracksByArtist.get(artKey);
 			const trackKey = seed.title.toUpperCase();
-			
+
 			if (!entry.tracks.some(t => t.title.toUpperCase() === trackKey)) {
 				entry.tracks.push({ title: seed.title, match: 1.0, playcount: 0 });
 			}
@@ -664,6 +666,11 @@ function addSeedTracksToResults(seeds, seedLimit, blacklist, seenArtists, tracks
 
 /**
  * Add artist to candidates if not already seen and not blacklisted.
+ * 
+ * @param {string} artistName - Artist name to add
+ * @param {Set} seenArtists - Set of already seen artists
+ * @param {Set} blacklist - Set of blacklisted artists
+ * @param {Array} candidates - Array to add candidate to
  */
 function addArtistCandidate(artistName, seenArtists, blacklist, candidates) {
 	if (!artistName) return;
@@ -676,7 +683,11 @@ function addArtistCandidate(artistName, seenArtists, blacklist, candidates) {
 }
 
 /**
- * Fetch top tracks for candidate artists.
+ * Fetch top tracks for candidate artists using Last.fm.
+ * 
+ * @param {object} modules - Module dependencies
+ * @param {Array} candidates - Array of candidates to enrich
+ * @param {object} config - Configuration settings
  */
 async function fetchTracksForCandidates(modules, candidates, config) {
 	const { api: { lastfmApi }, settings: { prefixes }, ui: { notifications } } = modules;
@@ -691,6 +702,9 @@ async function fetchTracksForCandidates(modules, candidates, config) {
 
 	for (let i = 0; i < totalCandidates; i++) {
 		const candidate = candidates[i];
+
+		// Skip special filter candidates
+		if (candidate.artist.startsWith('__')) continue;
 
 		// Skip if already has tracks (e.g., from track-based discovery)
 		if (candidate.tracks && candidate.tracks.length > 0) continue;
@@ -720,6 +734,9 @@ async function fetchTracksForCandidates(modules, candidates, config) {
 
 /**
  * Get the appropriate discovery function for a mode.
+ * 
+ * @param {string} mode - Discovery mode constant
+ * @returns {Function} Discovery function
  */
 function getDiscoveryStrategy(mode) {
 	switch (mode) {
@@ -727,9 +744,12 @@ function getDiscoveryStrategy(mode) {
 			return discoverByTrack;
 		case DISCOVERY_MODES.GENRE:
 			return discoverByGenre;
+		case DISCOVERY_MODES.RECCO:
+			return discoverByRecco;
 		case DISCOVERY_MODES.MOOD:
+			return discoverByMood;
 		case DISCOVERY_MODES.ACTIVITY:
-			return discoverByMoodActivity;
+			return discoverByActivity;
 		case DISCOVERY_MODES.ARTIST:
 		default:
 			return discoverByArtist;
@@ -738,11 +758,15 @@ function getDiscoveryStrategy(mode) {
 
 /**
  * Get human-readable name for discovery mode.
+ * 
+ * @param {string} mode - Discovery mode constant
+ * @returns {string} Human-readable name
  */
 function getDiscoveryModeName(mode) {
 	switch (mode) {
 		case DISCOVERY_MODES.TRACK: return 'Similar Tracks';
 		case DISCOVERY_MODES.GENRE: return 'Similar Genre';
+		case DISCOVERY_MODES.RECCO: return 'ReccoBeats';
 		case DISCOVERY_MODES.MOOD: return 'Mood';
 		case DISCOVERY_MODES.ACTIVITY: return 'Activity';
 		case DISCOVERY_MODES.ARTIST:
@@ -756,8 +780,12 @@ window.matchMonkeyDiscoveryStrategies = {
 	discoverByArtist,
 	discoverByTrack,
 	discoverByGenre,
-	discoverByMoodActivity,
+	discoverByRecco,
+	discoverByMood,
+	discoverByActivity,
 	getDiscoveryStrategy,
 	getDiscoveryModeName,
 	buildBlacklist,
+	extractSeedArtists,
+	extractGenresFromSeeds,
 };

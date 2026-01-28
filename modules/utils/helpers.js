@@ -2,10 +2,59 @@
  * General Helper Utilities
  * 
  * Common utilities for error formatting, shuffling, parsing, and other helper functions.
- * MediaMonkey 5 API Only
+
  */
 
 'use strict';
+
+/** Clean album name by removing edition markers and suffixes.
+ * @param {string} name - Original album name
+ * @returns {string} Cleaned album name
+ */
+function cleanAlbumName(name) {
+	if (!name) return "";
+
+	let cleaned = name;
+
+	// Remove parenthetical/bracketed edition markers
+	cleaned = cleaned.replace(/\(.*?\)/g, "");
+	cleaned = cleaned.replace(/\[.*?\]/g, "");
+	cleaned = cleaned.replace(/\{.*?\}/g, "");
+
+	// Remove common suffixes
+	cleaned = cleaned.replace(/\b-\s*(single|ep|remaster(ed)?|deluxe|bonus.*|live)\b/gi, "");
+	cleaned = cleaned.replace(/\b(single|ep|remaster(ed)?|deluxe|bonus.*|live)\b$/gi, "");
+
+	// Remove trailing dashes, spaces, punctuation
+	cleaned = cleaned.replace(/[-–—]+$/g, "");
+	cleaned = cleaned.replace(/^\s+|\s+$/g, "");
+
+	// Collapse multiple spaces
+	cleaned = cleaned.replace(/\s{2,}/g, " ");
+
+	return cleaned.trim();
+}
+
+function cleanTrackName(name) {
+	if (!name) return "";
+
+	let cleaned = name;
+
+	// Remove parenthetical feature tags: (feat. X), (ft. X), (featuring X), (with X)
+	cleaned = cleaned.replace(/\((feat\.?|featuring|ft\.?|with)\s+[^)]+\)/gi, "");
+
+	// Remove inline feature tags after a dash or space
+	cleaned = cleaned.replace(/[-–—]\s*(feat\.?|featuring|ft\.?|with)\s+.+$/gi, "");
+	cleaned = cleaned.replace(/\s+(feat\.?|featuring|ft\.?|with)\s+.+$/gi, "");
+
+	// Remove trailing punctuation left behind
+	cleaned = cleaned.replace(/[-–—:,;]+$/g, "");
+
+	// Collapse extra spaces
+	cleaned = cleaned.replace(/\s{2,}/g, " ");
+
+	return cleaned.trim();
+}
 
 /**
  * Normalize errors for logging.
@@ -115,6 +164,8 @@ function debounce(fn, delay) {
 
 // Export to window namespace for MM5
 window.matchMonkeyHelpers = {
+	cleanAlbumName,
+	cleanTrackName,
 	formatError,
 	shuffle,
 	parseListSetting,

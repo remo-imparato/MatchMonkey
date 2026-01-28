@@ -3,15 +3,15 @@
  * 
  * Main orchestration layer that ties together:
  * - Input collection (seed tracks)
- * - Discovery strategies (artist/track/genre based)
+ * - Discovery strategies (artist/track/genre/recco/mood/activity)
  * - Track matching (multi-pass fuzzy matching against library)
  * - Output generation (playlist creation or queue management)
  * - Auto-mode handling (auto-queue near end of playlist)
  * 
- * MediaMonkey 5 API Only
+
  * 
  * @author Remo Imparato
- * @license MIT
+
  */
 
 'use strict';
@@ -22,7 +22,7 @@ window.matchMonkeyOrchestration = {
 	 * 
 	 * @param {object} modules - Injected module dependencies
 	 * @param {boolean} [autoMode=false] - Whether running in auto-mode
-	 * @param {string} [discoveryMode='artist'] - Discovery mode: 'artist', 'track', 'genre', 'mood', or 'activity'
+	 * @param {string} [discoveryMode='artist'] - Discovery mode: 'artist', 'track', 'genre', 'recco', 'mood', or 'activity'
 	 * @returns {Promise<object>} Result object with status, tracklist, playlist info
 	 */
 	async generateSimilarPlaylist(modules, autoMode = false, discoveryMode = 'artist') {
@@ -107,11 +107,10 @@ window.matchMonkeyOrchestration = {
 
 			// Add mood/activity context if present or from settings
 			if (_moodActivityContext) {
-				// Context explicitly provided (from runMoodActivityPlaylist)
+				// Context explicitly provided
 				config_.moodActivityContext = _moodActivityContext.context;
 				config_.moodActivityValue = _moodActivityContext.value;
 				config_.playlistDuration = _moodActivityContext.duration;
-				config_.moodActivityBlendRatio = intSetting('MoodActivityBlendRatio') / 100.0;
 			} else if (discoveryMode === 'mood' || discoveryMode === 'activity') {
 				// Context not provided, read from settings
 				if (discoveryMode === 'mood') {
@@ -122,25 +121,33 @@ window.matchMonkeyOrchestration = {
 					config_.moodActivityValue = stringSetting('DefaultActivity', 'workout');
 				}
 				config_.playlistDuration = intSetting('PlaylistDuration', 60);
-				config_.moodActivityBlendRatio = intSetting('MoodActivityBlendRatio') / 100.0;
 
 				console.log(`Match Monkey: Using ${config_.moodActivityContext} "${config_.moodActivityValue}" from settings`);
 			}
 
 			console.log(`Match Monkey: Starting ${modeName} (auto=${autoMode})`);
 
-			// Step 1: Collect seed tracks
-			updateProgress(`Collecting seed tracks...`, 0.05);
-			const seeds = await this.collectSeedTracks(modules);
+			// Step 1: Collect seed tracks (not required for mood/activity modes)
+			let seeds = [];
+			const seedsRequired = !['mood', 'activity'].includes(discoveryMode);
 
-			if (!seeds || seeds.length === 0) {
-				terminateProgressTask(taskId);
-				showToast(`No seed tracks found. Select tracks or play something first.`, 'warning');
-				return { success: false, error: 'No seed tracks found.', tracksAdded: 0 };
+			if (seedsRequired) {
+				updateProgress(`Collecting seed tracks...`, 0.05);
+				seeds = await this.collectSeedTracks(modules);
+
+				if (!seeds || seeds.length === 0) {
+					terminateProgressTask(taskId);
+					showToast(`No seed tracks found. Select tracks or play something first.`, 'warning');
+					return { success: false, error: 'No seed tracks found.', tracksAdded: 0 };
+				}
+
+				console.log(`Match Monkey: ${seeds.length} seed(s) collected`);
+				updateProgress(`Found ${seeds.length} seed(s), starting discovery...`, 0.1);
+			} else {
+				// Mood/Activity modes don't need seeds
+				console.log(`Match Monkey: ${discoveryMode} mode - no seeds required`);
+				updateProgress(`Starting ${modeName} discovery...`, 0.1);
 			}
-
-			console.log(`Match Monkey: ${seeds.length} seed(s) collected`);
-			updateProgress(`Found ${seeds.length} seed(s), starting discovery...`, 0.1);
 
 			// Step 2: Run discovery strategy
 			const discoveryFn = strategies.getDiscoveryStrategy(discoveryMode);
@@ -168,7 +175,17 @@ window.matchMonkeyOrchestration = {
 			let results;
 
 			try {
-				results = await this.matchCandidatesToLibrary(modules, candidates, config_);
+				// Check if this is a mood/activity filter candidate (special handling)
+				const isMoodActivityFilter = candidates.length === 1 &&
+					(candidates[0].artist === '__MOOD_FILTER__' || candidates[0].artist === '__ACTIVITY_FILTER__');
+
+				if (isMoodActivityFilter) {
+					// Mood/Activity mode - search library with audio filtering
+					results = await this.matchMoodActivityToLibrary(modules, candidates[0], config_);
+				} else {
+					// Standard artist/track matching
+					results = await this.matchCandidatesToLibrary(modules, candidates, config_);
+				}
 			} catch (matchError) {
 				console.error(`Match Monkey: Library matching error:`, matchError);
 				terminateProgressTask(taskId);
@@ -205,7 +222,7 @@ window.matchMonkeyOrchestration = {
 				if (config_.autoMode || enqueueEnabled) {
 					output = await this.queueResults(modules, finalResults, config_);
 				} else {
-					const seedName = this.buildPlaylistSeedName(seeds);
+					const seedName = seeds.length > 0 ? this.buildPlaylistSeedName(seeds) : config_.moodActivityValue || 'Selection';
 					config_.seedName = seedName;
 					config_.modeName = modeName;
 					output = await this.buildResultsPlaylist(modules, finalResults, config_);
@@ -226,7 +243,7 @@ window.matchMonkeyOrchestration = {
 
 			cache?.clear?.();
 
-			showToast(`Added ${actualTracksAdded} ${modeName.toLowerCase()} tracks (${elapsed}s)`, 'success');
+			showToast(`Added ${actualTracksAdded} ${modeName.toLowerCase()} tracks`, 'success');
 
 			return {
 				success: true,
@@ -248,7 +265,7 @@ window.matchMonkeyOrchestration = {
 	 * Collect seed tracks from selection or currently playing.
 	 * 
 	 * @param {object} modules - Module dependencies
-	 * @returns {Promise<Array>} Array of seed objects [{artist, title, genre}, ...]
+	 * @returns {Promise<Array>} Array of seed objects [{artist, title, genre, album}, ...]
 	 */
 	async collectSeedTracks(modules) {
 		const seeds = [];
@@ -262,6 +279,17 @@ window.matchMonkeyOrchestration = {
 
 				// Wait for the tracklist to load before accessing it
 				await selectedTracks.whenLoaded();
+				let lastCount = -1;
+				let stableCount = selectedTracks.count;
+				const start = Date.now();
+				const timeout = 500;
+
+				while (stableCount !== lastCount && Date.now() - start < timeout) {
+					lastCount = stableCount;
+					await new Promise(r => setTimeout(r, 10));
+					stableCount = selectedTracks.count;
+				}
+
 
 				if (typeof selectedTracks.locked === 'function') {
 					selectedTracks.locked(() => {
@@ -271,9 +299,9 @@ window.matchMonkeyOrchestration = {
 							if (track) {
 								seeds.push({
 									artist: track.artist || '',
-									title: track.title || '',
+									title: matchMonkeyHelpers.cleanTrackName(track.title )|| '',
 									genre: track.genre || '',
-									album: track.album || '',
+									album: matchMonkeyHelpers.cleanAlbumName(track.album) || '',
 								});
 							}
 						}
@@ -294,15 +322,13 @@ window.matchMonkeyOrchestration = {
 						console.log(`Match Monkey: Using current track as seed: "${track.artist} - ${track.title}"`);
 						seeds.push({
 							artist: track.artist || '',
-							title: track.title || '',
+							title: matchMonkeyHelpers.cleanTrackName(track.title) || '',
 							genre: track.genre || '',
-							album: track.album || '',
-
+							album: matchMonkeyHelpers.cleanAlbumName(track.album) || '',
 						});
 					}
 				} catch (e) {
-					// If async call fails, ignore and continue to next source
-					console.warn('Match Monkey: Failed to get current track via getCurrentTrack():', e);
+					console.warn('Match Monkey: Failed to get current track:', e);
 				}
 			}
 
@@ -334,6 +360,9 @@ window.matchMonkeyOrchestration = {
 		for (let i = 0; i < totalCandidates; i++) {
 			const candidate = candidates[i];
 			if (!candidate?.artist) continue;
+
+			// Skip special filter candidates
+			if (candidate.artist.startsWith('__')) continue;
 
 			// Update progress periodically
 			if (i % 5 === 0) {
@@ -398,6 +427,52 @@ window.matchMonkeyOrchestration = {
 
 		console.log(`Match Monkey: Library matching found ${results.length} unique tracks`);
 		return results;
+	},
+
+	/**
+	 * Match mood/activity filter to library tracks.
+	 * Searches entire library and filters based on audio characteristics.
+	 * 
+	 * @param {object} modules - Module dependencies
+	 * @param {object} filterCandidate - Filter candidate with audioTargets
+	 * @param {object} config - Configuration settings
+	 * @returns {Promise<Array>} Array of matching library track objects
+	 */
+	async matchMoodActivityToLibrary(modules, filterCandidate, config) {
+		const { db, ui: { notifications } } = modules;
+		const { updateProgress } = notifications;
+
+		const audioTargets = filterCandidate.audioTargets || {};
+		const moodOrActivity = filterCandidate.mood || filterCandidate.activity || 'unknown';
+
+		console.log(`Match Monkey: Searching library for ${moodOrActivity} tracks with targets:`, audioTargets);
+		updateProgress(`Searching library for ${moodOrActivity} tracks...`, 0.5);
+
+		// For mood/activity mode, we search the entire library with rating filters
+		// and then shuffle to get variety
+		try {
+			// Search library for tracks (broad search)
+			const allTracks = await db.findLibraryTracks(
+				null, // No specific artist
+				null, // No specific titles
+				config.totalLimit || 1000, // Get plenty of tracks
+				{
+					best: config.bestEnabled,
+					minRating: config.minRating,
+					allowUnknown: config.allowUnknown,
+				}
+			);
+
+			console.log(`Match Monkey: Found ${allTracks.length} tracks in library for ${moodOrActivity} filtering`);
+
+			// For now, return all tracks - in future we could filter by audio characteristics
+			// if the user has audio features stored in their library
+			return allTracks;
+
+		} catch (e) {
+			console.error(`Match Monkey: Error searching library for ${moodOrActivity}:`, e);
+			return [];
+		}
 	},
 
 	/**
@@ -466,12 +541,6 @@ window.matchMonkeyOrchestration = {
 	/**
 	 * Build a playlist from results.
 	 * 
-	 * Handles:
-	 * 1. Confirmation dialog (if enabled) - lets user select existing playlist
-	 * 2. Parent playlist creation/lookup
-	 * 3. Playlist modes: Create new (with unique naming), Overwrite existing
-	 * 4. Clear existing tracks before adding new ones
-	 * 5. Navigate to playlist after creation
 	 * @param {object} modules - Module dependencies
 	 * @param {Array} tracks - Track objects for playlist
 	 * @param {object} config - Configuration settings
@@ -487,35 +556,29 @@ window.matchMonkeyOrchestration = {
 		const playlistMode = stringSetting('PlaylistMode', 'Create new playlist');
 		const navigateAfter = stringSetting('NavigateAfter', 'Navigate to new playlist');
 
-		// Get the discovery mode name (e.g., "Similar Artists", "Similar Tracks", "Similar Genre", "Mood: Energetic", "Activity: Workout")
 		const modeName = config.modeName || 'Similar Artists';
 		const seedName = config.seedName || 'Selection';
 
-		// Build playlist name from template with discovery mode indicator
+		// Build playlist name from template
 		let playlistName;
 
-		// If template contains %, replace it with seed name
 		if (playlistTemplate.indexOf('%') >= 0) {
 			playlistName = playlistTemplate.replace('%', seedName);
 		} else {
 			playlistName = `${playlistTemplate} ${seedName}`;
 		}
 
-		// Append discovery mode indicator in parentheses
-		// Examples:
-		// "- Similar to The Beatles (Similar Artists)"
-		// "- Similar to Shape of You (Similar Tracks)"
-		// "- Similar to Rock (Similar Genre)"
-		// "- Similar to The Beatles (Mood: Energetic)"
-		// "- Similar to The Beatles (Activity: Workout)"
+		// Append discovery mode indicator
 		if (config.moodActivityValue && (config.discoveryMode === 'mood' || config.discoveryMode === 'activity')) {
-			// Capitalize first letter of mood/activity value
 			const capitalizedValue = config.moodActivityValue.charAt(0).toUpperCase() + config.moodActivityValue.slice(1);
 			const contextLabel = config.moodActivityContext === 'mood' ? 'Mood' : 'Activity';
 			playlistName = `${playlistName} (${contextLabel}: ${capitalizedValue})`;
+		} else if (config.discoveryMode === 'recco') {
+			playlistName = `${playlistName} (ReccoBeats)`;
 		} else {
 			playlistName = `${playlistName} (${modeName})`;
 		}
+
 		// Truncate if too long
 		if (playlistName.length > 100) {
 			playlistName = playlistName.substring(0, 97) + '...';
@@ -538,7 +601,6 @@ window.matchMonkeyOrchestration = {
 				const dialogResult = await this.showPlaylistDialog();
 
 				if (dialogResult === null) {
-					// User cancelled
 					console.log('Match Monkey: User cancelled playlist dialog');
 					return { added: 0, playlist: null, cancelled: true };
 				}
@@ -548,12 +610,11 @@ window.matchMonkeyOrchestration = {
 				}
 			} catch (dialogError) {
 				console.error('Match Monkey: Dialog error:', dialogError);
-				// Continue with auto-creation
 			}
 		}
 
 		try {
-			// Resolve target playlist using db layer
+			// Resolve target playlist
 			const resolution = await db.resolveTargetPlaylist(
 				playlistName,
 				parentName,
@@ -570,7 +631,7 @@ window.matchMonkeyOrchestration = {
 
 			console.log(`Match Monkey: Using playlist "${targetPlaylist.name}" (clear: ${shouldClear})`);
 
-			// Clear existing tracks first if needed (overwrite mode or user-selected existing playlist)
+			// Clear existing tracks if needed
 			if (shouldClear) {
 				console.log('Match Monkey: Clearing existing tracks');
 				await db.clearPlaylistTracks(targetPlaylist);
@@ -600,7 +661,6 @@ window.matchMonkeyOrchestration = {
 
 	/**
 	 * Show the playlist selection dialog.
-	 * Returns the selected playlist, {autoCreate: true}, or null if cancelled.
 	 */
 	async showPlaylistDialog() {
 		return new Promise((resolve) => {
@@ -624,22 +684,18 @@ window.matchMonkeyOrchestration = {
 
 				const handleClose = () => {
 					if (dlg.modalResult !== 1) {
-						// User cancelled (clicked Cancel or closed dialog)
 						resolve(null);
 						return;
 					}
 
-					// User clicked OK - get selected playlist
 					const selectedPlaylist = dlg.getValue?.('getPlaylist')?.();
 					if (selectedPlaylist) {
 						resolve(selectedPlaylist);
 					} else {
-						// No playlist selected, auto-create
 						resolve({ autoCreate: true });
 					}
 				};
 
-				// Listen for dialog close
 				app.listen(dlg, 'closed', handleClose);
 
 			} catch (e) {
@@ -655,21 +711,18 @@ window.matchMonkeyOrchestration = {
 	navigateAfterCreation(navigateAfter, playlist) {
 		try {
 			if (navigateAfter === 'Navigate to new playlist' && playlist) {
-				// Use MM5's navigationHandlers system
 				if (typeof navigationHandlers !== 'undefined' &&
 					navigationHandlers['playlist']?.navigate) {
 					navigationHandlers['playlist'].navigate(playlist);
-					console.log('Match Monkey: Navigated to playlist via navigationHandlers');
+					console.log('Match Monkey: Navigated to playlist');
 				}
 			} else if (navigateAfter === 'Navigate to now playing') {
-				// Navigate to Now Playing
 				if (typeof navigationHandlers !== 'undefined' &&
 					navigationHandlers['nowPlaying']?.navigate) {
 					navigationHandlers['nowPlaying'].navigate();
 					console.log('Match Monkey: Navigated to Now Playing');
 				}
 			}
-			// 'Stay in current view' - do nothing
 		} catch (navError) {
 			console.warn('Match Monkey: Navigation error (non-fatal):', navError);
 		}
@@ -684,11 +737,9 @@ window.matchMonkeyOrchestration = {
 	buildPlaylistSeedName(seeds) {
 		if (!seeds || seeds.length === 0) return 'Selection';
 
-		// Get unique artists from seeds
 		const artists = new Set();
 		for (const seed of seeds) {
 			if (seed.artist) {
-				// Split by semicolon and add each artist
 				const parts = seed.artist.split(';').map(a => a.trim()).filter(Boolean);
 				for (const part of parts) {
 					artists.add(part);

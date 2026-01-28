@@ -12,7 +12,7 @@
  * - Error recovery and logging
  * 
  * @author Remo Imparato
- * @license MIT
+
  */
 
 'use strict';

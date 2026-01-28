@@ -4,7 +4,7 @@
  * Fetches similar artists and top tracks from Last.fm API.
  * Works with per-run cache to avoid redundant API calls within a single operation.
  * 
- * MediaMonkey 5 API Only
+
  */
 
 'use strict';

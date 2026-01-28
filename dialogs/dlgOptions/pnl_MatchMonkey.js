@@ -1,7 +1,7 @@
 /**
  * MatchMonkey Options Panel for MediaMonkey 5
  * 
- * MediaMonkey 5 API Only
+
  * 
  * @author Remo Imparato
  * @version 2.1.0
@@ -42,7 +42,7 @@
  * - GenreBlacklist -> GenreBlacklist
  * - TitleExclusions -> TitleExclusions
  * 
- * @license MIT
+
  */
 
 'use strict';

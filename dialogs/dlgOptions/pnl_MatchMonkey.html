@@ -18,12 +18,8 @@
 	- ShowConfirmDialog: Show playlist selection dialog
 	- MinRating: Minimum track rating (0-100)
 	- IncludeUnrated: Include tracks without ratings
-	- MoodDiscoveryEnabled: Enable mood/activity playlists
 	- DefaultMood: Default mood (energetic, relaxed, happy, sad, focused)
 	- DefaultActivity: Default activity (workout, study, party, sleep, driving)
-	- PlaylistDuration: Target playlist duration in minutes
-	- HybridMode: Combine ReccoBeats + Last.fm
-	- MoodActivityBlendRatio: Blend ratio 0.0-1.0 (0=all mood, 0.5=balanced, 1=all seed)
 	- ArtistBlacklist: Comma-separated blacklisted artists
 	- GenreBlacklist: Comma-separated blacklisted genres
 	- TitleExclusions: Comma-separated title words to exclude
@@ -139,60 +135,39 @@
 		</div>
 	</fieldset>
 
-	<!-- Mood & Activity (ReccoBeats) -->
+	<!-- Mood & Activity Defaults -->
 	<fieldset>
-		<legend>Mood & Activity (ReccoBeats AI)</legend>
+		<legend>Mood & Activity defaults</legend>
 		<div class="uiRows">
 			<div class="uiRow">
-				<div data-id="MoodDiscoveryEnabled" data-control-class="Checkbox" data-tip="Enable mood and activity-based playlist generation using ReccoBeats AI">Enable mood/activity discovery?</div>
-			</div>
-			<div class="uiRow">
 				<label class="inline">Default mood:</label>
-				<div data-id="DefaultMood" data-control-class="Dropdown" data-tip="Default mood to use when generating mood-based playlists">
+				<div data-id="DefaultMood" data-control-class="Dropdown" data-tip="Default mood preset. Mood playlists use predefined audio profiles to match track characteristics.">
 					<option value="energetic">Energetic</option>
 					<option value="relaxed">Relaxed</option>
 					<option value="happy">Happy</option>
 					<option value="sad">Sad</option>
 					<option value="focused">Focused</option>
+					<option value="angry">Angry</option>
+					<option value="romantic">Romantic</option>
 				</div>
 			</div>
 			<div class="uiRow">
 				<label class="inline">Default activity:</label>
-				<div data-id="DefaultActivity" data-control-class="Dropdown" data-tip="Default activity to use when generating activity-based playlists">
+				<div data-id="DefaultActivity" data-control-class="Dropdown" data-tip="Default activity preset. Activity playlists use predefined audio profiles optimized for each activity.">
 					<option value="workout">Workout</option>
 					<option value="study">Study</option>
 					<option value="party">Party</option>
 					<option value="sleep">Sleep</option>
 					<option value="driving">Driving</option>
+					<option value="meditation">Meditation</option>
+					<option value="cooking">Cooking</option>
 				</div>
 			</div>
-			<div class="uiRow">
-				<label class="inline" data-tip="Target playlist duration in minutes for activity-based playlists">Playlist duration (min):</label>
-				<div data-id="PlaylistDuration"
-					 data-control-class="Edit"
-					 data-tip="Target duration in minutes for activity playlists (e.g., 60 for 1-hour workout)"
-					 data-init-params="{type: 'number', min:10, max:300}"></div>
-			</div>
-			<div class="uiRow">
-				<div data-id="HybridMode" data-control-class="Checkbox" data-tip="Combine ReccoBeats recommendations with Last.fm artist expansion for better results (recommended)">Use hybrid mode (ReccoBeats + Last.fm)?</div>
-			</div>
-			<div class="uiRow">
-				<label class="inline">Seed/Mood balance:</label>
-				<div class="sliderContainer" style="display:flex;flex-direction:column;gap:0.5em;width:30em;">
-
-					<div data-id="MoodActivityBlendRatio"
-						data-control-class="Slider"
-						data-tip="Control the balance between your seed artists and mood recommendations. 0% = pure mood discovery, 50% = balanced (recommended), 100% = seed-based with mood filter"
-						data-init-params='{"min":0, "max":100, "step":10, ticks: [0, 50, 100]}'
-						style="background: xlinear-gradient(to right, var(--accent-color-light,#4a9eff) 0%, var(--accent-color,#2979ff) 50%, var(--success-color,#4caf50) 100%); height:6px; border-radius:3px;">
-					</div>
-
-					<div style="display:flex;justify-content:space-between;font-size:0.85em;color:var(--text-secondary,#888);margin-top:-0.25em;padding:0 0.25em;width:100%;align-items:center;">
-						<span style="white-space:nowrap; text-align:left;">All Mood</span>
-						<span style="flex:1; text-align:center; white-space:nowrap;">Balanced</span>
-						<span style="white-space:nowrap; text-align:right;">All Seeds</span>
-					</div>
-				</div>
+			<div class="uiRow" style="margin-top:0.5em;padding:0.5em;background:var(--panel-background,#f8f8f8);border-radius:4px;">
+				<span style="font-size:0.9em;color:var(--text-secondary,#666);">
+					<strong>Tip:</strong> Mood and Activity modes use predefined audio profiles (energy, tempo, etc.) to find matching tracks in your library. 
+					Use <strong>Similar AI</strong> menu if you want AI-powered recommendations based on selected tracks.
+				</span>
 			</div>
 		</div>
 	</fieldset>

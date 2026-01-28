@@ -4,11 +4,11 @@
  * This script runs on every MediaMonkey startup.
  * It loads all modules and ensures configuration exists with proper defaults.
  * 
- * MediaMonkey 5 API Only
+
  * 
  * @author Remo Imparato
  * @version 2.2.0
- * @license MIT
+
  */
 
 'use strict';
@@ -124,11 +124,11 @@ function start() {
 
 		// === Mood/Activity Discovery (ReccoBeats) ===
 		MoodDiscoveryEnabled: false,    // Enable mood-based discovery
-		DefaultMood: 'energetic',        // Default mood: energetic, relaxed, happy, sad, focused
-		DefaultActivity: 'workout',      // Default activity: workout, study, party, sleep, driving
-		PlaylistDuration: 60,            // Target playlist duration in minutes
-		HybridMode: true,                // Combine ReccoBeats + Last.fm (recommended)
-		MoodActivityBlendRatio: 0,    // Blend ratio: 0.5 = 50% seeds + 50% mood (0=all mood, 1=all seeds)
+		DefaultMood: '',                // Default mood: energetic, relaxed, happy, sad, focused
+		DefaultActivity: '',            // Default activity: workout, study, party, sleep, driving
+		PlaylistDuration: 60,           // Target playlist duration in minutes
+		HybridMode: true,               // Combine ReccoBeats + Last.fm (recommended)
+		MoodActivityBlendRatio: 0,      // Blend ratio: 0.5 = 50% seeds + 50% mood (0=all mood, 1=all seeds)
 
 		// === Filters ===
 		ArtistBlacklist: '',            // Comma-separated blacklisted artists

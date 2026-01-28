@@ -9,7 +9,7 @@
  * All functions use the MediaMonkey 5 API (`app.db`, `app.player`) and provide
  * error handling with graceful degradation.
  *
- * MediaMonkey 5 API Only
+
  *
  * @module modules/db
  */

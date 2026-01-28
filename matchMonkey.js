@@ -2,18 +2,22 @@
  * MatchMonkey Add-on for MediaMonkey 5
  * 
  * Complete refactored implementation using modular architecture.
- * Supports three discovery modes:
- * - Artist-based: Find similar artists (artist.getSimilar API)
- * - Track-based: Find similar tracks (track.getSimilar API)
- * - Genre-based: Find artists in same genre (tag.getTopArtists API)
+ * Supports multiple discovery modes:
+ * - Artist-based: Find similar artists (Last.fm artist.getSimilar API)
+ * - Track-based: Find similar tracks (Last.fm track.getSimilar API)
+ * - Genre-based: Find artists in same genre (Last.fm tag.getTopArtists API)
+ * - Recco-based: Find similar tracks using ReccoBeats AI (requires seed tracks)
+ * - Mood-based: Find tracks matching mood profiles (no seeds needed)
+ * - Activity-based: Find tracks matching activity profiles (no seeds needed)
  * 
  * @author Remo Imparato
- * @version 2.1.0
- * @description Generates playlists or queues tracks from similar artists/tracks/genres using Last.fm API.
- *              Supports automatic mode to queue similar tracks when approaching end of playlist.
+ * @version 2.2.0
+ * @description Generates playlists or queues tracks from similar artists/tracks/genres using Last.fm API
+ *              and ReccoBeats AI. Supports automatic mode to queue similar tracks when approaching
+ *              end of playlist.
  * 
  * @repository https://github.com/remo-imparato/SimilarArtistsMM5
- * @license MIT
+
  */
 
 (function(globalArg) {
@@ -87,17 +91,19 @@
 		// ============================================================================
 		
 		/**
-		 * Discovery mode types
-		 * - 'artist': Use artist.getSimilar to find similar artists
-		 * - 'track': Use track.getSimilar to find musically similar tracks
-		 * - 'genre': Use tag.getTopArtists to find artists in same genre
-		 * - 'mood': Use ReccoBeats mood API + Last.fm hybrid
-		 * - 'activity': Use ReccoBeats activity API + Last.fm hybrid
+		 * Discovery mode types:
+		 * - 'artist': Use Last.fm artist.getSimilar to find similar artists
+		 * - 'track': Use Last.fm track.getSimilar to find musically similar tracks
+		 * - 'genre': Use Last.fm tag.getTopArtists to find artists in same genre
+		 * - 'recco': Use ReccoBeats AI to find recommendations based on seed tracks
+		 * - 'mood': Use predefined mood audio profiles (no seeds needed)
+		 * - 'activity': Use predefined activity audio profiles (no seeds needed)
 		 */
 		const DISCOVERY_MODES = {
 			ARTIST: 'artist',
 			TRACK: 'track',
 			GENRE: 'genre',
+			RECCO: 'recco',
 			MOOD: 'mood',
 			ACTIVITY: 'activity'
 		};
@@ -112,7 +118,7 @@
 		 * Main entry point for all action handlers.
 		 * 
 		 * @param {boolean} [autoModeFlag=false] - Whether running in auto-mode
-		 * @param {string} [discoveryMode='artist'] - Discovery mode: 'artist', 'track', 'genre', 'mood', or 'activity'
+		 * @param {string} [discoveryMode='artist'] - Discovery mode constant
 		 * @param {object} [options={}] - Additional options
 		 * @param {string} [options.moodActivityValue] - Specific mood or activity value to use
 		 * @returns {Promise<object>} Result from orchestration
@@ -131,20 +137,29 @@
 				// Build enriched modules with mood/activity context if specified
 				let enrichedModules = modules;
 				
-				if ((discoveryMode === DISCOVERY_MODES.MOOD || discoveryMode === DISCOVERY_MODES.ACTIVITY) && options.moodActivityValue) {
+				// Handle mood/activity modes with optional value override
+				if (discoveryMode === DISCOVERY_MODES.MOOD || discoveryMode === DISCOVERY_MODES.ACTIVITY) {
 					const { getSetting } = storage;
 					const context = discoveryMode === DISCOVERY_MODES.MOOD ? 'mood' : 'activity';
+					
+					// Use provided value or fall back to settings default
+					let value = options.moodActivityValue;
+					if (!value) {
+						value = context === 'mood' 
+							? getSetting('DefaultMood', 'energetic')
+							: getSetting('DefaultActivity', 'workout');
+					}
 					
 					enrichedModules = {
 						...modules,
 						_moodActivityContext: {
 							context,
-							value: options.moodActivityValue,
+							value,
 							duration: getSetting('PlaylistDuration', 60)
 						}
 					};
 					
-					console.log(`Match Monkey: Using ${context} "${options.moodActivityValue}" from action`);
+					console.log(`Match Monkey: Using ${context} "${value}"`);
 				}
 				
 				const result = await orchestration.generateSimilarPlaylist(enrichedModules, autoModeFlag, discoveryMode);
@@ -159,7 +174,6 @@
 
 			} catch (e) {
 				console.error(`Match Monkey: Error in runMatchMonkey: ${e.toString()}`);
-				// Don't throw - return error result instead
 				return {
 					success: false,
 					error: e.message || String(e),
@@ -223,13 +237,10 @@
 		}
 
 		/**
-		 * Run mood/activity-based playlist generation.
+		 * Run mood/activity-based playlist generation (convenience function).
 		 * 
-		 * Uses ReccoBeats API for mood/activity recommendations combined with
-		 * Last.fm for similar artist expansion and library matching.
-		 * 
-		 * @param {string} [mood] - Target mood (e.g., 'energetic', 'relaxed', 'happy', 'sad')
-		 * @param {string} [activity] - Target activity (e.g., 'workout', 'study', 'party', 'sleep')
+		 * @param {string} [mood] - Target mood (e.g., 'energetic', 'relaxed')
+		 * @param {string} [activity] - Target activity (e.g., 'workout', 'study')
 		 * @returns {Promise<object>} Result from orchestration
 		 */
 		async function runMoodActivityPlaylist(mood, activity) {
@@ -237,56 +248,23 @@
 				const { getSetting } = storage;
 				
 				// Determine context and value
-				let context, value;
+				let discoveryMode, value;
 				
 				if (mood) {
-					context = 'mood';
+					discoveryMode = DISCOVERY_MODES.MOOD;
 					value = mood;
 				} else if (activity) {
-					context = 'activity';
+					discoveryMode = DISCOVERY_MODES.ACTIVITY;
 					value = activity;
 				} else {
 					// Use defaults from settings
-					const moodEnabled = getSetting('MoodDiscoveryEnabled', false);
-					if (moodEnabled) {
-						context = 'mood';
-						value = getSetting('DefaultMood', 'energetic');
-					} else {
-						context = 'activity';
-						value = getSetting('DefaultActivity', 'workout');
-					}
+					discoveryMode = DISCOVERY_MODES.MOOD;
+					value = getSetting('DefaultMood', 'energetic');
 				}
 				
-				const hybridMode = getSetting('HybridMode', true);
+				console.log(`Match Monkey: Running ${discoveryMode} playlist (${value})`);
 				
-				console.log(`Match Monkey: Running ${context}-based playlist (${value}, hybrid=${hybridMode})`);
-				
-				if (!hybridMode) {
-					console.warn('Match Monkey: Hybrid mode disabled - mood/activity requires hybrid mode for best results');
-				}
-				
-				// Use mood/activity discovery mode
-				const discoveryMode = context === 'mood' ? DISCOVERY_MODES.MOOD : DISCOVERY_MODES.ACTIVITY;
-				
-				// Add context to modules for discovery strategy
-				const enrichedModules = {
-					...modules,
-					_moodActivityContext: {
-						context,
-						value,
-						duration: getSetting('PlaylistDuration', 60)
-					}
-				};
-				
-				const result = await orchestration.generateSimilarPlaylist(enrichedModules, false, discoveryMode);
-				
-				if (result.success) {
-					console.log(`Match Monkey: ${context} playlist success - added ${result.tracksAdded} tracks`);
-				} else {
-					console.log(`Match Monkey: ${context} playlist completed - ${result.error}`);
-				}
-				
-				return result;
+				return await runMatchMonkey(false, discoveryMode, { moodActivityValue: value });
 				
 			} catch (e) {
 				console.error(`Match Monkey: Error in runMoodActivityPlaylist: ${e.toString()}`);
@@ -306,7 +284,6 @@
 
 		/**
 		 * Clear the cached auto trigger handler so it gets recreated with new settings.
-		 * Called when settings change to pick up new AutoMode value.
 		 */
 		function clearAutoTriggerHandlerCache() {
 			cachedAutoTriggerHandler = null;
@@ -321,9 +298,6 @@
 
 			cachedAutoTriggerHandler = autoMode.createAutoTriggerHandler({
 				getSetting,
-				// Auto-mode uses the discovery mode configured in settings (AutoMode)
-				// Options: 'Artist', 'Track', or 'Genre'
-				// If a discoveryMode is explicitly provided (for retries), use that instead
 				generateSimilarPlaylist: (autoModeFlag, discoveryMode) => {
 					// If discoveryMode is explicitly provided (e.g., from retry logic), use it
 					if (discoveryMode) {
@@ -333,15 +307,12 @@
 					
 					// Otherwise, read from settings
 					const autoModeSetting = getSetting('AutoMode', 'Track');
-					let mode = DISCOVERY_MODES.TRACK; // Default to track-based
+					let mode = DISCOVERY_MODES.TRACK;
 					
-					// Map setting value to discovery mode constant
 					if (autoModeSetting === 'Artist') {
 						mode = DISCOVERY_MODES.ARTIST;
 					} else if (autoModeSetting === 'Genre') {
 						mode = DISCOVERY_MODES.GENRE;
-					} else {
-						mode = DISCOVERY_MODES.TRACK;
 					}
 					
 					console.log(`Match Monkey Auto-Mode: Using ${autoModeSetting} discovery from settings (mode=${mode})`);
@@ -351,7 +322,6 @@
 				isAutoModeEnabled: () => autoMode.isAutoModeEnabled(getSetting),
 				threshold: 2,
 				logger: console.log,
-				// Pass the mode name getter for toast messages
 				getModeName: () => {
 					const autoModeSetting = getSetting('AutoMode', 'Track');
 					if (autoModeSetting === 'Artist') return 'Similar Artists';
@@ -390,7 +360,6 @@
 					autoMode.shutdownAutoMode(appState.autoModeState, console.log);
 					appState.autoModeState = null;
 				}
-				// Clear the cached handler on shutdown
 				clearAutoTriggerHandlerCache();
 			} catch (e) {
 				console.error(`Match Monkey: Error shutting down auto-mode: ${e.toString()}`);
@@ -426,7 +395,6 @@
 			try {
 				const { getSetting } = storage;
 
-				// Clear cached handler so it picks up new AutoMode setting
 				clearAutoTriggerHandlerCache();
 
 				if (!appState.autoModeState) {
@@ -526,7 +494,7 @@
 			start,
 			shutdown,
 			runMatchMonkey,
-			runMoodActivityPlaylist,  // NEW: Mood/activity playlist generation
+			runMoodActivityPlaylist,
 			toggleAuto,
 			isAutoEnabled,
 

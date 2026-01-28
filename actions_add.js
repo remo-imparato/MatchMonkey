@@ -4,28 +4,29 @@
  * Registers actions and menu items with MediaMonkey 5 following MM5 standards.
  * This file is loaded by MM5's action system at startup.
  * 
- * MediaMonkey 5 API Only
+
  * 
  * Actions registered:
- * - SimilarArtistsRun: Find similar artists (artist.getSimilar API)
- * - SimilarTracksRun: Find similar tracks (track.getSimilar API)
- * - SimilarGenreRun: Find artists in same genre (tag.getTopArtists API)
- * - SimilarMood*: Find tracks by mood (ReccoBeats API)
- * - SimilarActivity*: Find tracks by activity (ReccoBeats API)
+ * - SimilarArtistsRun: Find similar artists (Last.fm artist.getSimilar API)
+ * - SimilarTracksRun: Find similar tracks (Last.fm track.getSimilar API)
+ * - SimilarGenreRun: Find artists in same genre (Last.fm tag.getTopArtists API)
+ * - SimilarReccoRun: Find similar tracks using ReccoBeats AI (requires seed tracks)
+ * - SimilarMood*: Find tracks by mood preset (no seeds needed)
+ * - SimilarActivity*: Find tracks by activity preset (no seeds needed)
  * - SimilarArtistsToggleAuto: Toggle auto-queue mode on/off
  * 
  * @author Remo Imparato
- * @license MIT
+
  */
 
 'use strict';
 
 // ============================================================================
-// ACTION DEFINITIONS
+// ACTION DEFINITIONS - Last.fm Based
 // ============================================================================
 
 /**
- * Run action
+ * Run Similar Artists action (Last.fm)
  */
 actions.similarArtistsRun = {
 	title: _('Similar &Artists'),
@@ -44,7 +45,7 @@ actions.similarArtistsRun = {
 };
 
 /**
- * Run Similar Tracks action
+ * Run Similar Tracks action (Last.fm)
  */
 actions.similarTracksRun = {
 	title: _('Similar &Tracks'),
@@ -63,7 +64,7 @@ actions.similarTracksRun = {
 };
 
 /**
- * Run Similar Genre action
+ * Run Similar Genre action (Last.fm)
  */
 actions.similarGenreRun = {
 	title: _('Similar &Genre'),
@@ -81,18 +82,23 @@ actions.similarGenreRun = {
 	getTracklist: uitools.getSelectedTracklist
 };
 
+// ============================================================================
+// ACTION DEFINITIONS - ReccoBeats Based
+// ============================================================================
+
 /**
- * Run Mood action
+ * Run Similar Recco action (ReccoBeats AI - requires seed tracks)
+ * Uses selected tracks to find AI-powered recommendations
  */
-actions.similarMoodRun = {
-	title: _('Similar &Mood'),
-	icon: 'actor',
+actions.similarReccoRun = {
+	title: _('Similar &AI'),
+	icon: 'analyzeWaveform',
 	hotkeyAble: true,
 	visible: true,
 	disabled: uitools.notMediaListSelected,
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
-			window.matchMonkey.runMatchMonkey(false, 'mood');
+			window.matchMonkey.runMatchMonkey(false, 'recco');
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
@@ -100,40 +106,23 @@ actions.similarMoodRun = {
 	getTracklist: uitools.getSelectedTracklist
 };
 
-/**
- * Run Activity action
- */
-actions.similarActivityRun = {
-	title: _('Similar &Activity'),
-	icon: 'mediamonkey',
-	hotkeyAble: true,
-	visible: true,
-	disabled: uitools.notMediaListSelected,
-	execute: function () {
-		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
-			window.matchMonkey.runMatchMonkey(false, 'activity');
-		} else {
-			console.error('Match Monkey: Add-on not loaded');
-		}
-	},
-	getTracklist: uitools.getSelectedTracklist
-};
+// ============================================================================
+// MOOD ACTIONS - Use predefined audio profiles (no seeds needed)
+// ============================================================================
 
-// Mood actions
 actions.similarMoodEnergetic = {
 	title: _('&Energetic'),
 	icon: 'actor',
 	hotkeyAble: true,
 	visible: true,
-	disabled: uitools.notMediaListSelected,
+	disabled: false, // Mood doesn't need track selection
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
 			window.matchMonkey.runMatchMonkey(false, 'mood', { moodActivityValue: 'energetic' });
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
-	},
-	getTracklist: uitools.getSelectedTracklist
+	}
 };
 
 actions.similarMoodRelaxed = {
@@ -141,15 +130,14 @@ actions.similarMoodRelaxed = {
 	icon: 'actor',
 	hotkeyAble: true,
 	visible: true,
-	disabled: uitools.notMediaListSelected,
+	disabled: false,
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
 			window.matchMonkey.runMatchMonkey(false, 'mood', { moodActivityValue: 'relaxed' });
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
-	},
-	getTracklist: uitools.getSelectedTracklist
+	}
 };
 
 actions.similarMoodHappy = {
@@ -157,15 +145,14 @@ actions.similarMoodHappy = {
 	icon: 'actor',
 	hotkeyAble: true,
 	visible: true,
-	disabled: uitools.notMediaListSelected,
+	disabled: false,
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
 			window.matchMonkey.runMatchMonkey(false, 'mood', { moodActivityValue: 'happy' });
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
-	},
-	getTracklist: uitools.getSelectedTracklist
+	}
 };
 
 actions.similarMoodSad = {
@@ -173,15 +160,14 @@ actions.similarMoodSad = {
 	icon: 'actor',
 	hotkeyAble: true,
 	visible: true,
-	disabled: uitools.notMediaListSelected,
+	disabled: false,
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
 			window.matchMonkey.runMatchMonkey(false, 'mood', { moodActivityValue: 'sad' });
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
-	},
-	getTracklist: uitools.getSelectedTracklist
+	}
 };
 
 actions.similarMoodFocused = {
@@ -189,15 +175,14 @@ actions.similarMoodFocused = {
 	icon: 'actor',
 	hotkeyAble: true,
 	visible: true,
-	disabled: uitools.notMediaListSelected,
+	disabled: false,
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
 			window.matchMonkey.runMatchMonkey(false, 'mood', { moodActivityValue: 'focused' });
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
-	},
-	getTracklist: uitools.getSelectedTracklist
+	}
 };
 
 actions.similarMoodAngry = {
@@ -205,15 +190,14 @@ actions.similarMoodAngry = {
 	icon: 'actor',
 	hotkeyAble: true,
 	visible: true,
-	disabled: uitools.notMediaListSelected,
+	disabled: false,
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
 			window.matchMonkey.runMatchMonkey(false, 'mood', { moodActivityValue: 'angry' });
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
-	},
-	getTracklist: uitools.getSelectedTracklist
+	}
 };
 
 actions.similarMoodRomantic = {
@@ -221,19 +205,18 @@ actions.similarMoodRomantic = {
 	icon: 'actor',
 	hotkeyAble: true,
 	visible: true,
-	disabled: uitools.notMediaListSelected,
+	disabled: false,
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
 			window.matchMonkey.runMatchMonkey(false, 'mood', { moodActivityValue: 'romantic' });
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
-	},
-	getTracklist: uitools.getSelectedTracklist
+	}
 };
 
 // ============================================================================
-// ACTIVITY ACTIONS - Individual activity types
+// ACTIVITY ACTIONS - Use predefined audio profiles (no seeds needed)
 // ============================================================================
 
 actions.similarActivityWorkout = {
@@ -241,15 +224,14 @@ actions.similarActivityWorkout = {
 	icon: 'mediamonkey',
 	hotkeyAble: true,
 	visible: true,
-	disabled: uitools.notMediaListSelected,
+	disabled: false, // Activity doesn't need track selection
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
 			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'workout' });
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
-	},
-	getTracklist: uitools.getSelectedTracklist
+	}
 };
 
 actions.similarActivityStudy = {
@@ -257,15 +239,14 @@ actions.similarActivityStudy = {
 	icon: 'mediamonkey',
 	hotkeyAble: true,
 	visible: true,
-	disabled: uitools.notMediaListSelected,
+	disabled: false,
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
 			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'study' });
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
-	},
-	getTracklist: uitools.getSelectedTracklist
+	}
 };
 
 actions.similarActivityParty = {
@@ -273,15 +254,14 @@ actions.similarActivityParty = {
 	icon: 'mediamonkey',
 	hotkeyAble: true,
 	visible: true,
-	disabled: uitools.notMediaListSelected,
+	disabled: false,
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
 			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'party' });
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
-	},
-	getTracklist: uitools.getSelectedTracklist
+	}
 };
 
 actions.similarActivitySleep = {
@@ -289,15 +269,14 @@ actions.similarActivitySleep = {
 	icon: 'mediamonkey',
 	hotkeyAble: true,
 	visible: true,
-	disabled: uitools.notMediaListSelected,
+	disabled: false,
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
 			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'sleep' });
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
-	},
-	getTracklist: uitools.getSelectedTracklist
+	}
 };
 
 actions.similarActivityDriving = {
@@ -305,15 +284,14 @@ actions.similarActivityDriving = {
 	icon: 'mediamonkey',
 	hotkeyAble: true,
 	visible: true,
-	disabled: uitools.notMediaListSelected,
+	disabled: false,
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
 			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'driving' });
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
-	},
-	getTracklist: uitools.getSelectedTracklist
+	}
 };
 
 actions.similarActivityMeditation = {
@@ -321,15 +299,14 @@ actions.similarActivityMeditation = {
 	icon: 'mediamonkey',
 	hotkeyAble: true,
 	visible: true,
-	disabled: uitools.notMediaListSelected,
+	disabled: false,
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
 			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'meditation' });
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
-	},
-	getTracklist: uitools.getSelectedTracklist
+	}
 };
 
 actions.similarActivityCooking = {
@@ -337,16 +314,19 @@ actions.similarActivityCooking = {
 	icon: 'mediamonkey',
 	hotkeyAble: true,
 	visible: true,
-	disabled: uitools.notMediaListSelected,
+	disabled: false,
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
 			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'cooking' });
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
-	},
-	getTracklist: uitools.getSelectedTracklist
+	}
 };
+
+// ============================================================================
+// AUTO-MODE ACTION
+// ============================================================================
 
 /**
  * Toggle Auto-Mode action
@@ -380,7 +360,7 @@ actions.matchMonkeyToggleAuto = {
 // TOOLS MENU REGISTRATION - Using Submenu
 // ============================================================================
 
-// Mood submenu items
+// Mood submenu items (no track selection required)
 var moodSubmenuItems = [
 	{ action: actions.similarMoodEnergetic, order: 10 },
 	{ action: actions.similarMoodRelaxed, order: 20 },
@@ -391,7 +371,7 @@ var moodSubmenuItems = [
 	{ action: actions.similarMoodRomantic, order: 70 }
 ];
 
-// Activity submenu items
+// Activity submenu items (no track selection required)
 var activitySubmenuItems = [
 	{ action: actions.similarActivityWorkout, order: 10 },
 	{ action: actions.similarActivityStudy, order: 20 },
@@ -402,33 +382,35 @@ var activitySubmenuItems = [
 	{ action: actions.similarActivityCooking, order: 70 }
 ];
 
-// Similar Artists submenu for Tools menu
+// Match Monkey submenu for Tools menu
 _menuItems.tools.action.submenu.push({
 	action: {
 		title: _('&Match Monkey...'),
 		icon: 'script',
 		visible: true,
 		submenu: [
-			{ action: actions.similarArtistsRun, order: 10 },
+			{ action: actions.similarReccoRun, order: 10 },
 			{ action: actions.similarTracksRun, order: 20 },
-			{ action: actions.similarGenreRun, order: 30 },
-			{ 
+			{ action: actions.similarArtistsRun, order: 30 },
+			{ action: actions.similarGenreRun, order: 35 },
+			{ separator: true, order: 38 },
+			{
 				action: {
 					title: _('&Mood'),
 					icon: 'actor',
 					visible: true,
 					submenu: moodSubmenuItems
 				},
-				order: 40 
+				order: 40
 			},
-			{ 
+			{
 				action: {
 					title: _('&Activity'),
 					icon: 'mediamonkey',
 					visible: true,
 					submenu: activitySubmenuItems
 				},
-				order: 45 
+				order: 45
 			},
 			{ separator: true, order: 50 },
 			{ action: actions.matchMonkeyToggleAuto, order: 60 }
@@ -456,29 +438,10 @@ if (!window.menus) {
 			visible: true,
 			disabled: uitools.notMediaListSelected,
 			submenu: [
-				{ action: actions.similarArtistsRun, order: 10 },
+				{ action: actions.similarReccoRun, order: 10 },
 				{ action: actions.similarTracksRun, order: 20 },
-				{ action: actions.similarGenreRun, order: 30 },
-				{ 
-					action: {
-						title: _('&Mood'),
-						icon: 'actor',
-						visible: true,
-						disabled: uitools.notMediaListSelected,
-						submenu: moodSubmenuItems
-					},
-					order: 40 
-				},
-				{ 
-					action: {
-						title: _('&Activity'),
-						icon: 'mediamonkey',
-						visible: true,
-						disabled: uitools.notMediaListSelected,
-						submenu: activitySubmenuItems
-					},
-					order: 45 
-				}
+				{ action: actions.similarArtistsRun, order: 30 },
+				{ action: actions.similarGenreRun, order: 35 },
 			]
 		},
 		order: 100,

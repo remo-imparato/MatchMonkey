@@ -4,7 +4,7 @@
  * Per-run caches for Last.fm queries (cleared on each runMatchMonkey invocation).
  * Reduces redundant API calls within a single operation.
  * 
- * MediaMonkey 5 API Only
+
  */
 
 'use strict';
