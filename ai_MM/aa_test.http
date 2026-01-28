@@ -43,7 +43,8 @@ https://ws.audioscrobbler.com/2.0/?method=track.getSimilar&api_key=7fd988db0c4e9
 https://api.reccobeats.com/v1/album/search?searchText=American%20Idiot&page=0&size=50
 
 
-
+###
+GET https://ws.audioscrobbler.com/2.0/?method=track.getSimilar&api_key=7fd988db0c4e9d8b12aed27d0a91a932&format=json&artist=Eminem&track=Lose+Yourself&autocorrect=1&limit=100
 
 
 

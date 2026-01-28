@@ -271,55 +271,60 @@ window.matchMonkeyOrchestration = {
 		const seeds = [];
 
 		try {
-			// Priority 1: Selected tracks
-			const selectedTracks = uitools?.getSelectedTracklist?.();
-
-			if (selectedTracks && selectedTracks.count > 0) {
-				console.log(`Match Monkey: Using ${selectedTracks.count} selected track(s) as seeds`);
-
-				// Wait for the tracklist to load before accessing it
-				await selectedTracks.whenLoaded();
-				let lastCount = -1;
-				let stableCount = selectedTracks.count;
-				const start = Date.now();
-				const timeout = 500;
-
-				while (stableCount !== lastCount && Date.now() - start < timeout) {
-					lastCount = stableCount;
-					await new Promise(r => setTimeout(r, 10));
-					stableCount = selectedTracks.count;
+			// ---------------------------------------------------------
+			// PRIORITY 1: SELECTED TRACKS
+			// ---------------------------------------------------------
+			// Try to get selected tracklist
+			let selectedList = null;
+			try {
+				if (typeof uitools !== 'undefined' && uitools?.getSelectedTracklist) {
+					selectedList = uitools.getSelectedTracklist();
 				}
+			} catch (e) {
+				console.log('collectSeedTracks: Could not get selected tracklist: ' + e.toString());
+			}
 
+			if (selectedList) {
+				try {
+					await selectedList.whenLoaded();
 
-				if (typeof selectedTracks.locked === 'function') {
-					selectedTracks.locked(() => {
-						const count = Math.min(selectedTracks.count, 50);
-						for (let i = 0; i < count; i++) {
-							const track = selectedTracks.getValue(i);
-							if (track) {
+					if (typeof selectedList.locked === 'function') {
+
+						selectedList.locked(() => {
+							let track;
+							const count = selectedList.count || 0;
+							for (let i = 0; i < count; i++) {
+								track = selectedList.getFastObject(i, track);
 								seeds.push({
 									artist: track.artist || '',
-									title: matchMonkeyHelpers.cleanTrackName(track.title )|| '',
+									title: matchMonkeyHelpers.cleanTrackName(track.title) || '',
 									genre: track.genre || '',
 									album: matchMonkeyHelpers.cleanAlbumName(track.album) || '',
 								});
 							}
-						}
-					});
+						});
+					}
+				} catch (e) {
+					console.error('collectSeedTracks: Error iterating selection: ' + e.toString());
 				}
 			}
 
-			// Priority 2: Currently playing track
+			// ---------------------------------------------------------
+			// PRIORITY 2: CURRENTLY PLAYING TRACK
+			// ---------------------------------------------------------
 			if (seeds.length === 0) {
 				try {
 					let track = null;
+
 					if (typeof app.player?.getCurrentTrack === 'function') {
-						// Prefer async getter if provided by MM5
 						track = await app.player.getCurrentTrack();
 					}
 
 					if (track) {
-						console.log(`Match Monkey: Using current track as seed: "${track.artist} - ${track.title}"`);
+						console.log(
+							`Match Monkey: Using current track as seed: "${track.artist} - ${track.title}"`
+						);
+
 						seeds.push({
 							artist: track.artist || '',
 							title: matchMonkeyHelpers.cleanTrackName(track.title) || '',
@@ -336,7 +341,7 @@ window.matchMonkeyOrchestration = {
 			console.error('Match Monkey: Error collecting seeds:', e);
 		}
 
-		// Filter out seeds without artist
+		// Final cleanup
 		return seeds.filter(s => s.artist && s.artist.trim().length > 0);
 	},
 
