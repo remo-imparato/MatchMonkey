@@ -36,10 +36,8 @@ Open MatchMonkey settings (Tools ? Options ? Library ? MatchMonkey):
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| **MoodDiscoveryEnabled** | `false` | Enable mood-based discovery |
 | **DefaultMood** | `energetic` | Default mood for quick playlists |
 | **DefaultActivity** | `workout` | Default activity for quick playlists |
-| **PlaylistDuration** | `60` | Target duration in minutes |
 | **HybridMode** | `true` | Combine ReccoBeats + Last.fm (recommended) |
 | **MoodActivityBlendRatio** | `0.5` | Blend between seed artists and mood recommendations |
 

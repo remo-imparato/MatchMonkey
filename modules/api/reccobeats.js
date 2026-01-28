@@ -1235,7 +1235,7 @@ async function getReccoRecommendations(seeds, limit = 100) {
 
 	// Step 2: Fetch audio features
 	updateProgress(`Getting audio features for ${foundTracks.length} tracks...`, 0.35);
-	const audioFeatures = getAudioFeatures(foundTracks);
+	const audioFeatures = await getAudioFeatures(foundTracks);
 
 	if (audioFeatures.length === 0) {
 		console.log('getAudioFeatures: No audio features available');

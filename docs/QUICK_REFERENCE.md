@@ -156,10 +156,8 @@ window.matchMonkey.runMoodActivityPlaylist(null, 'workout');
 
 | Setting | Type | Default | Effect |
 |---------|------|---------|--------|
-| **MoodDiscoveryEnabled** | Boolean | false | Enable ReccoBeats integration |
 | **DefaultMood** | Dropdown | energetic | Default mood preset |
 | **DefaultActivity** | Dropdown | workout | Default activity preset |
-| **PlaylistDuration** | Number | 60 | Target duration in minutes |
 | **HybridMode** | Boolean | true | Combine ReccoBeats + Last.fm |
 | **MoodActivityBlendRatio** | Slider | 0.5 | Seed vs mood balance (0.0-1.0) |
 
@@ -167,9 +165,7 @@ window.matchMonkey.runMoodActivityPlaylist(null, 'workout');
 **Activity Options**: workout, study, party, sleep, driving
 
 **Effects**:
-- **MoodDiscoveryEnabled**: Unlocks mood/activity functions
 - **DefaultMood/Activity**: Used when not specified
-- **PlaylistDuration**: Targets specific length (activity mode)
 - **HybridMode**: Expands ReccoBeats results with Last.fm
 - **MoodActivityBlendRatio**: Controls personalization
   - `0.0` = Pure mood discovery

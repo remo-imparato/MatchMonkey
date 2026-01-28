@@ -223,13 +223,13 @@ const candidates = await discoveryFn(modules, seeds, config);
 strategies.DISCOVERY_MODES.ARTIST    // 'artist'
 strategies.DISCOVERY_MODES.TRACK     // 'track'
 strategies.DISCOVERY_MODES.GENRE     // 'genre'
-strategies.DISCOVERY_MODES.RECCO     // 'recco' (ReccoBeats AI with seeds)
+strategies.DISCOVERY_MODES.AIPOWER     // 'aipower' (ReccoBeats AI with seeds)
 strategies.DISCOVERY_MODES.MOOD      // 'mood' (preset profiles with seeds)
 strategies.DISCOVERY_MODES.ACTIVITY  // 'activity' (preset profiles with seeds)
 
 // Get human-readable name
 strategies.getDiscoveryModeName('track');    // 'Similar Tracks'
-strategies.getDiscoveryModeName('recco');    // 'ReccoBeats'
+strategies.getDiscoveryModeName('aipower');    // 'ReccoBeats'
 strategies.getDiscoveryModeName('mood');     // 'Mood'
 strategies.getDiscoveryModeName('activity'); // 'Activity'
 ```
@@ -243,7 +243,7 @@ const result = await orchestration.generateSimilarPlaylist(modules, false, 'arti
 // Returns: { success: true, tracksAdded: 45, playlist: {...}, elapsed: 8.2 }
 
 // Generate ReccoBeats playlist (requires seeds)
-const reccoResult = await orchestration.generateSimilarPlaylist(modules, false, 'recco');
+const reccoResult = await orchestration.generateSimilarPlaylist(modules, false, 'aipower');
 
 // Generate mood playlist (no seeds required)
 const moodResult = await orchestration.generateSimilarPlaylist(modules, false, 'mood');

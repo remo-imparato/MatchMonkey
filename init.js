@@ -88,7 +88,7 @@ function start() {
 	const DEFAULTS = {
 		// === Playlist Creation ===
 		PlaylistName: '- Similar to %', // Template (% = artist name)
-		ParentPlaylist: '',             // Parent playlist to organize results under (blank = root level)
+		ParentPlaylist: '- Match Monkey',             // Parent playlist to organize results under (blank = root level)
 		PlaylistMode: 'Create new playlist', // Create new / Overwrite / Do not create
 		ShowConfirmDialog: false,       // Show playlist selection dialog
 		ShuffleResults: true,           // Randomize final results
@@ -110,11 +110,11 @@ function start() {
 
 		// === Auto-Mode Settings ===
 		AutoModeEnabled: false,         // Enable auto-queue on playlist end
-		AutoModeDiscovery: 'Track',     // Discovery type: Artist/Track/Genre
+		AutoModeDiscovery: 'artist',     // Discovery type: artist/track/genre/aipower
 		AutoModeSeedLimit: 2,           // Seeds to process in auto-mode
 		AutoModeSimilarLimit: 10,       // Similar artists per seed in auto-mode
 		AutoModeTracksPerArtist: 5,     // Tracks per artist in auto-mode
-		AutoModeMaxTracks: 30,          // Max tracks per auto-queue trigger
+		AutoModeMaxTracks: 10,          // Max tracks per auto-queue trigger
 
 		// === Queue Behavior ===
 		EnqueueMode: false,             // Add to Now Playing instead of playlist
@@ -123,12 +123,10 @@ function start() {
 		NavigateAfter: 'Navigate to new playlist', // Navigation after completion
 
 		// === Mood/Activity Discovery (ReccoBeats) ===
-		MoodDiscoveryEnabled: false,    // Enable mood-based discovery
 		DefaultMood: '',                // Default mood: energetic, relaxed, happy, sad, focused
 		DefaultActivity: '',            // Default activity: workout, study, party, sleep, driving
-		PlaylistDuration: 60,           // Target playlist duration in minutes
-		HybridMode: true,               // Combine ReccoBeats + Last.fm (recommended)
-		MoodActivityBlendRatio: 0,      // Blend ratio: 0.5 = 50% seeds + 50% mood (0=all mood, 1=all seeds)
+		MoodActivityBlendRatio: 0.5,    // Blend ratio: 0.5 = 50% seeds + 50% mood (0=all mood, 1=all seeds)
+		HybridMode: true,               // Combine ReccoBeats + Last.fm
 
 		// === Filters ===
 		ArtistBlacklist: '',            // Comma-separated blacklisted artists

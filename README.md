@@ -118,7 +118,7 @@ For detailed documentation, see [ReccoBeats Integration Guide](docs/RECCOBEATS_I
 The Auto-Queue feature (Auto-mode) can keep playback going by automatically queuing similar-artist tracks when your Now Playing list is nearly finished.
 
 How it works
-  - Enable Auto-mode in the add-on settings (setting `OnPlay`). When enabled the add-on attaches a playback listener.
+  - Enable Auto-mode in the add-on settings (setting `AutoModeEnabled`). When enabled the add-on attaches a playback listener.
   - When playback advances and only a small number of entries remain (the add-on uses a default threshold of 2 or fewer), it automatically runs discovery and enqueues additional tracks.
   - In auto-mode the add-on forces enqueue behavior (it will add results to Now Playing instead of creating a playlist) and uses conservative defaults for limits to avoid overfilling the queue.
 
@@ -152,7 +152,6 @@ Access settings via **Tools → Options → Similar Artists**
 | **MoodDiscoveryEnabled** | Enable mood-based discovery | ☐ |
 | **DefaultMood** | Default mood (energetic, relaxed, happy, sad, focused) | energetic |
 | **DefaultActivity** | Default activity (workout, study, party, sleep, driving) | workout |
-| **PlaylistDuration** | Target playlist duration in minutes | 60 |
 | **HybridMode** | Combine ReccoBeats + Last.fm (recommended) | ☑ |
 | **MoodActivityBlendRatio** | Seed vs mood balance (0=all mood, 0.5=balanced, 1=all seed) | 0.5 |
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MatchMonkey Add-on for MediaMonkey 5
  * 
  * Complete refactored implementation using modular architecture.
@@ -89,13 +89,13 @@
 		// ============================================================================
 		// DISCOVERY MODES
 		// ============================================================================
-		
+
 		/**
 		 * Discovery mode types:
 		 * - 'artist': Use Last.fm artist.getSimilar to find similar artists
 		 * - 'track': Use Last.fm track.getSimilar to find musically similar tracks
 		 * - 'genre': Use Last.fm tag.getTopArtists to find artists in same genre
-		 * - 'recco': Use ReccoBeats AI to find recommendations based on seed tracks
+		 * - 'aipower': Use ReccoBeats AI to find recommendations based on seed tracks
 		 * - 'mood': Use predefined mood audio profiles
 		 * - 'activity': Use predefined activity audio profiles
 		 */
@@ -103,7 +103,7 @@
 			ARTIST: 'artist',
 			TRACK: 'track',
 			GENRE: 'genre',
-			RECCO: 'recco',
+			AIPOWER: 'aipower',
 			MOOD: 'mood',
 			ACTIVITY: 'activity'
 		};
@@ -154,8 +154,7 @@
 						...modules,
 						_moodActivityContext: {
 							context,
-							value,
-							duration: getSetting('PlaylistDuration', 60)
+							value
 						}
 					};
 					
@@ -194,7 +193,7 @@
 				const currentState = autoMode.isAutoModeEnabled(getSetting);
 				const newState = !currentState;
 				
-				setSetting('OnPlay', newState);
+				setSetting('AutoModeEnabled', newState);
 				console.log(`Match Monkey: Auto-mode setting changed from ${currentState} to ${newState}`);
 				
 				if (!appState.autoModeState) {
@@ -304,18 +303,12 @@
 						console.log(`Match Monkey Auto-Mode: Using explicit discovery mode: ${discoveryMode}`);
 						return orchestration.generateSimilarPlaylist(modules, autoModeFlag, discoveryMode);
 					}
-					
-					// Otherwise, read from settings
-					const autoModeSetting = getSetting('AutoMode', 'Track');
-					let mode = DISCOVERY_MODES.TRACK;
-					
-					if (autoModeSetting === 'Artist') {
-						mode = DISCOVERY_MODES.ARTIST;
-					} else if (autoModeSetting === 'Genre') {
-						mode = DISCOVERY_MODES.GENRE;
-					}
-					
-					console.log(`Match Monkey Auto-Mode: Using ${autoModeSetting} discovery from settings (mode=${mode})`);
+
+					// Otherwise, read from settings and normalize to lowercase
+					const autoModeSetting = getSetting('AutoModeDiscovery', 'track');
+					const mode = autoModeSetting.toLowerCase(); // ✅ Normalize to lowercase
+
+					console.log(`Match Monkey Auto-Mode: Using ${mode} discovery from settings`);
 					return orchestration.generateSimilarPlaylist(modules, autoModeFlag, mode);
 				},
 				showToast,
@@ -323,20 +316,46 @@
 				threshold: 2,
 				logger: console.log,
 				getModeName: () => {
-					const autoModeSetting = getSetting('AutoMode', 'Track');
-					if (autoModeSetting === 'Artist') return 'Similar Artists';
-					if (autoModeSetting === 'Genre') return 'Similar Genre';
-					return 'Similar Tracks';
+					// Use centralized display name function
+					const autoModeSetting = getSetting('AutoModeDiscovery', 'track');
+					return getDiscoveryModeDisplayName(autoModeSetting.toLowerCase());
 				},
 			});
 
 			return cachedAutoTriggerHandler;
 		}
 
+		/**
+		 * Get human-readable display name for discovery mode.
+		 * Centralized function to ensure consistency.
+		 * 
+		 * @param {string} mode - Discovery mode (lowercase)
+		 * @returns {string} Display name
+		 */
+		function getDiscoveryModeDisplayName(mode) {
+			const normalized = String(mode || '').toLowerCase();
+			switch (normalized) {
+				case 'artist':
+					return 'Similar Artists';
+				case 'track':
+					return 'Similar Tracks';
+				case 'genre':
+					return 'Similar Genre';
+				case 'aipower':
+					return 'AI-Powered';
+				case 'mood':
+					return 'Mood';
+				case 'activity':
+					return 'Activity';
+				default:
+					return 'Similar Tracks';
+			}
+		}
+
 		function initializeAutoMode() {
 			try {
 				const { getSetting } = storage;
-				const autoModeSetting = getSetting('AutoMode', 'Track');
+				const autoModeSetting = getSetting('AutoModeDiscovery', 'Track');
 				console.log(`Match Monkey: Initializing auto-mode (configured for ${autoModeSetting} discovery)`);
 
 				const handler = createAutoTriggerHandler();

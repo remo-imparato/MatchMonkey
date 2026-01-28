@@ -261,11 +261,6 @@ app.setValue('MatchMonkey', {
 
 ## Troubleshooting
 
-### Slider not responding
-1. Ensure MoodDiscoveryEnabled is checked
-2. Reload options panel (close and reopen)
-3. Check console for errors (F12)
-
 ### Value not saving
 1. Click "OK" or "Apply" to save settings
 2. Verify in console: `app.getValue('MatchMonkey', {}).MoodActivityBlendRatio`

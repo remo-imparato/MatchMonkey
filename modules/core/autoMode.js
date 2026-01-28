@@ -244,9 +244,6 @@ window.matchMonkeyAutoMode = {
 		try {
 			// Try new property name first, fall back to old
 			let enabled = getSetting(settingKey, undefined);
-			if (enabled === undefined) {
-				enabled = getSetting('OnPlay', false); // Old property name
-			}
 			return Boolean(enabled);
 		} catch (e) {
 			console.error(`Auto-Mode: Error checking enabled status: ${e.toString()}`);
@@ -294,9 +291,6 @@ window.matchMonkeyAutoMode = {
 
 				// Get mode name for messages (try new property name, fall back to old)
 				let configuredMode = getSetting('AutoModeDiscovery', undefined);
-				if (configuredMode === undefined) {
-					configuredMode = getSetting('AutoMode', 'Track');
-				}
 				const modeName = typeof getModeName === 'function' ? getModeName() : 'Similar Tracks';
 
 				// Support both styles:
@@ -365,7 +359,7 @@ window.matchMonkeyAutoMode = {
 					log(`Auto-Mode: User configured mode: ${configuredMode}`);
 
 					// Define all discovery modes to try in order
-					const allModes = ['track', 'artist', 'genre'];
+					const allModes = ['aipower', 'track', 'artist', 'genre'];
 					
 					// Start with user's preferred mode, then try others
 					const modesToTry = [configuredMode.toLowerCase()];
@@ -446,13 +440,16 @@ window.matchMonkeyAutoMode = {
 		 * Helper to get display name for discovery mode
 		 */
 		function getDiscoveryModeDisplayName(mode) {
-			switch (mode) {
-				case 'track':
-					return 'Similar Tracks';
+			const normalized = String(mode || '').toLowerCase();
+			switch (normalized) {
 				case 'artist':
 					return 'Similar Artists';
+				case 'track':
+					return 'Similar Tracks';
 				case 'genre':
 					return 'Similar Genre';
+				case 'aipower':
+					return 'AI-Powered';
 				default:
 					return 'Similar Tracks';
 			}

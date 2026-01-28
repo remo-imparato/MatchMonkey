@@ -22,7 +22,7 @@ window.matchMonkeyOrchestration = {
 	 * 
 	 * @param {object} modules - Injected module dependencies
 	 * @param {boolean} [autoMode=false] - Whether running in auto-mode
-	 * @param {string} [discoveryMode='artist'] - Discovery mode: 'artist', 'track', 'genre', 'recco', 'mood', or 'activity'
+	 * @param {string} [discoveryMode='artist'] - Discovery mode: 'artist', 'track', 'genre', 'aipower', 'mood', or 'activity'
 	 * @returns {Promise<object>} Result object with status, tracklist, playlist info
 	 */
 	async generateSimilarPlaylist(modules, autoMode = false, discoveryMode = 'artist') {
@@ -34,7 +34,7 @@ window.matchMonkeyOrchestration = {
 			_moodActivityContext,
 		} = modules;
 
-		const { intSetting, boolSetting, stringSetting } = storage;
+		const { getSetting, intSetting, boolSetting, stringSetting } = storage;
 		const { showToast, updateProgress, createProgressTask, terminateProgressTask } = notifications;
 		const { formatError, shuffle: shuffleUtil } = helpers;
 
@@ -110,7 +110,7 @@ window.matchMonkeyOrchestration = {
 				// Context explicitly provided
 				config_.moodActivityContext = _moodActivityContext.context;
 				config_.moodActivityValue = _moodActivityContext.value;
-				config_.playlistDuration = _moodActivityContext.duration;
+				config_.moodSeedBlend = getSetting("MoodActivityBlendRatio", 0.5);
 			} else if (discoveryMode === 'mood' || discoveryMode === 'activity') {
 				// Context not provided, read from settings
 				if (discoveryMode === 'mood') {
@@ -120,7 +120,6 @@ window.matchMonkeyOrchestration = {
 					config_.moodActivityContext = 'activity';
 					config_.moodActivityValue = stringSetting('DefaultActivity', 'workout');
 				}
-				config_.playlistDuration = intSetting('PlaylistDuration', 60);
 
 				console.log(`Match Monkey: Using ${config_.moodActivityContext} "${config_.moodActivityValue}" from settings`);
 			}
@@ -243,7 +242,7 @@ window.matchMonkeyOrchestration = {
 
 			cache?.clear?.();
 
-			showToast(`Added ${actualTracksAdded} ${modeName.toLowerCase()} tracks`, 'success');
+			showToast(`Added ${actualTracksAdded} ${modeName} tracks`, 'success');
 
 			return {
 				success: true,

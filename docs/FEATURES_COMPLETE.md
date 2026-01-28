@@ -150,7 +150,6 @@ Same as mood-based but with activity optimization:
 **Configuration**:
 - `MoodActivityBlendRatio`: Same as mood mode
 - `DefaultActivity`: workout, study, party, sleep, driving
-- `PlaylistDuration`: Target minutes (default: 60)
 - `HybridMode`: Enable hybrid mode (default: true)
 
 **Best For**:
@@ -427,7 +426,6 @@ window.matchMonkey.runMoodActivityPlaylist(null, 'workout');
 | TracksPerArtist | ? Used | ? Used | ? Used | ? Used | ? Used |
 | IncludeSeedArtist | ? Used | ? Used | ? Used | ? Used | ? Used |
 | MoodActivityBlendRatio | ? Not used | ? Not used | ? Not used | ? Primary | ? Primary |
-| PlaylistDuration | ? Not used | ? Not used | ? Not used | ?? Optional | ? Used |
 
 ---
 
@@ -494,7 +492,6 @@ IncludeSeedArtist: true
 ```
 Mode: Activity
 MoodActivityBlendRatio: 0.6
-PlaylistDuration: 90
 HybridMode: true
 ```
 

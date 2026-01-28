@@ -142,10 +142,8 @@ docs/
 ---
 
 #### Mood & Activity Settings
-- ? MoodDiscoveryEnabled - Enable feature
 - ? DefaultMood - Default mood preset
 - ? DefaultActivity - Default activity preset
-- ? PlaylistDuration - Target duration
 - ? HybridMode - ReccoBeats + Last.fm
 - ? MoodActivityBlendRatio - Seed/mood balance
 

@@ -27,7 +27,7 @@ const DISCOVERY_MODES = {
 	ARTIST: 'artist',
 	TRACK: 'track',
 	GENRE: 'genre',
-	RECCO: 'recco',    // ReccoBeats AI with seed tracks
+	AIPOWER: 'aipower',    // ReccoBeats AI with seed tracks
 	MOOD: 'mood',      // Mood preset
 	ACTIVITY: 'activity' // Activity preset
 };
@@ -564,7 +564,7 @@ async function discoverByMood(modules, seeds, config) {
 		const avgSeedsFeature = matchMonkeyReccoBeatsAPI.calculateAverageFeatures(audioFeatures);
 
 		// Clamp blend ratio
-		const BLEND_RATIO = 0.33; //0=all seed, 1=all mood
+		const BLEND_RATIO = config.moodSeedBlend;
 		const ratio = Math.min(1, Math.max(0, BLEND_RATIO));
 
 		audioTargets = matchMonkeyReccoBeatsAPI.blendFeatures(
@@ -659,7 +659,7 @@ async function discoverByActivity(modules, seeds, config) {
 		const avgSeedsFeature = matchMonkeyReccoBeatsAPI.calculateAverageFeatures(audioFeatures);
 
 		// Clamp blend ratio
-		const BLEND_RATIO = 0.33; //0=all seed, 1=all mood
+		const BLEND_RATIO = config.moodSeedBlend;
 		const ratio = Math.min(1, Math.max(0, BLEND_RATIO));
 
 		audioTargets = matchMonkeyReccoBeatsAPI.blendFeatures(
@@ -899,7 +899,7 @@ function getDiscoveryStrategy(mode) {
 			return discoverByTrack;
 		case DISCOVERY_MODES.GENRE:
 			return discoverByGenre;
-		case DISCOVERY_MODES.RECCO:
+		case DISCOVERY_MODES.AIPOWER:
 			return discoverByRecco;
 		case DISCOVERY_MODES.MOOD:
 			return discoverByMood;
@@ -919,13 +919,18 @@ function getDiscoveryStrategy(mode) {
  */
 function getDiscoveryModeName(mode) {
 	switch (mode) {
-		case DISCOVERY_MODES.TRACK: return 'Similar Tracks';
-		case DISCOVERY_MODES.GENRE: return 'Similar Genre';
-		case DISCOVERY_MODES.RECCO: return 'ReccoBeats';
-		case DISCOVERY_MODES.MOOD: return 'Mood';
-		case DISCOVERY_MODES.ACTIVITY: return 'Activity';
+		case DISCOVERY_MODES.TRACK:
+			return 'Similar Tracks';
+		case DISCOVERY_MODES.GENRE:
+			return 'Similar Genre';
+		case DISCOVERY_MODES.AIPOWER:
+			return 'AI Powered';
+		case DISCOVERY_MODES.MOOD:
+			return 'Mood';
+		case DISCOVERY_MODES.ACTIVITY:
+			return 'Activity';
 		case DISCOVERY_MODES.ARTIST:
-		default: return 'Similar Artists';
+		default: return 'Similar';
 	}
 }
 

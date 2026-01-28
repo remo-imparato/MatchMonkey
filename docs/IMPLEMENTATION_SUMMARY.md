@@ -66,10 +66,8 @@ Successfully integrated ReccoBeats API with MatchMonkey to enable mood and activ
 **Changes**:
 - Added `localRequirejs('modules/api/reccobeats')` to module loading
 - Added new configuration defaults:
-  - `MoodDiscoveryEnabled`: false
   - `DefaultMood`: 'energetic'
   - `DefaultActivity`: 'workout'
-  - `PlaylistDuration`: 60
   - `HybridMode`: true
   - `MoodActivityBlendRatio`: 0.5 (50% seed + 50% mood)
 
@@ -91,7 +89,6 @@ Successfully integrated ReccoBeats API with MatchMonkey to enable mood and activ
 - Adds mood/activity context to config object:
   - `moodActivityContext`: 'mood' or 'activity'
   - `moodActivityValue`: specific mood/activity name
-  - `playlistDuration`: target duration in minutes
   - `moodActivityBlendRatio`: blend ratio from settings (0.0-1.0)
 
 ### 5. `README.md`
@@ -237,10 +234,8 @@ Final Blended List (interleaved):
 ## Configuration Settings
 
 ### User-Configurable
-- `MoodDiscoveryEnabled` - Enable mood-based discovery
 - `DefaultMood` - Default mood preset
 - `DefaultActivity` - Default activity preset
-- `PlaylistDuration` - Target duration in minutes
 - `HybridMode` - Combine ReccoBeats + Last.fm
 - `MoodActivityBlendRatio` - Blend ratio (0.0-1.0, default 0.5)
   - `0.0` = 100% mood-based (ignore seeds)

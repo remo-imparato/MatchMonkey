@@ -12,10 +12,8 @@ Successfully added **Mood & Activity (ReccoBeats AI)** configuration section to 
 **File**: `dialogs/dlgOptions/pnl_MatchMonkey.html`
 
 Added complete "Mood & Activity (ReccoBeats AI)" fieldset with:
-- ? `MoodDiscoveryEnabled` (Checkbox) - Enable/disable feature
 - ? `DefaultMood` (Dropdown) - 5 mood options
 - ? `DefaultActivity` (Dropdown) - 5 activity options
-- ? `PlaylistDuration` (Number input) - Target duration in minutes
 - ? `HybridMode` (Checkbox) - ReccoBeats + Last.fm
 - ? **`MoodActivityBlendRatio` (Slider)** - Interactive 0-100% slider with labels
 
@@ -148,7 +146,6 @@ Complete guide with:
 const config = app.getValue('MatchMonkey', {});
 
 // Read mood/activity settings
-console.log('Mood discovery enabled:', config.MoodDiscoveryEnabled);
 console.log('Default mood:', config.DefaultMood);
 console.log('Blend ratio:', config.MoodActivityBlendRatio);
 
@@ -213,10 +210,8 @@ When slider is focused:
 
 ```javascript
 // In pnl_MatchMonkey.js load function
-UI.MoodDiscoveryEnabled.controlClass.checked = Boolean(cfg.MoodDiscoveryEnabled);
 UI.DefaultMood.controlClass.value = cfg.DefaultMood || 'energetic';
 UI.DefaultActivity.controlClass.value = cfg.DefaultActivity || 'workout';
-UI.PlaylistDuration.controlClass.value = cfg.PlaylistDuration || 60;
 UI.HybridMode.controlClass.checked = cfg.HybridMode !== false;
 
 // Convert ratio (0.0-1.0) to percentage (0-100)
@@ -228,10 +223,8 @@ UI.MoodActivityBlendRatio.controlClass.value = blendRatioPercent;
 
 ```javascript
 // In pnl_MatchMonkey.js save function
-this.config.MoodDiscoveryEnabled = UI.MoodDiscoveryEnabled.controlClass.checked;
 this.config.DefaultMood = UI.DefaultMood.controlClass.value || 'energetic';
 this.config.DefaultActivity = UI.DefaultActivity.controlClass.value || 'workout';
-this.config.PlaylistDuration = parseInt(UI.PlaylistDuration.controlClass.value, 10) || 60;
 this.config.HybridMode = UI.HybridMode.controlClass.checked;
 
 // Convert percentage (0-100) to ratio (0.0-1.0)
