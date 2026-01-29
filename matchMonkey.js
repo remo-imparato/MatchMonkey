@@ -292,16 +292,22 @@
 		function createAutoTriggerHandler() {
 			if (cachedAutoTriggerHandler) return cachedAutoTriggerHandler;
 
-			const { getSetting } = storage;
+			const { getSetting, intSetting } = storage;
 			const { showToast } = modules.ui.notifications;
+
+			// Read threshold from settings
+			const threshold = intSetting('AutoModeSeedLimit', 2);
 
 			cachedAutoTriggerHandler = autoMode.createAutoTriggerHandler({
 				getSetting,
-				generateSimilarPlaylist: (autoModeFlag, discoveryMode) => {
+				generateSimilarPlaylist: (autoModeFlag, discoveryMode, thresholdParam) => {
+					// Use provided threshold or fall back to settings
+					const actualThreshold = typeof thresholdParam === 'number' ? thresholdParam : threshold;
+					
 					// If discoveryMode is explicitly provided (e.g., from retry logic), use it
 					if (discoveryMode) {
 						console.log(`Match Monkey Auto-Mode: Using explicit discovery mode: ${discoveryMode}`);
-						return orchestration.generateSimilarPlaylist(modules, autoModeFlag, discoveryMode);
+						return orchestration.generateSimilarPlaylist(modules, autoModeFlag, discoveryMode, actualThreshold);
 					}
 
 					// Otherwise, read from settings and normalize to lowercase
@@ -309,11 +315,11 @@
 					const mode = autoModeSetting.toLowerCase(); // ✅ Normalize to lowercase
 
 					console.log(`Match Monkey Auto-Mode: Using ${mode} discovery from settings`);
-					return orchestration.generateSimilarPlaylist(modules, autoModeFlag, mode);
+					return orchestration.generateSimilarPlaylist(modules, autoModeFlag, mode, actualThreshold);
 				},
 				showToast,
 				isAutoModeEnabled: () => autoMode.isAutoModeEnabled(getSetting),
-				threshold: 2,
+				threshold,
 				logger: console.log,
 				getModeName: () => {
 					// Use centralized display name function

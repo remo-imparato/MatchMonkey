@@ -88,7 +88,7 @@ function start() {
 	const DEFAULTS = {
 		// === Playlist Creation ===
 		PlaylistName: '- Similar to %', // Template (% = artist name)
-		ParentPlaylist: '- Match Monkey',             // Parent playlist to organize results under (blank = root level)
+		ParentPlaylist: '',             // Parent playlist to organize results under (blank = root level)
 		PlaylistMode: 'Create new playlist', // Create new / Overwrite / Do not create
 		ShowConfirmDialog: false,       // Show playlist selection dialog
 		ShuffleResults: true,           // Randomize final results

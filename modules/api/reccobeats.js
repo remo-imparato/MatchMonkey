@@ -423,7 +423,7 @@ async function searchArtist(artistName) {
 	while (page < maxPages && page < maxPagesLimit) {
 		try {
 			const url = `${RECCOBEATS_API_BASE}/artist/search?searchText=${encodeURIComponent(artistName)}&page=${page}&size=50`;
-			console.log(`searchArtist: GET ${url}`);
+			//console.log(`searchArtist: GET ${url}`);
 
 			const res = await rateLimitedFetch(url, { method: 'GET', headers });
 
@@ -502,7 +502,7 @@ async function searchAlbum(albumName) {
 	while (page < maxPages && page < maxPagesLimit) {
 		try {
 			const url = `${RECCOBEATS_API_BASE}/album/search?searchText=${encodeURIComponent(albumName)}&page=${page}&size=50`;
-			console.log(`searchAlbum: GET ${url}`);
+			//console.log(`searchAlbum: GET ${url}`);
 
 			const res = await rateLimitedFetch(url, { method: 'GET', headers });
 

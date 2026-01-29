@@ -23,9 +23,10 @@ window.matchMonkeyOrchestration = {
 	 * @param {object} modules - Injected module dependencies
 	 * @param {boolean} [autoMode=false] - Whether running in auto-mode
 	 * @param {string} [discoveryMode='artist'] - Discovery mode: 'artist', 'track', 'genre', 'aipower', 'mood', or 'activity'
+	 * @param {number} [autoModeThreshold] - Threshold for auto-mode seed collection
 	 * @returns {Promise<object>} Result object with status, tracklist, playlist info
 	 */
-	async generateSimilarPlaylist(modules, autoMode = false, discoveryMode = 'artist') {
+	async generateSimilarPlaylist(modules, autoMode = false, discoveryMode = 'artist', autoModeThreshold = 3) {
 		const {
 			utils: { helpers },
 			settings: { storage },
@@ -135,11 +136,20 @@ window.matchMonkeyOrchestration = {
 
 			if (seedsRequired) {
 				updateProgress(`Collecting seed tracks...`, 0.05);
-				seeds = await this.collectSeedTracks(modules);
+
+				// In auto-mode, collect seeds from Now Playing queue
+				if (autoMode) {
+					console.log(`Match Monkey Auto-Mode: Using Now Playing queue for seeds (threshold=${autoModeThreshold})`);
+					seeds = await this.collectAutoModeSeedsFromQueue(modules, autoModeThreshold);
+				} else {
+					// Manual mode: use selection or current track
+					seeds = await this.collectSeedTracks(modules);
+				}
 
 				if (!seeds || seeds.length === 0) {
 					terminateProgressTask(taskId);
-					showToast(`No seed tracks found. Select tracks or play something first.`, { type: 'warning', duration: 5000 });
+					const modeMsg = autoMode ? 'No tracks in Now Playing queue.' : 'Select tracks or play something first.';
+					showToast(`No seed tracks found. ${modeMsg}`, { type: 'warning', duration: 5000 });
 					console.log('Match Monkey: No seed tracks found, exiting');
 					return { success: false, error: 'No seed tracks found.', tracksAdded: 0 };
 				}
@@ -217,7 +227,8 @@ window.matchMonkeyOrchestration = {
 
 			// Step 4: Apply randomization if enabled
 			if (config_.randomize) {
-				updateProgress(`Shuffling results...`, 0.85);
+				console.log(`Match Monkey: Randomizing ${results.length} results`);
+				updateProgress(`Shuffling ${results.length} results...`, 0.85);
 				shuffleUtil(results);
 			}
 
@@ -363,6 +374,91 @@ window.matchMonkeyOrchestration = {
 		}
 
 		// Final cleanup
+		return seeds.filter(s => s.artist && s.artist.trim().length > 0);
+	},
+
+	/**
+	 * Collect seed tracks from Now Playing queue for auto-mode.
+	 * Uses the threshold setting to determine how many remaining tracks to use as seeds.
+	 * 
+	 * @param {object} modules - Module dependencies
+	 * @param {number} threshold - Number of remaining tracks that trigger auto-mode
+	 * @returns {Promise<Array>} Array of seed objects [{artist, title, genre, album}, ...]
+	 */
+	async collectAutoModeSeedsFromQueue(modules, threshold) {
+		const seeds = [];
+
+		try {
+			if (!app.player) {
+				console.warn('collectAutoModeSeedsFromQueue: Player not available');
+				return seeds;
+			}
+
+			// Get Now Playing tracklist
+			const tracklist = (typeof app.player.getTracklist === 'function')
+				? app.player.getTracklist()
+				: null;
+
+			if (!tracklist) {
+				console.warn('collectAutoModeSeedsFromQueue: Now Playing tracklist not available');
+				return seeds;
+			}
+
+			// Wait for tracklist to load
+			if (typeof tracklist.whenLoaded === 'function') {
+				await tracklist.whenLoaded();
+			}
+
+			// Get index of the currently playing track
+			let currentIndex = -1;
+			try {
+				if (typeof app.player.getIndexOfPlayingTrack === 'function') {
+					currentIndex = app.player.getIndexOfPlayingTrack(tracklist);
+				}
+			} catch (e) {
+				console.warn('collectAutoModeSeedsFromQueue: Could not get playing index:', e);
+			}
+
+			if (currentIndex == null || currentIndex < 0) {
+				console.warn('collectAutoModeSeedsFromQueue: Invalid playing index');
+				return seeds;
+			}
+
+			const totalTracks = tracklist.count || 0;
+			const seedCount = threshold;
+
+			const startIndex = currentIndex;
+			const endIndex = Math.min(startIndex + seedCount, totalTracks);
+
+			console.log(
+				`Match Monkey Auto-Mode: Collecting seeds from Now Playing (playing=${currentIndex}, total=${totalTracks}, collecting ${endIndex - startIndex} tracks)`
+			);
+
+			// Extract tracks
+			if (typeof tracklist.locked === 'function') {
+				tracklist.locked(() => {
+					let track;
+					for (let i = startIndex; i < endIndex; i++) {
+						track = tracklist.getFastObject(i, track);
+						if (track) {
+							seeds.push({
+								artist: matchMonkeyHelpers.cleanArtistName(track.artist || ''),
+								title: matchMonkeyHelpers.cleanTrackName(track.title || ''),
+								album: matchMonkeyHelpers.cleanAlbumName(track.album || ''),
+								genre: track.genre || '',
+								path: track.path || '' // optional unique key
+							});
+						}
+					}
+				});
+			}
+
+			console.log(`Match Monkey Auto-Mode: Collected ${seeds.length} seeds from Now Playing queue`);
+
+		} catch (e) {
+			console.error('Match Monkey Auto-Mode: Error collecting seeds from queue:', e);
+		}
+
 		return seeds.filter(s => s.artist && s.artist.trim().length > 0);
 	},
 
@@ -519,13 +615,11 @@ window.matchMonkeyOrchestration = {
 		let added = 0;
 
 		try {
-			// Get the real Now Playing playlist
-			const np = (typeof app.player?.getPlaylist === 'function')
-				? app.player.getPlaylist()
-				: null;
+			const np = app.player.getTracklist();
+			if (!np) return;
 
-			// Wait for NP to load
-			if (np && typeof np.whenLoaded === 'function') {
+			// Wait for load
+			if (typeof np.whenLoaded === 'function') {
 				await np.whenLoaded();
 			}
 
@@ -539,8 +633,9 @@ window.matchMonkeyOrchestration = {
 
 			if (skipDuplicates && np && typeof np.locked === 'function') {
 				np.locked(() => {
+					let t;
 					for (let i = 0; i < np.count; i++) {
-						const t = np.getFastObject(i);
+						t = np.getFastObject(i, t);
 						if (t?.path) {
 							existing.add(t.path);
 						}

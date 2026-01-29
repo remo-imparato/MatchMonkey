@@ -387,8 +387,8 @@ window.matchMonkeyAutoMode = {
 						}
 
 						try {
-							// Call Phase 5 orchestration with autoMode=true and specific discovery mode
-							const result = await generateSimilarPlaylist(true, attemptMode);
+							// Call Phase 5 orchestration with autoMode=true, discovery mode, and threshold
+							const result = await generateSimilarPlaylist(true, attemptMode, threshold);
 
 							if (result && result.success && result.tracksAdded > 0) {
 								totalTracksAdded = result.tracksAdded;
