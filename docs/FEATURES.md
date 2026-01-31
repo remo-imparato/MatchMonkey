@@ -100,8 +100,8 @@ window.matchMonkey.runMatchMonkey(false, 'genre');
 
 ---
 
-#### D. Mood-Based Discovery (ReccoBeats AI)
-**Algorithm**: ReccoBeats AI + Last.fm hybrid with seed awareness
+#### D. Mood-Based Discovery (ReccoBeats)
+**Algorithm**: ReccoBeats + Last.fm hybrid with seed awareness
 
 **Process**:
 1. Extract seed artists from selection
@@ -138,8 +138,8 @@ window.matchMonkey.runMoodActivityPlaylist('energetic', null);
 
 ---
 
-#### E. Activity-Based Discovery (ReccoBeats AI)
-**Algorithm**: ReccoBeats AI + Last.fm hybrid with duration awareness
+#### E. Activity-Based Discovery (ReccoBeats)
+**Algorithm**: ReccoBeats + Last.fm hybrid with duration awareness
 
 **Process**:
 Same as mood-based but with activity optimization:

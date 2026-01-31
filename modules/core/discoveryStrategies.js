@@ -5,7 +5,7 @@
  * - Artist-based: Use Last.fm artist.getSimilar API
  * - Track-based: Use Last.fm track.getSimilar API  
  * - Genre-based: Use Last.fm tag.getTopArtists API
- * - Recco-based: Use ReccoBeats AI recommendations from seed tracks
+ * - Recco-based: Use ReccoBeats recommendations from seed tracks
  * - Mood-based: Use predefined mood audio profiles
  * - Activity-based: Use predefined activity audio profiles
  * 
@@ -27,7 +27,7 @@ const DISCOVERY_MODES = {
 	ARTIST: 'artist',
 	TRACK: 'track',
 	GENRE: 'genre',
-	AIPOWER: 'aipower',    // ReccoBeats AI with seed tracks
+	ACOUSTICS: 'acoustics',    // ReccoBeats with seed tracks
 	MOOD: 'mood',      // Mood preset
 	ACTIVITY: 'activity' // Activity preset
 };
@@ -86,7 +86,7 @@ async function discoverByArtist(modules, seeds, config) {
 			console.log(`Discovery [Artist]: Found ${similar.length} similar artists for "${artistName}"`);
 			updateProgress(`Last.fm: Found ${similar.length} similar to "${artistName}"`, progress);
 
-			// Include seed artist if configured
+			// Include seed artist in the search if configured
 			if (config.includeSeedArtist) {
 				addArtistCandidate(artistName, seenArtists, blacklist, candidates);
 			}
@@ -153,7 +153,7 @@ async function discoverByTrack(modules, seeds, config) {
 	console.log(`Discovery [Track]: Processing ${seedLimit} seed tracks, max ${trackSimilarLimit} similar per track`);
 	updateProgress(`Querying Last.fm for ${seedLimit} seed track(s)...`, 0.2);
 
-	// If includeSeedArtist is enabled, add seed tracks first
+	// Include seed artist in the search if configured
 	if (config.includeSeedArtist) {
 		addSeedTracksToResults(seeds, seedLimit, blacklist, seenArtists, tracksByArtist);
 	}
@@ -384,7 +384,7 @@ async function discoverByGenre(modules, seeds, config) {
 }
 
 // ============================================================================
-// RECCOBEATS-BASED DISCOVERY (Seed-based AI recommendations)
+// RECCOBEATS-BASED DISCOVERY (Seed-based acoustic recommendations)
 // ============================================================================
 
 function buildReccoCandidates(result, blacklist, seenArtists) {
@@ -444,7 +444,7 @@ function buildReccoCandidates(result, blacklist, seenArtists) {
 /**
  * ReccoBeats-based discovery strategy.
  * 
- * Uses ReccoBeats API to find AI-powered recommendations based on seed tracks.
+ * Uses ReccoBeats API to find acousticly similar recommendations based on seed tracks.
  * Workflow: Album Search → Find Tracks → Get Audio Features → Get Recommendations
  * 
  * This mode requires seed tracks with album information for best results.
@@ -472,8 +472,8 @@ async function discoverByRecco(modules, seeds, config) {
 	updateProgress(`ReccoBeats: Analyzing ${seeds.length} seed track(s)...`, 0.2);
 
 	// Step 1: Get ReccoBeats recommendations based on seed tracks
-	updateProgress('ReccoBeats: Requesting AI-powered recommendations...', 0.25);
-	console.log(`Discovery [ReccoBeats]: Requesting AI recommendations (limit: ${config.similarLimit || 100})`);
+	updateProgress('ReccoBeats: Requesting acoustic recommendations...', 0.25);
+	console.log(`Discovery [ReccoBeats]: Requesting acoustic recommendations (limit: ${config.similarLimit || 100})`);
 
 	const result = await reccobeatsApi.getReccoRecommendations(
 		seeds.slice(0, 5),
@@ -487,7 +487,7 @@ async function discoverByRecco(modules, seeds, config) {
 	}
 
 	console.log(`Discovery [ReccoBeats]: Received ${result.recommendations.length} recommendations from ${result.foundCount} seed(s)`);
-	updateProgress(`ReccoBeats: Found ${result.recommendations.length} AI recommendations from ${result.foundCount} seed(s)`, 0.4);
+	updateProgress(`ReccoBeats: Found ${result.recommendations.length} acoustic recommendations from ${result.foundCount} seed(s)`, 0.4);
 
 	// Step 2: Extract artists from recommendations
 	updateProgress(`Processing ${result.recommendations.length} ReccoBeats recommendations...`, 0.5);
@@ -495,8 +495,8 @@ async function discoverByRecco(modules, seeds, config) {
 	candidates = buildReccoCandidates(result, blacklist, seenArtists);
 
 	const totalTracks = candidates.reduce((sum, c) => sum + (c.tracks?.length || 0), 0);
-	console.log(`Discovery [ReccoBeats]: Built ${candidates.length} candidate artists from AI recommendations`);
-	updateProgress(`ReccoBeats: ${candidates.length} artists with ${totalTracks} tracks from AI`, 0.6);
+	console.log(`Discovery [ReccoBeats]: Built ${candidates.length} candidate artists from acoustic recommendations`);
+	updateProgress(`ReccoBeats: ${candidates.length} artists with ${totalTracks} tracks from acoustic`, 0.6);
 
 	return candidates;
 }
@@ -950,7 +950,7 @@ function getDiscoveryStrategy(mode) {
 			return discoverByTrack;
 		case DISCOVERY_MODES.GENRE:
 			return discoverByGenre;
-		case DISCOVERY_MODES.AIPOWER:
+		case DISCOVERY_MODES.ACOUSTICS:
 			return discoverByRecco;
 		case DISCOVERY_MODES.MOOD:
 			return discoverByMood;
@@ -972,15 +972,16 @@ function getDiscoveryModeName(mode) {
 	switch (mode) {
 		case DISCOVERY_MODES.TRACK:
 			return 'Similar Tracks';
+		case DISCOVERY_MODES.ARTIST:
+			return 'Similar Artist';
 		case DISCOVERY_MODES.GENRE:
 			return 'Similar Genre';
-		case DISCOVERY_MODES.AIPOWER:
-			return 'AI Powered';
+		case DISCOVERY_MODES.ACOUSTICS:
+			return 'Similar Acoustics';
 		case DISCOVERY_MODES.MOOD:
 			return 'Mood';
 		case DISCOVERY_MODES.ACTIVITY:
 			return 'Activity';
-		case DISCOVERY_MODES.ARTIST:
 		default: return 'Similar';
 	}
 }

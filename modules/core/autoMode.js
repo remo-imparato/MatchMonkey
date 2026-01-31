@@ -359,7 +359,7 @@ window.matchMonkeyAutoMode = {
 					log(`Auto-Mode: User configured mode: ${getDiscoveryModeDisplayName(configuredMode)}`);
 
 					// Define all discovery modes to try in order
-					const allModes = ['track', 'aipower', 'artist', 'genre'];
+					const allModes = ['track', 'acoustics', 'artist', 'genre'];
 
 					// Start with user's preferred mode, then try others
 					const modesToTry = [configuredMode];
@@ -448,8 +448,8 @@ window.matchMonkeyAutoMode = {
 					return 'Similar Tracks';
 				case 'genre':
 					return 'Similar Genre';
-				case 'aipower':
-					return 'Similar Audio';
+				case 'acoustics':
+					return 'Similar Acoustics';
 				default:
 					return 'Similar Artists';
 			}
@@ -467,8 +467,8 @@ window.matchMonkeyAutoMode = {
 					return 'track';
 				case 'similar genre':
 					return 'genre';
-				case 'similar audio':
-					return 'aipower';
+				case 'similar acoustics':
+					return 'acoustics';
 				default:
 					return 'artist';
 			}

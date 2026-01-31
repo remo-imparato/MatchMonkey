@@ -1,4 +1,4 @@
-# ReccoBeats Integration - Usage Examples & Tutorial
+﻿# Usage Examples & Tutorial
 
 ## Tutorial: Creating Your First Mood Playlist
 
@@ -13,26 +13,15 @@
    - Select 3-5 tracks from artists you like for workouts
    - Example: AC/DC, Metallica, Foo Fighters tracks
 
-2. **Configure Settings** (optional):
-   ```javascript
-   app.setValue('MatchMonkey', {
-       ...app.getValue('MatchMonkey', {}),
-       MoodActivityBlendRatio: 0.5,  // Balanced: 50% your taste + 50% workout
-       SimilarArtistsLimit: 20,       // 20 total artists
-       TracksPerArtist: 30,           // Up to 30 tracks per artist
-       MaxPlaylistTracks: 100         // 100 track playlist
-   });
-   ```
+2. **Configure Settings (optional)**:
+   - In Tools → Options → Similar Artists, set a balanced blend ratio so results mix your taste with workout characteristics
+   - Adjust similar artists limit, tracks per artist and max playlist size to control variety and length
 
 3. **Generate Playlist**:
-   ```javascript
-   window.matchMonkey.runMoodActivityPlaylist(null, 'workout');
-   ```
+   - Run a Mood/Activity playlist using the "workout" activity option in the add-on UI
 
 4. **Result**:
-   - 10 artists similar to your seeds (AC/DC ? Guns N' Roses, Led Zeppelin, etc.)
-   - 10 workout-optimized artists (high tempo, energetic)
-   - Total: ~100 tracks perfectly suited for your workout
+   - A mix of artists similar to your seeds plus workout-optimized picks, assembled into the playlist size you configured
 
 ---
 
@@ -43,24 +32,14 @@
 **Steps**:
 
 1. **Configure for Pure Mood Discovery**:
-   ```javascript
-   app.setValue('MatchMonkey', {
-       ...app.getValue('MatchMonkey', {}),
-       MoodActivityBlendRatio: 0.0,  // 100% mood-based
-       DefaultMood: 'focused',
-       TracksPerArtist: 20
-   });
-   ```
+   - In the add-on settings, set the blend ratio to favour the mood (pure mood = low seed influence)
+   - Choose the `focused` or `relaxed` mood and reduce tracks-per-artist if you want a concise list
 
 2. **Generate Playlist** (no need to select tracks):
-   ```javascript
-   window.matchMonkey.runMoodActivityPlaylist('focused', null);
-   ```
+   - Run the Mood playlist for the chosen mood from the UI
 
 3. **Result**:
-   - Pure focus/study music from ReccoBeats AI
-   - Instrumental, ambient, lo-fi artists
-   - No influence from your current library
+   - A list of focus-friendly or relaxed tracks chosen for the mood, independent of your current library selection
 
 ---
 
@@ -71,27 +50,17 @@
 **Steps**:
 
 1. **Select Current Favorites**:
-   - Select 5-10 tracks you're loving right now
-   - Example: Indie pop/rock you've been playing
+   - Select 5–10 tracks you're loving right now (indie pop/rock works well for this example)
 
 2. **Configure for Seed-Heavy**:
-   ```javascript
-   app.setValue('MatchMonkey', {
-       ...app.getValue('MatchMonkey', {}),
-       MoodActivityBlendRatio: 0.8,  // 80% your style + 20% happy mood
-       IncludeSeedArtist: true        // Include original artists
-   });
-   ```
+   - Set the blend ratio to favour your seeds (higher percent seed influence)
+   - Optionally enable including seed artist results
 
 3. **Generate Playlist**:
-   ```javascript
-   window.matchMonkey.runMoodActivityPlaylist('happy', null);
-   ```
+   - Run the Mood playlist for the `happy` mood from the UI
 
 4. **Result**:
-   - Mostly artists similar to your selections
-   - Filtered/enhanced by "happy" characteristics
-   - Some new happy-mood artists for variety
+   - A playlist that closely matches your style but filtered to emphasise happy characteristics
 
 ---
 
@@ -99,72 +68,34 @@
 
 ### Example 1: Morning Energy Boost
 
-```javascript
-// You wake up and want energetic music to start your day
+- Play your morning favorites and select them
+- Increase blend ratio slightly toward seeds to maintain familiarity
+- Run the `energetic` mood playlist
 
-// 1. Play your morning favorites (The Black Keys, Arctic Monkeys)
-// 2. Select those tracks
-// 3. Run:
-app.setValue('MatchMonkey', {
-    ...app.getValue('MatchMonkey', {}),
-    MoodActivityBlendRatio: 0.6  // 60% your style, 40% energetic
-});
-window.matchMonkey.runMoodActivityPlaylist('energetic', null);
-
-// Result: Energetic indie rock perfect for your morning routine
-```
+Result: Energetic indie/rock tuned for your morning routine
 
 ### Example 2: Evening Wind-Down
 
-```javascript
-// After work, you want to relax with familiar comfort music
+- Select comforting, mellow tracks
+- Use a moderate blend ratio to prefer familiar artists while adding relaxing elements
+- Run the `relaxed` mood playlist
 
-// 1. Select your comfort artists (Fleetwood Mac, James Taylor)
-// 2. Run:
-app.setValue('MatchMonkey', {
-    ...app.getValue('MatchMonkey', {}),
-    MoodActivityBlendRatio: 0.7,  // 70% familiar, 30% relaxing
-    MaxPlaylistTracks: 50          // Shorter playlist for evening
-});
-window.matchMonkey.runMoodActivityPlaylist('relaxed', null);
-
-// Result: Mellow, familiar artists with relaxing characteristics
-```
+Result: Mellow, familiar music suitable for winding down
 
 ### Example 3: Discover New Party Music
 
-```javascript
-// Hosting a party, want fresh dance music
+- Optionally select popular or diverse tracks, or leave selection empty for broader discovery
+- Use a low seed blend ratio to prioritise party characteristics
+- Run the `party` activity playlist
 
-// 1. Don't select anything (or select diverse popular tracks)
-// 2. Run:
-app.setValue('MatchMonkey', {
-    ...app.getValue('MatchMonkey', {}),
-    MoodActivityBlendRatio: 0.2,  // 20% familiar, 80% party discoveries
-    UseLastfmRanking: true         // Get popular tracks
-});
-window.matchMonkey.runMoodActivityPlaylist(null, 'party');
-
-// Result: Mostly new party-friendly artists with broad appeal
-```
+Result: Fresh, danceable tracks with a mix of popular and new artists
 
 ### Example 4: Genre + Mood Exploration
 
-```javascript
-// You love progressive rock and want more energetic examples
+- Select multiple artists from a target genre (e.g., Progressive Rock)
+- Use a balanced blend ratio and request the `energetic` mood
 
-// 1. Select multiple prog rock artists (Pink Floyd, Yes, Genesis)
-// 2. Run:
-app.setValue('MatchMonkey', {
-    ...app.getValue('MatchMonkey', {}),
-    MoodActivityBlendRatio: 0.5,   // Balanced
-    SimilarArtistsLimit: 30,       // More artists for diversity
-    TracksPerArtist: 20
-});
-window.matchMonkey.runMoodActivityPlaylist('energetic', null);
-
-// Result: Energetic progressive rock (Rush, Dream Theater, etc.)
-```
+Result: Energetic selections within the chosen genre
 
 ---
 
@@ -174,42 +105,10 @@ window.matchMonkey.runMoodActivityPlaylist('energetic', null);
 
 Try different ratios to see what works best:
 
-```javascript
-// Ultra-conservative (mostly your taste)
-app.setValue('MatchMonkey', {
-    ...app.getValue('MatchMonkey', {}),
-    MoodActivityBlendRatio: 0.9
-});
-window.matchMonkey.runMoodActivityPlaylist('happy', null);
-
-// Conservative (your taste with mood enhancement)
-app.setValue('MatchMonkey', {
-    ...app.getValue('MatchMonkey', {}),
-    MoodActivityBlendRatio: 0.7
-});
-window.matchMonkey.runMoodActivityPlaylist('happy', null);
-
-// Balanced (default, best for most users)
-app.setValue('MatchMonkey', {
-    ...app.getValue('MatchMonkey', {}),
-    MoodActivityBlendRatio: 0.5
-});
-window.matchMonkey.runMoodActivityPlaylist('happy', null);
-
-// Adventurous (mostly new discoveries)
-app.setValue('MatchMonkey', {
-    ...app.getValue('MatchMonkey', {}),
-    MoodActivityBlendRatio: 0.3
-});
-window.matchMonkey.runMoodActivityPlaylist('happy', null);
-
-// Pure discovery (no seed influence)
-app.setValue('MatchMonkey', {
-    ...app.getValue('MatchMonkey', {}),
-    MoodActivityBlendRatio: 0.0
-});
-window.matchMonkey.runMoodActivityPlaylist('happy', null);
-```
+- High seed influence (0.7–0.9): mostly your taste with subtle mood filtering
+- Balanced (0.4–0.6): mix of familiar and new — a good starting point
+- Low seed influence (0.2–0.3): mostly mood/activity-driven discovery
+- Pure mood (0.0): ignore seeds and rely entirely on mood/activity characteristics
 
 ---
 
@@ -219,73 +118,24 @@ window.matchMonkey.runMoodActivityPlaylist('happy', null);
 
 Gradually discover new music while maintaining your taste:
 
-```javascript
-// Week 1: Safe exploration (70% seeds)
-app.setValue('MatchMonkey', {
-    ...app.getValue('MatchMonkey', {}),
-    MoodActivityBlendRatio: 0.7
-});
-window.matchMonkey.runMoodActivityPlaylist('energetic', null);
-
-// Week 2: Moderate exploration (50% seeds)
-app.setValue('MatchMonkey', {
-    ...app.getValue('MatchMonkey', {}),
-    MoodActivityBlendRatio: 0.5
-});
-window.matchMonkey.runMoodActivityPlaylist('energetic', null);
-
-// Week 3: Heavy exploration (30% seeds)
-app.setValue('MatchMonkey', {
-    ...app.getValue('MatchMonkey', {}),
-    MoodActivityBlendRatio: 0.3
-});
-window.matchMonkey.runMoodActivityPlaylist('energetic', null);
-```
+- Week 1: Safe exploration (higher seed influence)
+- Week 2: Moderate exploration (balanced)
+- Week 3: Heavier exploration (lower seed influence)
 
 ### Workflow 2: Multi-Mood Day Planner
 
 Create playlists for different times of day:
 
-```javascript
-// Morning: Energetic wake-up
-// Select morning favorites
-window.matchMonkey.runMoodActivityPlaylist('energetic', null);
-
-// Afternoon: Focus work playlist
-// Select concentration music
-window.matchMonkey.runMoodActivityPlaylist('focused', null);
-
-// Evening: Relaxation playlist
-// Select calming favorites
-window.matchMonkey.runMoodActivityPlaylist('relaxed', null);
-
-// Night: Sleep preparation
-// Let algorithm find ambient music
-app.setValue('MatchMonkey', {
-    ...app.getValue('MatchMonkey', {}),
-    MoodActivityBlendRatio: 0.0  // Pure sleep music
-});
-window.matchMonkey.runMoodActivityPlaylist(null, 'sleep');
-```
+- Morning: Energetic wake-up
+- Afternoon: Focus/work playlist
+- Evening: Relaxation playlist
+- Night: Sleep/ambient
 
 ### Workflow 3: Genre Deep-Dive
 
 Explore a genre with mood variations:
 
-```javascript
-// Select multiple artists from target genre (e.g., Jazz)
-
-// Energetic jazz
-window.matchMonkey.runMoodActivityPlaylist('energetic', null);
-
-// Relaxed jazz
-window.matchMonkey.runMoodActivityPlaylist('relaxed', null);
-
-// Happy jazz
-window.matchMonkey.runMoodActivityPlaylist('happy', null);
-
-// Result: Three different jazz playlists with different vibes
-```
+- Select multiple artists from the genre then run mood variations to create several themed playlists
 
 ---
 
@@ -293,36 +143,25 @@ window.matchMonkey.runMoodActivityPlaylist('happy', null);
 
 ### Seed Selection Tips
 
-1. **Quality over Quantity**: 3-5 well-chosen tracks better than 20 random ones
-2. **Consistency**: Select tracks from similar genre/style for cohesive results
-3. **Diversity**: Mix artists within genre for broader recommendations
-4. **Recency**: Use tracks you're currently enjoying for relevant playlists
+1. Quality over Quantity: 3–5 well-chosen tracks are better than many random ones
+2. Consistency: Select tracks from a similar style for cohesive results
+3. Diversity: Mix several artists within a genre for broader recommendations
+4. Recency: Use tracks you're currently enjoying for relevant playlists
 
 ### Blend Ratio Tips
 
-| If you want... | Use ratio... | Example |
-|----------------|--------------|---------|
-| Safe exploration | 0.7-0.8 | Your style with subtle mood |
-| Balanced mix | 0.4-0.6 | Half familiar, half new |
-| Adventure | 0.2-0.3 | Mostly new discoveries |
-| Pure discovery | 0.0 | Ignore seeds completely |
-| Mood filtering | 1.0 | Your seeds with mood filter |
+- Safe exploration: 0.7–0.8 — your style with subtle mood
+- Balanced: 0.4–0.6 — a good middle ground
+- Adventure: 0.2–0.3 — mostly new discoveries
+- Pure discovery: 0.0 — ignore seeds completely
 
 ### Mood/Activity Selection Tips
 
-**Moods**:
-- `energetic` - Best with rock, metal, electronic
-- `relaxed` - Works with any genre
-- `happy` - Pop, indie, upbeat genres
-- `sad` - Best with singer-songwriter, indie
-- `focused` - Instrumental, ambient, classical
-
-**Activities**:
-- `workout` - High tempo, energetic (use with uptempo seeds)
-- `study` - Often instrumental (works without seeds)
-- `party` - Danceable, popular (low blend ratio recommended)
-- `sleep` - Ambient, minimal (pure mood works best)
-- `driving` - Engaging but not distracting
+- energetic — Best with rock, metal, electronic
+- relaxed — Works with many genres
+- happy — Pop and upbeat genres
+- sad — Singer-songwriter and melancholic styles
+- focused — Instrumental, ambient, and classical
 
 ---
 
@@ -330,75 +169,44 @@ window.matchMonkey.runMoodActivityPlaylist('happy', null);
 
 ### Problem: Results too random
 
-**Solution**: Increase blend ratio
-
-```javascript
-app.setValue('MatchMonkey', {
-    ...app.getValue('MatchMonkey', {}),
-    MoodActivityBlendRatio: 0.7  // More seed influence
-});
-```
+**Solution**: Increase seed influence (raise blend ratio) and select more consistent seeds
 
 ### Problem: Results too similar to seeds
 
-**Solution**: Decrease blend ratio
-
-```javascript
-app.setValue('MatchMonkey', {
-    ...app.getValue('MatchMonkey', {}),
-    MoodActivityBlendRatio: 0.3  // More mood influence
-});
-```
+**Solution**: Decrease blend ratio to introduce more mood/activity-driven picks
 
 ### Problem: Not enough tracks
 
-**Solution**: Increase limits
-
-```javascript
-app.setValue('MatchMonkey', {
-    ...app.getValue('MatchMonkey', {}),
-    SimilarArtistsLimit: 30,     // More artists
-    TracksPerArtist: 40,          // More tracks per artist
-    MaxPlaylistTracks: 0          // No limit
-});
-```
+**Solution**: Increase similar artists limit and tracks-per-artist in settings; expand max playlist size
 
 ### Problem: Wrong mood feel
 
 **Solutions**:
-1. Try different mood name
-2. Check seed selection (are they appropriate?)
-3. Adjust blend ratio
-4. Check other filters (MinRating, etc.)
+- Try a different mood
+- Check seed selection
+- Adjust blend ratio
 
 ---
 
-## Success Stories
+## Tips for Best Results
 
-### User Story 1: "Perfect Gym Mix"
+(Repeated tips; keep for convenience.)
 
-> "I selected my favorite Metallica and Slipknot tracks, set ratio to 0.6, ran 'workout' activity. Got 100 tracks of heavy metal perfect for lifting. Some familiar bands, some new discoveries. Game changer!" - Mike
-
-### User Story 2: "Study Music Discovery"
-
-> "I knew nothing about study music. Set ratio to 0.0 (pure mood), ran 'focused' mood. Algorithm found amazing lo-fi and ambient artists I never would have discovered." - Sarah
-
-### User Story 3: "Party Playlist Pro"
-
-> "Hosting parties every month. I select current popular tracks, set ratio to 0.4, run 'party' activity. Always fresh, crowd-pleasing playlists with good mix of familiar and new." - DJ Alex
+- Start with a small tight seed set (3–5 tracks)
+- Use balanced blend ratios for predictable variety
+- Tune discovery limits for speed vs variety
 
 ---
 
 ## Next Steps
 
-1. **Experiment**: Try different ratios to find your preference
-2. **Refine**: Adjust based on results
-3. **Save Favorites**: Keep track of successful ratio/mood combinations
-4. **Share**: Tell others about configurations that work well
+1. Experiment with different blend ratios and modes
+2. Save playlists you like and note which settings produced them
+3. Try Auto-Queue for continuous playback
 
 ---
 
 For more information, see:
-- [ReccoBeats Integration Guide](RECCOBEATS_INTEGRATION.md)
-- [Quick Reference](QUICK_REFERENCE.md)
-- [Implementation Summary](IMPLEMENTATION_SUMMARY.md)
+- Quick Reference
+- User Guide
+- ReccoBeats Integration Guide

@@ -6,14 +6,14 @@
  * - Artist-based: Find similar artists (Last.fm artist.getSimilar API)
  * - Track-based: Find similar tracks (Last.fm track.getSimilar API)
  * - Genre-based: Find artists in same genre (Last.fm tag.getTopArtists API)
- * - Recco-based: Find similar tracks using ReccoBeats AI (requires seed tracks)
+ * - Recco-based: Find similar tracks using ReccoBeats (requires seed tracks)
  * - Mood-based: Find tracks matching mood profiles
  * - Activity-based: Find tracks matching activity profiles
  * 
  * @author Remo Imparato
  * @version 2.2.0
  * @description Generates playlists or queues tracks from similar artists/tracks/genres using Last.fm API
- *              and ReccoBeats AI. Supports automatic mode to queue similar tracks when approaching
+ *              and ReccoBeats. Supports automatic mode to queue similar tracks when approaching
  *              end of playlist.
  * 
  * @repository https://github.com/remo-imparato/SimilarArtistsMM5
@@ -95,7 +95,7 @@
 		 * - 'artist': Use Last.fm artist.getSimilar to find similar artists
 		 * - 'track': Use Last.fm track.getSimilar to find musically similar tracks
 		 * - 'genre': Use Last.fm tag.getTopArtists to find artists in same genre
-		 * - 'aipower': Use ReccoBeats AI to find recommendations based on seed tracks
+		 * - 'acoustics': Use ReccoBeats to find recommendations based on seed tracks
 		 * - 'mood': Use predefined mood audio profiles
 		 * - 'activity': Use predefined activity audio profiles
 		 */
@@ -103,7 +103,7 @@
 			ARTIST: 'artist',
 			TRACK: 'track',
 			GENRE: 'genre',
-			AIPOWER: 'aipower',
+			ACOUSTICS: 'acoustics',
 			MOOD: 'mood',
 			ACTIVITY: 'activity'
 		};
@@ -347,8 +347,8 @@
 					return 'Similar Tracks';
 				case 'genre':
 					return 'Similar Genre';
-				case 'aipower':
-					return 'Similar Audio';
+				case 'acoustics':
+					return 'Similar Acoustics';
 				case 'mood':
 					return 'Mood';
 				case 'activity':

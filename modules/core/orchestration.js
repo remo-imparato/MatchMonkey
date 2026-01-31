@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MatchMonkey Core Orchestration Logic
  * 
  * Main orchestration layer that ties together:
@@ -22,7 +22,7 @@ window.matchMonkeyOrchestration = {
 	 * 
 	 * @param {object} modules - Injected module dependencies
 	 * @param {boolean} [autoMode=false] - Whether running in auto-mode
-	 * @param {string} [discoveryMode='artist'] - Discovery mode: 'artist', 'track', 'genre', 'aipower', 'mood', or 'activity'
+	 * @param {string} [discoveryMode='artist'] - Discovery mode: 'artist', 'track', 'genre', 'acoustics', 'mood', or 'activity'
 	 * @param {number} [autoModeThreshold] - Threshold for auto-mode seed collection
 	 * @returns {Promise<object>} Result object with status, tracklist, playlist info
 	 */
@@ -251,7 +251,7 @@ window.matchMonkeyOrchestration = {
 			}
 
 			console.log(`Match Monkey: Removed ${results.length - dedupedResults.length} duplicates, ${dedupedResults.length} unique tracks remain`);
-			updateProgress(`Removed ${results.length - dedupedResults.length} duplicates ? ${dedupedResults.length} unique tracks`, 0.83);
+			updateProgress(`Removed ${results.length - dedupedResults.length} duplicates → ${dedupedResults.length} unique tracks`, 0.83);
 
 			// Step 5: Apply randomization if enabled
 			if (config_.randomize) {
@@ -261,13 +261,16 @@ window.matchMonkeyOrchestration = {
 				updateProgress(`Shuffled ${dedupedResults.length} tracks`, 0.86);
 			}
 
+			//TODO: include seed tracks if enabled
+
+
 			// Apply final limit
 			const finalResults = config_.totalLimit < 100000
 				? dedupedResults.slice(0, config_.totalLimit)
 				: dedupedResults;
 
 			if (finalResults.length < dedupedResults.length) {
-				console.log(`Match Monkey: Applied limit: ${dedupedResults.length} ? ${finalResults.length} tracks`);
+				console.log(`Match Monkey: Applied limit: ${dedupedResults.length} → ${finalResults.length} tracks`);
 				updateProgress(`Applied limit: ${finalResults.length} of ${dedupedResults.length} tracks`, 0.87);
 			}
 
@@ -709,7 +712,7 @@ window.matchMonkeyOrchestration = {
 					}
 					existingCount = np.count;
 				});
-				
+
 				if (existingCount > 0) {
 					updateProgress(`Checking ${tracks.length} tracks against ${existingCount} in queue...`, 0.92);
 				}
@@ -719,7 +722,7 @@ window.matchMonkeyOrchestration = {
 
 			// Add tracks to Now Playing
 			updateProgress(`Adding ${tracks.length} tracks to Now Playing...`, 0.93);
-			
+
 			for (const track of tracks) {
 				const dupKey = makeDupKey(track);
 
@@ -743,7 +746,7 @@ window.matchMonkeyOrchestration = {
 			} else {
 				updateProgress(`Queued ${added} tracks to Now Playing`, 0.98);
 			}
-			
+
 			console.log(`Match Monkey: Queued ${added} tracks to Now Playing`);
 
 		} catch (e) {
@@ -761,12 +764,13 @@ window.matchMonkeyOrchestration = {
 	 * @param {object} config - Configuration settings
 	 * @returns {Promise<object>} Result with playlist reference
 	 */
+	//*
 	async buildResultsPlaylist(modules, tracks, config) {
 		const { db, settings: { storage }, ui: { notifications } } = modules;
 		const { stringSetting } = storage;
 		const { showToast, updateProgress } = notifications;
 
-		const playlistTemplate = stringSetting('PlaylistName', '- Similar to %');
+		const playlistTemplate = stringSetting('PlaylistName', '- Similar to % (#)');
 		const parentName = stringSetting('ParentPlaylist', '');
 		const playlistMode = stringSetting('PlaylistMode', 'Create new playlist');
 		const navigateAfter = stringSetting('NavigateAfter', 'Navigate to new playlist');
@@ -788,12 +792,12 @@ window.matchMonkeyOrchestration = {
 			const capitalizedValue = config.moodActivityValue.charAt(0).toUpperCase() + config.moodActivityValue.slice(1);
 			const contextLabel = config.moodActivityContext === 'mood' ? 'Mood' : 'Activity';
 			playlistName = `${playlistName} (${contextLabel}: ${capitalizedValue})`;
-		} else if (config.discoveryMode === 'aipower') {
-			playlistName = `${playlistName} (AI Audio)`;
+		} else if (config.discoveryMode === 'acoustics') {
+			playlistName = `${playlistName} (Similar Acoustics)`;
 		} else if (config.discoveryMode === 'track') {
 			playlistName = `${playlistName} (Similar Tracks)`;
 		} else if (config.discoveryMode === 'genre') {
-			playlistName = `${playlistName} (Genre)`;
+			playlistName = `${playlistName} (Similar Genre)`;
 		} else {
 			playlistName = `${playlistName} (${modeName})`;
 		}
@@ -884,6 +888,184 @@ window.matchMonkeyOrchestration = {
 			return { added: 0, playlist: null };
 		}
 	},
+	/*/
+		async buildResultsPlaylist(modules, tracks, config) {
+		const { db, settings: { storage }, ui: { notifications } } = modules;
+		const { stringSetting } = storage;
+		const { showToast, updateProgress } = notifications;
+
+		const playlistTemplate = stringSetting('PlaylistName', '- Similar to % (#)');
+		const parentName = stringSetting('ParentPlaylist', '');
+		const playlistMode = stringSetting('PlaylistMode', 'Create new playlist');
+		const navigateAfter = stringSetting('NavigateAfter', 'Navigate to new playlist');
+
+		const modeName = config.modeName || 'Similar Artists';
+		const seedName = config.seedName || 'Selection';
+
+		// Helper: produce playlist name from a template supporting multiple replacement tokens.
+		// Supported placeholders (case-insensitive):
+		// - %SEED% or % : seed/artist display name (backwards compatible with single '%')
+		// - %MODE% : friendly mode name (e.g. "Similar Artists")
+		// - %TYPE% : discovery mode key (e.g. "artist", "track", "mood")
+		// - %MOOD% or %CONTEXT% : mood/activity value if present
+		// - (#) or %COUNT% or %N% or %TRACKS% : number of tracks added
+		const buildNameFromTemplate = (template) => {
+			if (!template || typeof template !== 'string') return '';
+
+			let name = template;
+
+			// Replace explicit track-count token "(#)"
+			name = name.replace(/\(\#\)/g, String(tracks.length));
+
+			// Replace common count tokens (%COUNT%, %N%, %TRACKS%)
+			name = name.replace(/%COUNT%/ig, String(tracks.length));
+			name = name.replace(/%N%/ig, String(tracks.length));
+			name = name.replace(/%TRACKS%/ig, String(tracks.length));
+			name = name.replace(/%#%/ig, String(tracks.length));
+
+			// Replacement map for other tokens
+			const replacements = {
+				'SEED': seedName,
+				'MODE': modeName,
+				'TYPE': config.discoveryMode || '',
+				'MOOD': config.moodActivityValue || '',
+				'CONTEXT': config.moodActivityValue || '',
+				'ARTIST': seedName, // alias for backwards/explicit artist token
+			};
+
+			// Replace %TOKEN% style placeholders (case-insensitive)
+			name = name.replace(/%([A-Z0-9_]+)%/ig, (m, token) => {
+				const key = String(token).toUpperCase();
+				return (replacements.hasOwnProperty(key) ? String(replacements[key]) : m);
+			});
+
+			// Backwards compatibility: single '%' -> first occurrence becomes seedName
+			// Only replace if a %SEED% style token wasn't used.
+			if (name.indexOf('%') >= 0 && !/%[A-Z0-9_]+%/i.test(template)) {
+				name = name.replace('%', seedName);
+			}
+
+			// Final cleanup: collapse multiple spaces, trim
+			name = name.replace(/\s+/g, ' ').trim();
+
+			return name;
+		};
+
+		// Build playlist name from template
+		let playlistName = buildNameFromTemplate(playlistTemplate || '');
+
+		// If template produced an empty name, fall back to previous behaviour
+		if (!playlistName) {
+			if (playlistTemplate.indexOf('%') >= 0) {
+				playlistName = playlistTemplate.replace('%', seedName);
+			} else {
+				playlistName = `${playlistTemplate} ${seedName}`;
+			}
+		}
+
+		// Append discovery mode indicator when relevant
+		if (config.moodActivityValue && (config.discoveryMode === 'mood' || config.discoveryMode === 'activity')) {
+			const capitalizedValue = config.moodActivityValue.charAt(0).toUpperCase() + config.moodActivityValue.slice(1);
+			const contextLabel = config.moodActivityContext === 'mood' ? 'Mood' : 'Activity';
+			playlistName = `${playlistName} (${contextLabel}: ${capitalizedValue})`;
+		} else if (config.discoveryMode === 'acoustics') {
+			playlistName = `${playlistName} (Similar Acoustics)`;
+		} else if (config.discoveryMode === 'track') {
+			playlistName = `${playlistName} (Similar Tracks)`;
+		} else if (config.discoveryMode === 'genre') {
+			playlistName = `${playlistName} (Similar Genre)`;
+		} else {
+			playlistName = `${playlistName} (${modeName})`;
+		}
+
+		// Truncate if too long
+		if (playlistName.length > 100) {
+			playlistName = playlistName.substring(0, 97) + '...';
+		}
+
+		console.log(`Match Monkey: Building playlist "${playlistName}" (mode: ${playlistMode})`);
+		updateProgress(`Creating playlist "${playlistName}"...`, 0.92);
+
+		// Handle "Do not create playlist" mode
+		if (playlistMode === 'Do not create playlist') {
+			showToast(`Found ${tracks.length} tracks (playlist creation disabled)`, 'info');
+			return { added: 0, playlist: null };
+		}
+
+		let userSelectedPlaylist = null;
+
+		// Show confirmation dialog if enabled
+		if (config.showConfirm) {
+			console.log('Match Monkey: Showing playlist selection dialog');
+			updateProgress('Waiting for playlist selection...', 0.93);
+			try {
+				const dialogResult = await this.showPlaylistDialog();
+
+				if (dialogResult === null) {
+					console.log('Match Monkey: UserCancelled playlist dialog');
+					return { added: 0, playlist: null, cancelled: true };
+				}
+
+				if (dialogResult && !dialogResult.autoCreate) {
+					userSelectedPlaylist = dialogResult;
+				}
+			} catch (dialogError) {
+				console.error('Match Monkey: Dialog error:', dialogError);
+			}
+		}
+
+		try {
+			// Resolve target playlist
+			updateProgress(`Resolving playlist "${playlistName}"...`, 0.94);
+			const resolution = await db.resolveTargetPlaylist(
+				playlistName,
+				parentName,
+				playlistMode,
+				userSelectedPlaylist
+			);
+
+			const targetPlaylist = resolution.playlist;
+			const shouldClear = resolution.shouldClear;
+
+			if (!targetPlaylist) {
+				throw new Error('Failed to create or find target playlist');
+			}
+
+			console.log(`Match Monkey: Using playlist "${targetPlaylist.name}" (clear: ${shouldClear})`);
+
+			// Clear existing tracks if needed
+			if (shouldClear) {
+				console.log('Match Monkey: Clearing existing tracks');
+				updateProgress(`Clearing existing tracks from "${targetPlaylist.name}"...`, 0.95);
+				await db.clearPlaylistTracks(targetPlaylist);
+			}
+
+			// Add tracks to playlist
+			updateProgress(`Adding ${tracks.length} tracks to "${targetPlaylist.name}"...`, 0.96);
+			const addedCount = await db.addTracksToPlaylist(targetPlaylist, tracks);
+
+			if (addedCount === 0) {
+				console.warn('Match Monkey: No tracks were added to playlist');
+				showToast(`Warning: No tracks could be added to playlist`, 'warning');
+			} else {
+				updateProgress(`Added ${addedCount} tracks to "${targetPlaylist.name}"`, 0.98);
+			}
+
+			// Navigate based on user settings
+			this.navigateAfterCreation(navigateAfter, targetPlaylist);
+
+			console.log(`Match Monkey: Playlist "${targetPlaylist.name}" complete with ${addedCount} tracks`);
+
+			return { added: addedCount, playlist: targetPlaylist };
+
+		} catch (e) {
+			console.error('Match Monkey: Error creating playlist:', e);
+			showToast(`Failed to create playlist: ${e.message}`, 'error');
+			return { added: 0, playlist: null };
+		}
+	},
+
+	//*/
 
 	/**
 	 * Show the playlist selection dialog.

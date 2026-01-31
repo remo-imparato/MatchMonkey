@@ -109,27 +109,6 @@
 				</div>
 			</fieldset>
 
-			<!-- Queue Behavior -->
-			<fieldset>
-				<legend>Queue behavior (playlist creation override)</legend>
-				<div class="uiRows">
-					<div class="uiRow">
-						<div data-id="EnqueueMode" data-control-class="Checkbox" data-tip="If enabled, add results to Now Playing (queue) instead of creating a playlist.">Enqueue to Now Playing instead of creating playlist?</div>
-					</div>
-					<div class="uiRow">
-						<div data-id="ClearQueueFirst" data-control-class="Checkbox" data-tip="If checked, clear the current Now Playing queue before adding results.">Clear queue before adding?</div>
-					</div>
-					<div class="uiRow">
-						<label class="inline">After completion:</label>
-						<div data-id="NavigateAfter" data-control-class="Dropdown" data-tip="Choose where the app should navigate after playlist/queue creation.">
-							<option>Navigate to new playlist</option>
-							<option>Navigate to now playing</option>
-							<option>Stay in current view</option>
-						</div>
-					</div>
-				</div>
-			</fieldset>
-
 		</div>
 
 		<!-- RIGHT COLUMN -->
@@ -140,7 +119,7 @@
 				<legend>Mood & Activity defaults</legend>
 				<div class="uiRows">
 
-					<div class="uiRow">
+					<div class="uiRow" style="display:none;">
 						<label class="inline">Default mood:</label>
 						<div data-id="DefaultMood" data-control-class="Dropdown" data-tip="Choose the default mood preset used...">
 							<option value="energetic">Energetic</option>
@@ -153,7 +132,7 @@
 						</div>
 					</div>
 
-					<div class="uiRow">
+					<div class="uiRow" style="display:none;">
 						<label class="inline">Default activity:</label>
 						<div data-id="DefaultActivity" data-control-class="Dropdown" data-tip="Choose the default activity preset used...">
 							<option value="workout">Workout</option>
@@ -167,7 +146,7 @@
 					</div>
 
 					<div class="uiRow">
-						<label class="inline">Audio feature balance:</label>
+						<label class="inline">Acoustic feature balance:</label>
 						<div class="sliderContainer" style="width:30em;">
 							<div data-id="MoodActivityBlendRatio"
 								 data-control-class="Slider"
@@ -185,8 +164,8 @@
 					<div class="uiRow" style="margin-top:0.5em;padding:0.5em;background:var(--panel-background,#f8f8f8);border-radius:4px;">
 						<span style="font-size:0.9em;color:var(--text-secondary,#666);">
 							<strong>Tip:</strong> Mood and Activity modes apply predefined audio profiles on top of your seed tracks.
-							The <strong>Audio Feature Balance</strong> slider controls how strongly the mood influences the results.
-							For AI‑powered suggestions that use only your selected tracks—without applying a template—use the <strong>AI‑Powered</strong> menu.
+							The <strong>Acoustic Feature Balance</strong> slider controls how strongly the mood influences the results.
+							For AI‑powered suggestions that use only your selected tracks—without applying a template—use the <strong>Similar acoustics</strong> menu.
 						</span>
 					</div>
 
@@ -206,7 +185,7 @@
 							<option value="artist">Similar Artists</option>
 							<option value="track">Similar Tracks</option>
 							<option value="genre">Similar Genre</option>
-							<option value="aipower">Similar Audio</option>
+							<option value="acoustics">Similar Acoustics</option>
 						</div>
 					</div>
 					<div class="uiRow">
@@ -239,6 +218,27 @@
 					</div>
 					<div class="uiRow">
 						<div data-id="SkipDuplicates" data-control-class="Checkbox" data-tip="Prevent adding tracks that already exist in the current Now Playing queue when Auto-queue is active.">Skip duplicates in queue?</div>
+					</div>
+				</div>
+			</fieldset>
+
+			<!-- Queue Behavior -->
+			<fieldset>
+				<legend>Queue behavior (playlist creation override)</legend>
+				<div class="uiRows">
+					<div class="uiRow">
+						<div data-id="EnqueueMode" data-control-class="Checkbox" data-tip="If enabled, add results to Now Playing (queue) instead of creating a playlist.">Enqueue to Now Playing instead of creating playlist?</div>
+					</div>
+					<div class="uiRow">
+						<div data-id="ClearQueueFirst" data-control-class="Checkbox" data-tip="If checked, clear the current Now Playing queue before adding results.">Clear queue before adding?</div>
+					</div>
+					<div class="uiRow">
+						<label class="inline">After completion:</label>
+						<div data-id="NavigateAfter" data-control-class="Dropdown" data-tip="Choose where the app should navigate after playlist/queue creation.">
+							<option>Navigate to new playlist</option>
+							<option>Navigate to now playing</option>
+							<option>Stay in current view</option>
+						</div>
 					</div>
 				</div>
 			</fieldset>

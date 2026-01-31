@@ -10,7 +10,7 @@
  * - SimilarArtistsRun: Find similar artists (Last.fm artist.getSimilar API)
  * - SimilarTracksRun: Find similar tracks (Last.fm track.getSimilar API)
  * - SimilarGenreRun: Find artists in same genre (Last.fm tag.getTopArtists API)
- * - SimilarReccoRun: Find similar tracks using ReccoBeats AI (requires seed tracks)
+ * - SimilarReccoRun: Find similar tracks using ReccoBeats (requires seed tracks)
  * - SimilarMood*: Find tracks by mood preset
  * - SimilarActivity*: Find tracks by activity preset
  * - SimilarArtistsToggleAuto: Toggle auto-queue mode on/off
@@ -87,18 +87,18 @@ actions.similarGenreRun = {
 // ============================================================================
 
 /**
- * Run Similar Recco action (ReccoBeats AI - requires seed tracks)
- * Uses selected tracks to find Similar Audio recommendations
+ * Run Similar Recco action (ReccoBeats - requires seed tracks)
+ * Uses selected tracks to find Similar Acoustics recommendations
  */
 actions.similarReccoRun = {
-	title: _('Similar A&udio'),
+	title: _('Similar A&coustics'),
 	icon: 'analyzeWaveform',
 	hotkeyAble: true,
 	visible: true,
 	disabled: uitools.notMediaListSelected,
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
-			window.matchMonkey.runMatchMonkey(false, 'aipower');
+			window.matchMonkey.runMatchMonkey(false, 'acoustics');
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
@@ -488,11 +488,11 @@ _menuItems.tools.action.submenu.push({
 		icon: 'script',
 		visible: true,
 		submenu: [
-			{ action: actions.similarReccoRun, order: 10 },
-			{ action: actions.similarTracksRun, order: 20 },
-			{ action: actions.similarArtistsRun, order: 30 },
-			{ action: actions.similarGenreRun, order: 35 },
-			{ separator: true, order: 38 },
+			{ action: actions.similarTracksRun, order: 10 },
+			{ action: actions.similarArtistsRun, order: 20 },
+			{ action: actions.similarGenreRun, order: 30 },
+			{ separator: true, order: 40 },
+			{ action: actions.similarReccoRun, order: 50 },
 			{
 				action: {
 					title: _('&Mood'),
@@ -500,7 +500,7 @@ _menuItems.tools.action.submenu.push({
 					visible: true,
 					submenu: moodSubmenuItems
 				},
-				order: 40
+				order: 60
 			},
 			{
 				action: {
@@ -509,10 +509,10 @@ _menuItems.tools.action.submenu.push({
 					visible: true,
 					submenu: activitySubmenuItems
 				},
-				order: 45
+				order: 70
 			},
-			{ separator: true, order: 50 },
-			{ action: actions.matchMonkeyToggleAuto, order: 60 }
+			{ separator: true, order: 80 },
+			{ action: actions.matchMonkeyToggleAuto, order: 90 }
 		]
 	},
 	order: 40,
@@ -537,11 +537,11 @@ if (!window.menus) {
 			visible: true,
 			disabled: uitools.notMediaListSelected,
 			submenu: [
-				{ action: actions.similarReccoRun, order: 10 },
-				{ action: actions.similarTracksRun, order: 20 },
-				{ action: actions.similarArtistsRun, order: 30 },
-				{ action: actions.similarGenreRun, order: 35 },
-				{ separator: true, order: 38 },
+				{ action: actions.similarTracksRun, order: 10 },
+				{ action: actions.similarArtistsRun, order: 20 },
+				{ action: actions.similarGenreRun, order: 30 },
+				{ separator: true, order: 40 },
+				{ action: actions.similarReccoRun, order:510 },
 				{
 					action: {
 						title: _('&Mood'),
@@ -549,7 +549,7 @@ if (!window.menus) {
 						visible: true,
 						submenu: moodSubmenuItems
 					},
-					order: 40
+					order: 60
 				},
 				{
 					action: {
@@ -558,7 +558,7 @@ if (!window.menus) {
 						visible: true,
 						submenu: activitySubmenuItems
 					},
-					order: 45
+					order: 70
 				}
 			]
 		},

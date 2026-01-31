@@ -1,7 +1,7 @@
 ﻿/**
  * ReccoBeats API Integration Module
  * 
- * Fetches AI-powered music recommendations using the ReccoBeats API.
+ * Fetches music recommendations using the ReccoBeats API.
  * 
  * Two main workflows:
  * 1. Seed-based (Similar Recco): Select tracks → Find on ReccoBeats → Get audio features → Get recommendations
@@ -1321,7 +1321,7 @@ async function getReccoRecommendations(seeds, limit = 100) {
 	console.log(`getReccoRecommendations: Audio targets - energy: ${audioTargets.energy?.toFixed(2)}, valence: ${audioTargets.valence?.toFixed(2)}, tempo: ${audioTargets.tempo}`);
 
 	// Step 4: Get recommendations
-	updateProgress(`Requesting ${limit} AI recommendations...`, 0.6);
+	updateProgress(`Requesting ${limit} acoustic recommendations...`, 0.6);
 	console.log(`getReccoRecommendations: Step 4 - Requesting recommendations (limit: ${limit})`);
 	
 	const seedIds = foundTracks.map(r => r.trackId);
