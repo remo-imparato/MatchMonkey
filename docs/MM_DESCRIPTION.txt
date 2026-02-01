@@ -7,3 +7,42 @@
 • Ranking, quality, and rating filters help you pick the best versions every time  
 
 **Short, sweet, and seriously powerful — discover more and keep your library alive.**
+
+
+
+## 🔄 Changelog
+
+### Version 2.1 (ReccoBeats Integration) *(NEW)*
+
+- ✨ **ReccoBeats API Integration**: AI-powered mood and activity-based playlists
+- ✨ **Mood Playlists**: Generate playlists for energetic, relaxed, happy, sad, focused moods
+- ✨ **Activity Playlists**: Create context-aware playlists for workout, study, party, sleep, driving
+- ✨ **Seed-Aware Discovery**: Blends your current listening with mood/activity recommendations
+- ✨ **Configurable Blend Ratio**: Control balance between seed artists and mood recommendations (0.0-1.0)
+- ✨ **Intelligent Mixing**: Interleaves seed-based and mood-based artists for optimal variety
+- ✨ **Hybrid Discovery**: Combine ReccoBeats recommendations with Last.fm artist expansion
+- ✨ **Intelligent Caching**: ReccoBeats responses cached for faster subsequent queries
+- 📚 **Documentation**: Comprehensive [ReccoBeats Integration Guide](docs/RECCOBEATS_INTEGRATION.md)
+
+### Version 2.0 (Recent updates)
+
+- ✨ New discovery modes: **Search by Title,** **Search by Artist** and **Search by Genre**
+- ✨ Deduplication: avoid duplicate songs by `artist|title`, choose best bitrate then highest rating
+- ✨ Menu: context menu and Tools submenu registration for right-click and Tools menu
+- ✨ Playlist: Create a new Playlist or add to Now Playing
+- ✨ Auto Queme: Auto queue new tracks based on Artist, Track, or Genre similarity
+
+### Version 1.1 (Initial MM5 rewrite)
+
+- ✨ Complete rewrite for MediaMonkey 5
+- ✨ Modern async/await patterns throughout
+- ✨ Multi-pass fuzzy track matching (75-90% accuracy)
+- ✨ Improved artist prefix handling
+- ✨ Real-time progress indicators
+- ✨ Enhanced playlist creation workflow
+- ✨ Auto-queue mode for continuous playback
+- ✨ Ranking system for popularity-based sorting
+- 🐛 Removed legacy MM4 fallback code
+- 📚 Comprehensive code documentation
+
+

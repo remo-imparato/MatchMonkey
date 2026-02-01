@@ -25,7 +25,7 @@ You can run discovery by Track, Artist, Genre or Acoustics (ReccoBeats AI) — c
 - 🤖 **Auto-Queue / Endless music**: Auto-mode can automatically queue similar tracks when Now Playing is nearing the end
 - 🧭 **Deduplication**: Removes duplicate songs by `artist|title`. Current implementation keeps the first matching candidate; enhanced selection (bitrate/rating prioritization) is planned
 - 🎲 **Randomization**: Optionally shuffle results for variety
-- 🔄 **Prefix Handling**: Handles common artist prefix patterns (e.g., `The Beatles` ⇄ `Beatles, The`) and respects MediaMonkey prefix settings
+- 🔄 **Prefix Handling**: Handles common name prefix and suffix patterns (e.g., `The Beatles` ⇄ `Beatles, The`) and respects MediaMonkey prefix settings
 - 🛠️ **MM5 Best Practices**: Uses MM5 APIs and persistent track references where available
 
 ---
@@ -37,6 +37,14 @@ You can run discovery by Track, Artist, Genre or Acoustics (ReccoBeats AI) — c
 3. Click **Install Extension** and select the downloaded `.mmip` file
 4. Restart MediaMonkey 5
 5. Configure the add-on via **Tools → Options → Similar Artists**
+
+---
+
+## Documentation
+
+- **Quick Start**: `docs/QUICKSTART.md`
+- **Full Guide**: `docs/USER_GUIDE.md`
+- **Examples**: `docs/EXAMPLES_TUTORIAL.md`
 
 ---
 
@@ -203,26 +211,54 @@ When multiple versions of the same `artist|title` are found (different album/com
 The add-on intelligently handles common artist name prefix patterns:
 
 - **"The Beatles"** matches: `Beatles, The` and `The Beatles`
-- **"Beatles"** matches: `The Beatles` and `Beatles, The`
 - Respects MediaMonkey's **IgnoreTHEs** setting
+- (CDS), (feat.), feat., featureing, etc. are stripped during normalization
 
 ---
 
-## 🛠️ Technical Details
+## 💡 Tips & Tricks
 
-### Requirements
+1. **Use Auto-Queue Mode** - Enable it in settings for endless music discovery
+2. **Mood Playlists** *(NEW)* - Try `runMoodActivityPlaylist('energetic', null)` for instant workout mixes
+3. **Activity Context** *(NEW)* - Use activity-based discovery for studying, working, or relaxing
+4. **Seed Multiple Tracks** - Select multiple tracks for more diverse recommendations
+5. **Ranking Mode** - Enable "Select highest ranked by Last.fm" for popular tracks
+6. **Hybrid Mode** *(NEW)* - Keep HybridMode enabled for best mood/activity recommendations
 
-- **MediaMonkey 5.0+**
-- **Last.fm API Key** (default included)
-- **Internet Connection** (for Last.fm and ReccoBeats queries)
-- **ReccoBeats API** (optional, for mood/activity playlists)
+---
 
-### Architecture
+## Support
 
-- **Language**: JavaScript (ES6+)
-- **MM5 APIs**: Modern async patterns with `app.listen`, `uitools`, `backgroundTasks`
-- **Database**: Direct SQL queries against MediaMonkey's SQLite database
-- **Progress Tracking**: Real-time progress indicators via MM5's task system
+- **Issues**: https://github.com/remo-imparato/SimilarArtistsMM5/issues
+- **Email**: rimparato@hotmail.com
+- **Ko-fi**: https://ko-fi.com/remoimparato
+- 
+---
+
+## 📝 License
+
+Match Monkey is dual-licensed:
+
+- **MIT License** — free for personal and non-commercial use  
+- **Commercial License** — required for business or revenue-generating use  
+
+If you plan to use Match Monkey commercially, please obtain a license:
+
+- **Email:** rimparato@hotmail.com  
+- **Ko‑fi:** https://ko-fi.com/remoimparato  
+- **GitHub:** https://github.com/remo-imparato/
+
+See the included **LICENSE** (MIT) and **license-commercial.txt** (Commercial EULA) for full terms.
+
+- MIT License (published): https://github.com/remo-imparato/SimilarArtistsMM5/blob/updateMatchMonkey/license-mit.txt
+- Commercial EULA (published): https://github.com/remo-imparato/SimilarArtistsMM5/blob/updateMatchMonkey/license-commercial.txt
+
+
+---
+
+## 🐛 Bug Reports & Feature Requests
+
+Found a bug or have a feature idea? Please open an issue on the [GitHub Issues](https://github.com/remo-imparato/SimilarArtistsMM5/issues) page.
 
 ---
 
@@ -245,107 +281,6 @@ The add-on intelligently handles common artist name prefix patterns:
 - **Last.fm** - Music recommendation API
 - **ReccoBeats** - AI-powered mood and activity recommendations
 - **MediaMonkey Community** - Testing and feedback
-
----
-
-## 📝 License
-
-Match Monkey is dual-licensed:
-
-- **MIT License** — free for personal and non-commercial use  
-- **Commercial License** — required for business or revenue-generating use  
-
-If you plan to use Match Monkey commercially, please obtain a license:
-
-- **Email:** rimparato@hotmail.com  
-- **Ko‑fi:** https://ko-fi.com/remoimparato  
-- **GitHub:** https://github.com/remo-imparato/
-
-See the included **LICENSE** (MIT) and **license-commercial.txt** (Commercial EULA) for full terms.
-
-- MIT License (published): https://github.com/remo-imparato/SimilarArtistsMM5/blob/updateMatchMonkey/license-mit.txt
-- Commercial EULA (published): https://github.com/remo-imparato/SimilarArtistsMM5/blob/updateMatchMonkey/license-commercial.txt
-
----
-
-## 🐛 Bug Reports & Feature Requests
-
-Found a bug or have a feature idea? Please open an issue on the [GitHub Issues](https://github.com/remo-imparato/SimilarArtistsMM5/issues) page.
-
----
-
-## 🔄 Changelog
-
-### Version 2.1 (ReccoBeats Integration) *(NEW)*
-
-- ✨ **ReccoBeats API Integration**: AI-powered mood and activity-based playlists
-- ✨ **Mood Playlists**: Generate playlists for energetic, relaxed, happy, sad, focused moods
-- ✨ **Activity Playlists**: Create context-aware playlists for workout, study, party, sleep, driving
-- ✨ **Seed-Aware Discovery**: Blends your current listening with mood/activity recommendations
-- ✨ **Configurable Blend Ratio**: Control balance between seed artists and mood recommendations (0.0-1.0)
-- ✨ **Intelligent Mixing**: Interleaves seed-based and mood-based artists for optimal variety
-- ✨ **Hybrid Discovery**: Combine ReccoBeats recommendations with Last.fm artist expansion
-- ✨ **Intelligent Caching**: ReccoBeats responses cached for faster subsequent queries
-- 📚 **Documentation**: Comprehensive [ReccoBeats Integration Guide](docs/RECCOBEATS_INTEGRATION.md)
-
-### Version 2.0 (Recent updates)
-
-- ✨ New discovery modes: **Search by Title,** **Search by Artist** and **Search by Genre**
-- ✨ Deduplication: avoid duplicate songs by `artist|title`, choose best bitrate then highest rating
-- ✨ Menu: context menu and Tools submenu registration for right-click and Tools menu
-- ✨ Playlist: Create a new Playlist or add to Now Playing
-- ✨ Auto Queme: Auto queue new tracks based on Artist, Track, or Genre similarity
-
-### Version 1.1 (Initial MM5 rewrite)
-
-- ✨ Complete rewrite for MediaMonkey 5
-- ✨ Modern async/await patterns throughout
-- ✨ Multi-pass fuzzy track matching (75-90% accuracy)
-- ✨ Improved artist prefix handling
-- ✨ Real-time progress indicators
-- ✨ Enhanced playlist creation workflow
-- ✨ Auto-queue mode for continuous playback
-- ✨ Ranking system for popularity-based sorting
-- 🐛 Removed legacy MM4 fallback code
-- 📚 Comprehensive code documentation
-
----
-
-## 📚 Resources
-
-- [MediaMonkey 5 Download](https://www.mediamonkey.com/)
-- [Last.fm API Documentation](https://www.last.fm/api)
-- [ReccoBeats API Documentation](https://reccobeats.com/docs/apis/reccobeats-api)
-- [MediaMonkey Forums](https://www.mediamonkey.com/forum/)
-- [GitHub Repository](https://github.com/remo-imparato/SimilarArtistsMM5)
-- [ReccoBeats Integration Guide](docs/RECCOBEATS_INTEGRATION.md)
-
----
-
-## 💡 Tips & Tricks
-
-1. **Use Auto-Queue Mode** - Enable it in settings for endless music discovery
-2. **Mood Playlists** *(NEW)* - Try `runMoodActivityPlaylist('energetic', null)` for instant workout mixes
-3. **Activity Context** *(NEW)* - Use activity-based discovery for studying, working, or relaxing
-4. **Seed Multiple Tracks** - Select multiple tracks for more diverse recommendations
-5. **Ranking Mode** - Enable "Select highest ranked by Last.fm" for popular tracks
-6. **Hybrid Mode** *(NEW)* - Keep HybridMode enabled for best mood/activity recommendations
-
----
-
-## Documentation
-
-- **Quick Start**: `docs/QUICKSTART.md`
-- **Full Guide**: `docs/USER_GUIDE.md`
-- **Examples**: `docs/EXAMPLES_TUTORIAL.md`
-
----
-
-## Support
-
-- **Issues**: https://github.com/remo-imparato/SimilarArtistsMM5/issues
-- **Email**: rimparato@hotmail.com
-- **Ko-fi**: https://ko-fi.com/remoimparato
 
 <p align="center">
   <sub>Built with ❤️ for the MediaMonkey community</sub>
