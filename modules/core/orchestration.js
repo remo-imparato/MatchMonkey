@@ -273,8 +273,61 @@ window.matchMonkeyOrchestration = {
 				updateProgress(`Shuffled ${dedupedResults.length} tracks`, 0.86);
 			}
 
-			//TODO: include seed tracks if enabled
+			// Step 5b: Include seed tracks if enabled
+			// When IncludeSeedArtist is true, we also include the actual seed tracks at the beginning
+			if (config_.includeSeedArtist && seeds.length > 0) {
+				updateProgress(`Including seed tracks...`, 0.87);
+				console.log(`Match Monkey: Including ${seeds.length} seed track(s) in results`);
 
+				const seedTracksToAdd = [];
+				const existingKeys = new Set();
+
+				// Build a set of existing track keys for deduplication
+				for (const track of dedupedResults) {
+					const key = makeDupKey(track);
+					if (key) existingKeys.add(key);
+				}
+
+				// Find seed tracks in library and add them if not already present
+				for (const seed of seeds) {
+					if (!seed.artist || !seed.title) continue;
+
+					try {
+						// Search for this specific track in the library
+						const foundTracks = await db.findLibraryTracks(
+							seed.artist,
+							seed.title,
+							1, // Only need one match
+							{
+								best: config_.bestEnabled,
+								minRating: 0, // Don't filter seed tracks by rating
+								allowUnknown: true,
+							}
+						);
+
+						if (foundTracks && foundTracks.length > 0) {
+							const foundTrack = foundTracks[0];
+							const key = makeDupKey(foundTrack);
+
+							// Only add if not already in results
+							if (key && !existingKeys.has(key)) {
+								existingKeys.add(key);
+								seedTracksToAdd.push(foundTrack);
+								console.log(`Match Monkey: Added seed track "${seed.artist} - ${seed.title}"`);
+							}
+						}
+					} catch (e) {
+						console.warn(`Match Monkey: Could not find seed track "${seed.artist} - ${seed.title}":`, e.message);
+					}
+				}
+
+				// Prepend seed tracks to the beginning of results
+				if (seedTracksToAdd.length > 0) {
+					console.log(`Match Monkey: Prepending ${seedTracksToAdd.length} seed track(s) to results`);
+					dedupedResults.unshift(...seedTracksToAdd);
+					updateProgress(`Added ${seedTracksToAdd.length} seed track(s) to results`, 0.88);
+				}
+			}
 
 			// Apply final limit
 			const finalResults = config_.totalLimit < 100000
