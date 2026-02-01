@@ -32,11 +32,11 @@ You can run discovery by Track, Artist, Genre or Acoustics (ReccoBeats AI) — c
 
 ## Documentation
 
-- **Quick Start**: [Quick Start](docs/QUICK_START.md)
-- **Quick Reference**: [Quick Reference](docs/QUICK_REFERENCE.md)
-- **User Guide**: [Full Guide](docs/USER_GUIDE.md)
-- **Examples**: [Examples](docs/EXAMPLES_TUTORIAL.md)
-- **Donate:** https://ko-fi.com/remoimparato  
+- [Quick Start](docs/QUICK_START.md)
+- [Quick Reference](docs/QUICK_REFERENCE.md)
+- [User Guide](docs/USER_GUIDE.md)
+- [Examples](docs/EXAMPLES_TUTORIAL.md)
+- [**Donate:**](https://ko-fi.com/remoimparato)
 
 ---
 
