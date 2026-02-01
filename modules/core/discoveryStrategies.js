@@ -469,10 +469,9 @@ async function discoverByRecco(modules, seeds, config) {
 	const blacklist = buildBlacklist(modules);
 
 	console.log(`Discovery [ReccoBeats]: Processing ${seeds.length} seed track(s)`);
-	updateProgress(`ReccoBeats: Analyzing ${seeds.length} seed track(s)...`, 0.2);
 
 	// Step 1: Get ReccoBeats recommendations based on seed tracks
-	updateProgress('ReccoBeats: Requesting acoustic recommendations...', 0.25);
+	updateProgress('ReccoBeats: Searching database for seed tracks (artist/album/track must match official names exactly)...', 0.25);
 	console.log(`Discovery [ReccoBeats]: Requesting acoustic recommendations (limit: ${config.similarLimit || 100})`);
 
 	const result = await reccobeatsApi.getReccoRecommendations(
@@ -482,12 +481,20 @@ async function discoverByRecco(modules, seeds, config) {
 
 	if (!result.recommendations || result.recommendations.length === 0) {
 		console.log('Discovery [ReccoBeats]: No recommendations received');
-		updateProgress('ReccoBeats: No recommendations found', 0.4);
+		
+		// Provide helpful error message based on what failed
+		if (result.foundCount === 0) {
+			updateProgress('ReccoBeats: None of your tracks were found - ensure Artist, Album, and Track tags match official release names exactly', 0.4);
+		} else if (result.foundCount < result.seedCount) {
+			updateProgress(`ReccoBeats: Only ${result.foundCount} of ${result.seedCount} tracks found - no recommendations available`, 0.4);
+		} else {
+			updateProgress('ReccoBeats: No recommendations found for these tracks', 0.4);
+		}
 		return candidates;
 	}
 
 	console.log(`Discovery [ReccoBeats]: Received ${result.recommendations.length} recommendations from ${result.foundCount} seed(s)`);
-	updateProgress(`ReccoBeats: Found ${result.recommendations.length} acoustic recommendations from ${result.foundCount} seed(s)`, 0.4);
+	updateProgress(`ReccoBeats: Found ${result.recommendations.length} acoustic recommendations from ${result.foundCount}/${result.seedCount} seed(s)`, 0.4);
 
 	// Step 2: Extract artists from recommendations
 	updateProgress(`Processing ${result.recommendations.length} ReccoBeats recommendations...`, 0.5);
@@ -496,7 +503,7 @@ async function discoverByRecco(modules, seeds, config) {
 
 	const totalTracks = candidates.reduce((sum, c) => sum + (c.tracks?.length || 0), 0);
 	console.log(`Discovery [ReccoBeats]: Built ${candidates.length} candidate artists from acoustic recommendations`);
-	updateProgress(`ReccoBeats: ${candidates.length} artists with ${totalTracks} tracks from acoustic`, 0.6);
+	updateProgress(`ReccoBeats: ${candidates.length} artists with ${totalTracks} tracks from acoustic analysis`, 0.6);
 
 	return candidates;
 }
@@ -530,7 +537,7 @@ async function discoverByMood(modules, seeds, config) {
 
 	const mood = config.moodActivityValue || 'energetic';
 	console.log(`Discovery [Mood]: Processing "${mood}" mood with ${seeds.length} seed track(s)`);
-	updateProgress(`Mood "${mood}": Preparing ${seeds.length} seed track(s)...`, 0.15);
+	updateProgress(`Mood "${mood}": Preparing ${seeds.length} seed track(s) - requires exact metadata...`, 0.15);
 
 	// Expand seeds by splitting artists
 	seeds = expandSeedsByArtist(seeds);
@@ -541,7 +548,7 @@ async function discoverByMood(modules, seeds, config) {
 	const limitedSeeds = seeds.slice(0, 5);
 
 	// Step 1: Find track IDs
-	updateProgress(`ReccoBeats: Looking up ${limitedSeeds.length} tracks...`, 0.2);
+	updateProgress(`ReccoBeats: Looking up ${limitedSeeds.length} tracks (artist/album/track must match official names)...`, 0.2);
 	console.log(`Discovery [Mood]: Looking up track IDs for ${limitedSeeds.length} seeds`);
 
 	const trackResults = await reccobeatsApi.findTrackIdsBatch(limitedSeeds);
@@ -550,9 +557,15 @@ async function discoverByMood(modules, seeds, config) {
 	const foundTracks = trackResults.filter(r => r.trackId);
 	if (foundTracks.length === 0) {
 		console.log('Discovery [Mood]: No tracks found on ReccoBeats');
-		updateProgress('ReccoBeats: No matching tracks found in database', 0.3);
+		updateProgress('ReccoBeats: None of your tracks found - verify Artist, Album, and Track tags match official release names exactly', 0.3);
+		return [];
 	} else {
-		updateProgress(`ReccoBeats: Found ${foundTracks.length}/${limitedSeeds.length} tracks in database`, 0.25);
+		const notFound = limitedSeeds.length - foundTracks.length;
+		if (notFound > 0) {
+			updateProgress(`ReccoBeats: Found ${foundTracks.length}/${limitedSeeds.length} tracks (${notFound} missing - check tag accuracy)`, 0.25);
+		} else {
+			updateProgress(`ReccoBeats: Successfully found all ${foundTracks.length} tracks`, 0.25);
+		}
 	}
 
 	console.log(`Discovery [Mood]: Found ${foundTracks.length}/${limitedSeeds.length} tracks on ReccoBeats`);
@@ -574,6 +587,7 @@ async function discoverByMood(modules, seeds, config) {
 		//console.warn("Discovery [Mood]: No audio features found, using pure mood preset");
 		//updateProgress(`Mood "${mood}": Using pure mood preset (no seed features)`, 0.35);
 		//audioTargets = moodPreset;
+		updateProgress(`ReccoBeats: No audio features available for found tracks`, 0.35);
 		return [];
 	} else {
 		updateProgress(`ReccoBeats: Blending ${audioFeatures.length} seed features with "${mood}" preset...`, 0.35);
@@ -635,6 +649,11 @@ async function discoverByActivity(modules, seeds, config) {
 	const { updateProgress } = notifications;
 	const reccobeatsApi = window.matchMonkeyReccoBeatsAPI;
 
+	if (!reccobeatsApi) {
+		console.error('Discovery [Activity]: ReccoBeats API not available');
+		return [];
+	}
+
 	if (!seeds || seeds.length === 0) {
 		console.warn('Discovery [Activity]: No seed tracks provided');
 		return { recommendations: [], seedCount: 0, foundCount: 0 };
@@ -642,7 +661,7 @@ async function discoverByActivity(modules, seeds, config) {
 
 	const activity = config.moodActivityValue || 'workout';
 	console.log(`Discovery [Activity]: Processing "${activity}" activity with ${seeds.length} seed track(s)`);
-	updateProgress(`Activity "${activity}": Preparing ${seeds.length} seed track(s)...`, 0.15);
+	updateProgress(`Activity "${activity}": Preparing ${seeds.length} seed track(s) - requires exact metadata...`, 0.15);
 
 	// Expand seeds by splitting artists
 	seeds = expandSeedsByArtist(seeds);
@@ -653,7 +672,7 @@ async function discoverByActivity(modules, seeds, config) {
 	const limitedSeeds = seeds.slice(0, 5);
 
 	// Step 1: Find track IDs
-	updateProgress(`ReccoBeats: Looking up ${limitedSeeds.length} tracks...`, 0.2);
+	updateProgress(`ReccoBeats: Looking up ${limitedSeeds.length} tracks (artist/album/track must match official names)...`, 0.2);
 	console.log(`Discovery [Activity]: Looking up track IDs for ${limitedSeeds.length} seeds`);
 
 	const trackResults = await reccobeatsApi.findTrackIdsBatch(limitedSeeds);
@@ -662,14 +681,19 @@ async function discoverByActivity(modules, seeds, config) {
 	const foundTracks = trackResults.filter(r => r.trackId);
 	if (foundTracks.length === 0) {
 		console.log('Discovery [Activity]: No tracks found on ReccoBeats');
-		updateProgress('ReccoBeats: No matching tracks found in database', 0.3);
-		return { recommendations: [], seedCount: limitedSeeds.length, foundCount: 0 };
+		updateProgress('ReccoBeats: None of your tracks found - verify Artist, Album, and Track tags match official release names exactly', 0.3);
+		return [];
 	}
 
 	console.log(`Discovery [Activity]: Found ${foundTracks.length}/${limitedSeeds.length} tracks on ReccoBeats`);
-	updateProgress(`ReccoBeats: Found ${foundTracks.length}/${limitedSeeds.length} tracks in database`, 0.25);
+	const notFound = limitedSeeds.length - foundTracks.length;
+	if (notFound > 0) {
+		updateProgress(`ReccoBeats: Found ${foundTracks.length}/${limitedSeeds.length} tracks (${notFound} missing - check tag accuracy)`, 0.25);
+	} else {
+		updateProgress(`ReccoBeats: Successfully found all ${foundTracks.length} tracks`, 0.25);
+	}
 
-	const activityPreset = reccobeatsApi?.ACTIVITY_AUDIO_TARGETS?.[activity.toLowerCase()];
+	let activityPreset = reccobeatsApi?.ACTIVITY_AUDIO_TARGETS?.[activity.toLowerCase()];
 	let audioTargets = null;
 
 	if (!activityPreset) {
@@ -686,6 +710,7 @@ async function discoverByActivity(modules, seeds, config) {
 		//	console.warn("Discovery [Activity]: No audio features found, using pure activity preset");
 		//	updateProgress(`Activity "${activity}": Using pure activity preset (no seed features)`, 0.35);
 		//	audioTargets = activityPreset;
+		updateProgress(`ReccoBeats: No audio features available for found tracks`, 0.35);
 		return [];
 
 	} else {

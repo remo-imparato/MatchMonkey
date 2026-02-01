@@ -47,7 +47,7 @@ async function fetchSimilarArtists(artistName, limit) {
 		if (cache?.getCachedSimilarArtists) {
 			const cached = cache.getCachedSimilarArtists(artistName);
 			if (cached !== null) {
-				console.log(`Last.fm API: Using cached similar artists for "${artistName}" (${cached.length} artists)`);
+				console.log(`fetchSimilarArtists: Cache hit for artist="${artistName}" (${cached.length} artists)`);
 				return cached;
 			}
 		}
@@ -55,8 +55,8 @@ async function fetchSimilarArtists(artistName, limit) {
 		// Get API key
 		const apiKey = getApiKey();
 		if (!apiKey) {
-			console.error('Last.fm API: No API key available');
-			updateProgress('Error: Last.fm API key not configured');
+			console.error('fetchSimilarArtists: No API key available');
+			updateProgress('Last.fm: API key not configured - contact developer', undefined);
 			cache?.cacheSimilarArtists?.(artistName, []);
 			return [];
 		}
@@ -73,15 +73,16 @@ async function fetchSimilarArtists(artistName, limit) {
 		if (lim) params.set('limit', String(lim));
 
 		const url = API_BASE + '?' + params.toString();
-		updateProgress(`Querying Last.fm for artists similar to "${artistName}"...`);
+		console.log(`fetchSimilarArtists: Searching Last.fm for artist="${artistName}", limit=${lim || 'default'}`);
 		console.log(`fetchSimilarArtists: GET ${url}`);
+		updateProgress(`Last.fm: Finding artists similar to "${artistName}"...`, undefined);
 
 		// Make HTTP request using native fetch (MM5)
 		const res = await fetch(url);
 
 		if (!res || !res.ok) {
-			console.warn(`Last.fm API: HTTP ${res?.status} ${res?.statusText} for artist.getSimilar "${artistName}"`);
-			updateProgress(`Failed to fetch similar artists for "${artistName}" (HTTP ${res?.status})`);
+			console.warn(`fetchSimilarArtists: HTTP ${res?.status} ${res?.statusText} for artist="${artistName}"`);
+			updateProgress(`Last.fm: Failed to fetch similar artists for "${artistName}" (HTTP ${res?.status})`, undefined);
 			cache?.cacheSimilarArtists?.(artistName, []);
 			return [];
 		}
@@ -91,16 +92,23 @@ async function fetchSimilarArtists(artistName, limit) {
 		try {
 			data = await res.json();
 		} catch (e) {
-			console.warn(`Last.fm API: Invalid JSON response for "${artistName}": ${e.toString()}`);
-			updateProgress(`Error parsing Last.fm response for "${artistName}"`);
+			console.warn(`fetchSimilarArtists: Invalid JSON response for artist="${artistName}": ${e.toString()}`);
+			updateProgress(`Last.fm: Error parsing response for "${artistName}"`, undefined);
 			cache?.cacheSimilarArtists?.(artistName, []);
 			return [];
 		}
 
 		// Check for API errors
 		if (data?.error) {
-			console.warn(`Last.fm API: Error ${data.error} - ${data.message || 'Unknown error'} for "${artistName}"`);
-			updateProgress(`Last.fm API error for "${artistName}": ${data.message || data.error}`);
+			console.warn(`fetchSimilarArtists: API Error ${data.error} for artist="${artistName}" - ${data.message || 'Unknown error'}`);
+			
+			// Provide helpful error messages
+			if (data.error === 6) {
+				updateProgress(`Last.fm: Artist "${artistName}" not found - try different spelling or check artist name`, undefined);
+			} else {
+				updateProgress(`Last.fm: Error for "${artistName}": ${data.message || 'Unknown error'}`, undefined);
+			}
+			
 			cache?.cacheSimilarArtists?.(artistName, []);
 			return [];
 		}
@@ -109,7 +117,16 @@ async function fetchSimilarArtists(artistName, limit) {
 		const artists = data?.similarartists?.artist || [];
 		let asArr = Array.isArray(artists) ? artists : (artists ? [artists] : []);
 		
-		console.log(`Last.fm API: Retrieved ${asArr.length} similar artists for "${artistName}"`);
+		console.log(`fetchSimilarArtists: SUCCESS - Retrieved ${asArr.length} similar artists for artist="${artistName}"`);
+		if (asArr.length > 0) {
+			console.log(`fetchSimilarArtists: Top 5 results:`, asArr.slice(0, 5).map(a => a.name).join(', '));
+		}
+		
+		if (asArr.length === 0) {
+			updateProgress(`Last.fm: No similar artists found for "${artistName}"`, undefined);
+		} else {
+			updateProgress(`Last.fm: Found ${asArr.length} similar artists for "${artistName}"`, undefined);
+		}
 		
 		// Cache results for subsequent calls in this run
 		cache?.cacheSimilarArtists?.(artistName, asArr);
@@ -117,8 +134,8 @@ async function fetchSimilarArtists(artistName, limit) {
 		return asArr;
 
 	} catch (e) {
-		console.error(`Last.fm API: fetchSimilarArtists error for "${artistName}":`, e.toString());
-		window.matchMonkeyNotifications?.updateProgress?.(`Error fetching similar artists: ${e.toString()}`);
+		console.error(`fetchSimilarArtists: Exception for artist="${artistName}":`, e.toString());
+		window.matchMonkeyNotifications?.updateProgress?.(`Last.fm: Error fetching similar artists for "${artistName}"`, undefined);
 		window.lastfmCache?.cacheSimilarArtists?.(artistName, []);
 		return [];
 	}
@@ -145,7 +162,7 @@ async function fetchTopTracks(artistName, limit, includePlaycount = false) {
 		if (cache?.getCachedTopTracks) {
 			const cached = cache.getCachedTopTracks(artistName, limit, includePlaycount);
 			if (cached !== null) {
-				console.log(`Last.fm API: Using cached top tracks for "${artistName}" (${cached.length} tracks, limit: ${limit})`);
+				console.log(`fetchTopTracks: Cache hit for artist="${artistName}" (${cached.length} tracks, limit=${limit}, includePlaycount=${includePlaycount})`);
 				return cached;
 			}
 		}
@@ -153,8 +170,8 @@ async function fetchTopTracks(artistName, limit, includePlaycount = false) {
 		// Get API key
 		const apiKey = getApiKey();
 		if (!apiKey) {
-			console.error('Last.fm API: No API key available');
-			updateProgress('Error: Last.fm API key not configured');
+			console.error('fetchTopTracks: No API key available');
+			updateProgress('Last.fm: API key not configured - contact developer', undefined);
 			cache?.cacheTopTracks?.(artistName, limit, includePlaycount, []);
 			return [];
 		}
@@ -171,15 +188,16 @@ async function fetchTopTracks(artistName, limit, includePlaycount = false) {
 		if (lim) params.set('limit', String(lim));
 
 		const url = API_BASE + '?' + params.toString();
-		const purpose = (lim >= 100) ? 'for ranking' : 'for collection';
-		updateProgress(`Fetching top tracks ${purpose} for "${artistName}"...`);
+		const purpose = (lim >= 100) ? 'for ranking' : 'for discovery';
+		console.log(`fetchTopTracks: Fetching tracks ${purpose} for artist="${artistName}", limit=${lim || 'default'}, includePlaycount=${includePlaycount}`);
 		console.log(`fetchTopTracks: GET ${url}`);
+		updateProgress(`Last.fm: Fetching top tracks ${purpose} for "${artistName}"...`, undefined);
 
 		// Make HTTP request using native fetch (MM5)
 		const res = await fetch(url);
 		if (!res || !res.ok) {
-			console.warn(`Last.fm API: HTTP ${res?.status} ${res?.statusText} for artist.getTopTracks "${artistName}"`);
-			updateProgress(`Failed to fetch top tracks for "${artistName}" (HTTP ${res?.status})`);
+			console.warn(`fetchTopTracks: HTTP ${res?.status} ${res?.statusText} for artist="${artistName}"`);
+			updateProgress(`Last.fm: Failed to fetch tracks for "${artistName}" (HTTP ${res?.status})`, undefined);
 			cache?.cacheTopTracks?.(artistName, limit, includePlaycount, []);
 			return [];
 		}
@@ -189,16 +207,23 @@ async function fetchTopTracks(artistName, limit, includePlaycount = false) {
 		try {
 			data = await res.json();
 		} catch (e) {
-			console.warn(`Last.fm API: Invalid JSON response for "${artistName}": ${e.toString()}`);
-			updateProgress(`Error parsing Last.fm response for "${artistName}"`);
+			console.warn(`fetchTopTracks: Invalid JSON response for artist="${artistName}": ${e.toString()}`);
+			updateProgress(`Last.fm: Error parsing response for "${artistName}"`, undefined);
 			cache?.cacheTopTracks?.(artistName, limit, includePlaycount, []);
 			return [];
 		}
 
 		// Check for API errors
 		if (data?.error) {
-			console.warn(`Last.fm API: Error ${data.error} - ${data.message || 'Unknown error'} for "${artistName}"`);
-			updateProgress(`Last.fm API error for "${artistName}": ${data.message || data.error}`);
+			console.warn(`fetchTopTracks: API Error ${data.error} for artist="${artistName}" - ${data.message || 'Unknown error'}`);
+			
+			// Provide helpful error messages
+			if (data.error === 6) {
+				updateProgress(`Last.fm: Artist "${artistName}" not found - verify artist name spelling`, undefined);
+			} else {
+				updateProgress(`Last.fm: Error fetching tracks for "${artistName}": ${data.message || 'Unknown error'}`, undefined);
+			}
+			
 			cache?.cacheTopTracks?.(artistName, limit, includePlaycount, []);
 			return [];
 		}
@@ -222,17 +247,30 @@ async function fetchTopTracks(artistName, limit, includePlaycount = false) {
 			}
 		}
 
-		console.log(`Last.fm API: Retrieved ${rows.length} top tracks for "${artistName}" (${purpose})`);
+		console.log(`fetchTopTracks: SUCCESS - Retrieved ${rows.length} tracks for artist="${artistName}" (${purpose})`);
+		if (rows.length > 0) {
+			const topTracks = includePlaycount 
+				? rows.slice(0, 5).map(t => `${t.title} (plays: ${t.playcount})`).join(', ')
+				: rows.slice(0, 5).join(', ');
+			console.log(`fetchTopTracks: Top 5 tracks: ${topTracks}`);
+		}
 		
 		// Slice to requested limit and cache
 		const out = typeof lim === 'number' ? rows.slice(0, lim) : rows;
+		
+		if (out.length === 0) {
+			updateProgress(`Last.fm: No tracks found for "${artistName}"`, undefined);
+		} else {
+			updateProgress(`Last.fm: Retrieved ${out.length} tracks for "${artistName}"`, undefined);
+		}
+		
 		cache?.cacheTopTracks?.(artistName, limit, includePlaycount, out);
 		
 		return out;
 
 	} catch (e) {
-		console.error(`Last.fm API: fetchTopTracks error for "${artistName}":`, e.toString());
-		window.matchMonkeyNotifications?.updateProgress?.(`Error fetching top tracks: ${e.toString()}`);
+		console.error(`fetchTopTracks: Exception for artist="${artistName}":`, e.toString());
+		window.matchMonkeyNotifications?.updateProgress?.(`Last.fm: Error fetching tracks for "${artistName}"`, undefined);
 		window.lastfmCache?.cacheTopTracks?.(artistName, limit, includePlaycount, []);
 		return [];
 	}
@@ -262,14 +300,15 @@ async function fetchSimilarTracks(artistName, trackName, limit = 100) {
 		// Check cache first
 		if (cache?.isActive?.() && cache._similarTracks?.has?.(cacheKey)) {
 			const cached = cache._similarTracks.get(cacheKey) || [];
-			console.log(`Last.fm API: Using cached similar tracks for "${artistName} - ${trackName}" (${cached.length} tracks)`);
+			console.log(`fetchSimilarTracks: Cache hit for artist="${artistName}", track="${trackName}" (${cached.length} tracks)`);
 			return cached;
 		}
 
 		// Get API key
 		const apiKey = getApiKey();
 		if (!apiKey) {
-			console.error('Last.fm API: No API key available');
+			console.error('fetchSimilarTracks: No API key available');
+			updateProgress('Last.fm: API key not configured - contact developer', undefined);
 			return [];
 		}
 
@@ -286,13 +325,15 @@ async function fetchSimilarTracks(artistName, trackName, limit = 100) {
 		if (lim) params.set('limit', String(lim));
 
 		const url = API_BASE + '?' + params.toString();
-		updateProgress(`Finding tracks similar to "${trackName}"...`);
+		console.log(`fetchSimilarTracks: Searching for similar tracks - artist="${artistName}", track="${trackName}", limit=${lim || 'default'}`);
 		console.log(`fetchSimilarTracks: GET ${url}`);
+		updateProgress(`Last.fm: Finding tracks similar to "${artistName} - ${trackName}"...`, undefined);
 
 		// Make HTTP request
 		const res = await fetch(url);
 		if (!res || !res.ok) {
-			console.warn(`Last.fm API: HTTP ${res?.status} for track.getSimilar "${artistName} - ${trackName}"`);
+			console.warn(`fetchSimilarTracks: HTTP ${res?.status} for artist="${artistName}", track="${trackName}"`);
+			updateProgress(`Last.fm: Failed to find similar tracks (HTTP ${res?.status})`, undefined);
 			return [];
 		}
 
@@ -301,13 +342,22 @@ async function fetchSimilarTracks(artistName, trackName, limit = 100) {
 		try {
 			data = await res.json();
 		} catch (e) {
-			console.warn(`Last.fm API: Invalid JSON response for "${artistName} - ${trackName}": ${e.toString()}`);
+			console.warn(`fetchSimilarTracks: Invalid JSON response for artist="${artistName}", track="${trackName}": ${e.toString()}`);
+			updateProgress(`Last.fm: Error parsing response for "${trackName}"`, undefined);
 			return [];
 		}
 
 		// Check for API errors
 		if (data?.error) {
-			console.warn(`Last.fm API: Error ${data.error} - ${data.message || 'Unknown error'} for "${artistName} - ${trackName}"`);
+			console.warn(`fetchSimilarTracks: API Error ${data.error} for artist="${artistName}", track="${trackName}" - ${data.message || 'Unknown error'}`);
+			
+			// Provide helpful error messages
+			if (data.error === 6) {
+				updateProgress(`Last.fm: Track "${trackName}" by "${artistName}" not found - verify artist and track names`, undefined);
+			} else {
+				updateProgress(`Last.fm: Error finding similar tracks: ${data.message || 'Unknown error'}`, undefined);
+			}
+			
 			return [];
 		}
 
@@ -331,7 +381,16 @@ async function fetchSimilarTracks(artistName, trackName, limit = 100) {
 			});
 		}
 
-		console.log(`Last.fm API: Found ${results.length} similar tracks for "${artistName} - ${trackName}"`);
+		console.log(`fetchSimilarTracks: SUCCESS - Found ${results.length} similar tracks for artist="${artistName}", track="${trackName}"`);
+		if (results.length > 0) {
+			console.log(`fetchSimilarTracks: Top 5 results:`, results.slice(0, 5).map(t => `${t.artist} - ${t.title} (match: ${t.match.toFixed(3)})`).join(', '));
+		}
+		
+		if (results.length === 0) {
+			updateProgress(`Last.fm: No similar tracks found for "${trackName}"`, undefined);
+		} else {
+			updateProgress(`Last.fm: Found ${results.length} similar tracks for "${trackName}"`, undefined);
+		}
 
 		// Cache results
 		if (cache?.isActive?.()) {
@@ -342,7 +401,8 @@ async function fetchSimilarTracks(artistName, trackName, limit = 100) {
 		return results;
 
 	} catch (e) {
-		console.error(`Last.fm API: fetchSimilarTracks error for "${artistName} - ${trackName}":`, e.toString());
+		console.error(`fetchSimilarTracks: Exception for artist="${artistName}", track="${trackName}":`, e.toString());
+		window.matchMonkeyNotifications?.updateProgress?.(`Last.fm: Error finding similar tracks for "${trackName}"`, undefined);
 		return [];
 	}
 }
@@ -359,19 +419,23 @@ async function fetchArtistInfo(artistName) {
 		if (!artistName) return null;
 
 		const cache = window.lastfmCache;
+		const updateProgress = window.matchMonkeyNotifications?.updateProgress || (() => {});
 
 		// Build cache key
 		const cacheKey = `artistinfo:${artistName}`.toUpperCase();
 
 		// Check cache
 		if (cache?.isActive?.() && cache._artistInfo?.has?.(cacheKey)) {
-			return cache._artistInfo.get(cacheKey);
+			const cached = cache._artistInfo.get(cacheKey);
+			console.log(`fetchArtistInfo: Cache hit for artist="${artistName}"`);
+			return cached;
 		}
 
 		// Get API key
 		const apiKey = getApiKey();
 		if (!apiKey) {
 			console.error('fetchArtistInfo: No API key available');
+			updateProgress('Last.fm: API key not configured - contact developer', undefined);
 			return null;
 		}
 
@@ -385,22 +449,44 @@ async function fetchArtistInfo(artistName) {
 		});
 
 		const url = API_BASE + '?' + params.toString();
-		console.log(`fetchArtistInfo: querying ${url}`);
+		console.log(`fetchArtistInfo: Getting genre tags for artist="${artistName}"`);
+		console.log(`fetchArtistInfo: GET ${url}`);
+		updateProgress(`Last.fm: Getting genre tags for "${artistName}"...`, undefined);
 
 		const res = await fetch(url);
-		if (!res || !res.ok) return null;
+		if (!res || !res.ok) {
+			console.warn(`fetchArtistInfo: HTTP ${res?.status} for artist="${artistName}"`);
+			updateProgress(`Last.fm: Failed to get artist info (HTTP ${res?.status})`, undefined);
+			return null;
+		}
 
 		let data;
 		try {
 			data = await res.json();
 		} catch (e) {
+			console.warn(`fetchArtistInfo: Invalid JSON response for artist="${artistName}": ${e.toString()}`);
+			updateProgress(`Last.fm: Error parsing artist info for "${artistName}"`, undefined);
 			return null;
 		}
 
-		if (data?.error) return null;
+		if (data?.error) {
+			console.warn(`fetchArtistInfo: API Error ${data.error} for artist="${artistName}" - ${data.message || 'Unknown error'}`);
+			
+			if (data.error === 6) {
+				updateProgress(`Last.fm: Artist "${artistName}" not found - cannot retrieve genre tags`, undefined);
+			} else {
+				updateProgress(`Last.fm: Error getting artist info: ${data.message || 'Unknown error'}`, undefined);
+			}
+			
+			return null;
+		}
 
 		const artist = data?.artist;
-		if (!artist) return null;
+		if (!artist) {
+			console.log(`fetchArtistInfo: No artist data in response for artist="${artistName}"`);
+			updateProgress(`Last.fm: No artist info available for "${artistName}"`, undefined);
+			return null;
+		}
 
 		// Extract tags (genres)
 		const tags = artist.tags?.tag || [];
@@ -415,6 +501,17 @@ async function fetchArtistInfo(artistName) {
 			bio: artist.bio?.summary || ''
 		};
 
+		console.log(`fetchArtistInfo: SUCCESS - Retrieved artist info for artist="${artistName}" (${result.tags.length} tags)`);
+		if (result.tags.length > 0) {
+			console.log(`fetchArtistInfo: Tags: ${result.tags.join(', ')}`);
+		}
+		
+		if (result.tags.length === 0) {
+			updateProgress(`Last.fm: No genre tags found for "${artistName}"`, undefined);
+		} else {
+			updateProgress(`Last.fm: Found ${result.tags.length} genre tags for "${artistName}"`, undefined);
+		}
+
 		// Cache result
 		if (cache?.isActive?.()) {
 			if (!cache._artistInfo) cache._artistInfo = new Map();
@@ -424,7 +521,8 @@ async function fetchArtistInfo(artistName) {
 		return result;
 
 	} catch (e) {
-		console.error('fetchArtistInfo error: ' + e.toString());
+		console.error(`fetchArtistInfo: Exception for artist="${artistName}":`, e.toString());
+		window.matchMonkeyNotifications?.updateProgress?.(`Last.fm: Error getting artist info`, undefined);
 		return null;
 	}
 }
@@ -440,10 +538,13 @@ async function fetchArtistsByTag(tag, limit = 30) {
 	try {
 		if (!tag) return [];
 
+		const updateProgress = window.matchMonkeyNotifications?.updateProgress || (() => {});
+
 		// Get API key
 		const apiKey = getApiKey();
 		if (!apiKey) {
 			console.error('fetchArtistsByTag: No API key available');
+			updateProgress('Last.fm: API key not configured - contact developer', undefined);
 			return [];
 		}
 
@@ -456,31 +557,57 @@ async function fetchArtistsByTag(tag, limit = 30) {
 		});
 
 		const url = API_BASE + '?' + params.toString();
-		console.log(`fetchArtistsByTag: querying ${url}`);
+		console.log(`fetchArtistsByTag: Searching for artists in tag="${tag}", limit=${limit}`);
+		console.log(`fetchArtistsByTag: GET ${url}`);
+		updateProgress(`Last.fm: Searching for artists in "${tag}" genre...`, undefined);
 
 		const res = await fetch(url);
-		if (!res || !res.ok) return [];
+		if (!res || !res.ok) {
+			console.warn(`fetchArtistsByTag: HTTP ${res?.status} for tag="${tag}"`);
+			updateProgress(`Last.fm: Failed to search "${tag}" genre (HTTP ${res?.status})`, undefined);
+			return [];
+		}
 
 		let data;
 		try {
 			data = await res.json();
 		} catch (e) {
+			console.warn(`fetchArtistsByTag: Invalid JSON response for tag="${tag}": ${e.toString()}`);
+			updateProgress(`Last.fm: Error parsing results for "${tag}" genre`, undefined);
 			return [];
 		}
 
-		if (data?.error) return [];
+		if (data?.error) {
+			console.warn(`fetchArtistsByTag: API Error ${data.error} for tag="${tag}" - ${data.message || 'Unknown error'}`);
+			updateProgress(`Last.fm: Error searching "${tag}" genre: ${data.message || 'Unknown error'}`, undefined);
+			return [];
+		}
 
 		let artists = data?.topartists?.artist || [];
 		if (!Array.isArray(artists)) artists = artists ? [artists] : [];
 
-		return artists.map(a => ({
+		const results = artists.map(a => ({
 			name: a.name,
 			url: a.url || '',
 			listeners: Number(a.listeners) || 0
 		})).filter(a => a.name);
 
+		console.log(`fetchArtistsByTag: SUCCESS - Found ${results.length} artists for tag="${tag}"`);
+		if (results.length > 0) {
+			console.log(`fetchArtistsByTag: Top 5 artists: ${results.slice(0, 5).map(a => `${a.name} (${a.listeners.toLocaleString()} listeners)`).join(', ')}`);
+		}
+		
+		if (results.length === 0) {
+			updateProgress(`Last.fm: No artists found in "${tag}" genre`, undefined);
+		} else {
+			updateProgress(`Last.fm: Found ${results.length} artists in "${tag}" genre`, undefined);
+		}
+
+		return results;
+
 	} catch (e) {
-		console.error('fetchArtistsByTag error: ' + e.toString());
+		console.error(`fetchArtistsByTag: Exception for tag="${tag}":`, e.toString());
+		window.matchMonkeyNotifications?.updateProgress?.(`Last.fm: Error searching genre`, undefined);
 		return [];
 	}
 }

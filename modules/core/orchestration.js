@@ -180,7 +180,19 @@ window.matchMonkeyOrchestration = {
 
 			if (!candidates || candidates.length === 0) {
 				terminateProgressTask(taskId);
-				showToast(`No ${modeName} candidates found. Try different seeds or settings. Acoustic search requires perfect artist, album, track tags.`, { type: 'info', duration: 5000 });
+				
+				// Provide specific guidance based on discovery mode
+				let errorMsg = `No ${modeName} candidates found.`;
+				let guidance = '';
+				
+				if (discoveryMode === 'acoustics' || discoveryMode === 'mood' || discoveryMode === 'activity') {
+					errorMsg = `No tracks found on ReccoBeats.`;
+					guidance = ' Acoustic search requires Artist, Album, and Track tags to match official release names exactly. Check your library metadata for accuracy.';
+				} else {
+					guidance = ' Try different seeds or adjust settings.';
+				}
+				
+				showToast(`${errorMsg}${guidance}`, { type: 'info', duration: 7000 });
 				console.log(`Match Monkey: Discovery returned no candidates`);
 				return { success: false, error: `No ${modeName} found.`, tracksAdded: 0 };
 			}
@@ -1064,8 +1076,6 @@ window.matchMonkeyOrchestration = {
 			return { added: 0, playlist: null };
 		}
 	},
-
-	//*/
 
 	/**
 	 * Show the playlist selection dialog.

@@ -1,4 +1,5 @@
-﻿/**
+﻿/**````````javascript
+/**
  * ReccoBeats API Integration Module
  * 
  * Fetches music recommendations using the ReccoBeats API.
@@ -75,105 +76,105 @@ const AUDIO_FEATURE_NAMES = [
 const MOOD_AUDIO_TARGETS = {
 	// High-energy pop, EDM, pop-rock, upbeat indie.
 	energetic: {
-		energy: 0.8,
-		valence: 0.7,
-		danceability: 0.7,
-		speechiness: 0.10,
-		loudness: -6,
-		liveness: 0.1,
-		tempo: 130
+		'energy': 0.8,
+		'valence': 0.7,
+		'danceability': 0.7,
+		'speechiness': 0.10,
+		'loudness': -6,
+		'liveness': 0.1,
+		'tempo': 130
 	},
 
 	// Chill indie, soft pop, acoustic, mellow electronic.
 	relaxed: {
-		energy: 0.3,
-		valence: 0.5,
-		danceability: 0.3,
-		acousticness: 0.5,
-		instrumentalness: 0.2,
-		speechiness: 0.05,
-		liveness: 0.1,
-		tempo: 80
+		'energy': 0.3,
+		'valence': 0.5,
+		'danceability': 0.3,
+		'acousticness': 0.5,
+		'instrumentalness': 0.2,
+		'speechiness': 0.05,
+		'liveness': 0.1,
+		'tempo': 80
 	},
 
 	// Feel-good pop, upbeat indie, dance-pop.
 	happy: {
-		energy: 0.6,
-		valence: 0.9,
-		danceability: 0.6,
-		acousticness: 0.2,
-		speechiness: 0.10,
-		loudness: -5,
-		tempo: 115
+		'energy': 0.6,
+		'valence': 0.9,
+		'danceability': 0.6,
+		'acousticness': 0.2,
+		'speechiness': 0.10,
+		'loudness': -5,
+		'tempo': 115
 	},
 
 	// Emotional ballads, soft acoustic, mellow indie.
 	sad: {
-		energy: 0.3,
-		valence: 0.2,
-		danceability: 0.3,
-		acousticness: 0.6,
-		instrumentalness: 0.15,
-		speechiness: 0.05,
-		loudness: -10,
-		tempo: 70
+		'energy': 0.3,
+		'valence': 0.2,
+		'danceability': 0.3,
+		'acousticness': 0.6,
+		'instrumentalness': 0.15,
+		'speechiness': 0.05,
+		'loudness': -10,
+		'tempo': 70
 	},
 
 	// Ambient electronic, downtempo, lo-fi beats.
 	focused: {
-		energy: 0.4,
-		valence: 0.4,
-		danceability: 0.3,
-		instrumentalness: 0.6,
-		acousticness: 0.4,
-		speechiness: 0.05,
-		loudness: -10,
-		tempo: 95
+		'energy': 0.4,
+		'valence': 0.4,
+		'danceability': 0.3,
+		'instrumentalness': 0.6,
+		'acousticness': 0.4,
+		'speechiness': 0.05,
+		'loudness': -10,
+		'tempo': 95
 	},
 
 	// Hard rock, metalcore, punk, aggressive alt-rock, rap, EDM.
 	angry: {
-		energy: 0.9,
-		valence: 0.2,
-		danceability: 0.5,
-		speechiness: 0.15,
-		acousticness: 0.05,
-		loudness: -7,
-		tempo: 120
+		'energy': 0.9,
+		'valence': 0.2,
+		'danceability': 0.5,
+		'speechiness': 0.15,
+		'acousticness': 0.05,
+		'loudness': -7,
+		'tempo': 120
 	},
 
 	// Soft pop, R&B, acoustic love songs.
 	romantic: {
-		energy: 0.4,
-		valence: 0.6,
-		danceability: 0.4,
-		acousticness: 0.5,
-		speechiness: 0.05,
-		loudness: -8,
-		tempo: 90
+		'energy': 0.4,
+		'valence': 0.6,
+		'danceability': 0.4,
+		'acousticness': 0.5,
+		'speechiness': 0.05,
+		'loudness': -8,
+		'tempo': 90
 	},
 
 	// Uplifting pop, indie-pop, cinematic pop, inspirational EDM.
 	uplifting: {
-		energy: 0.7,
-		valence: 0.8,
-		danceability: 0.5,
-		acousticness: 0.3,
-		speechiness: 0.05,
-		loudness: -6,
-		tempo: 120
+		'energy': 0.7,
+		'valence': 0.8,
+		'danceability': 0.5,
+		'acousticness': 0.3,
+		'speechiness': 0.05,
+		'loudness': -6,
+		'tempo': 120
 	},
 
 	// Dark pop, alt-electronic, moody indie.
 	dark: {
-		energy: 0.5,
-		valence: 0.2,
-		danceability: 0.4,
-		acousticness: 0.4,
-		instrumentalness: 0.3,
-		speechiness: 0.05,
-		loudness: -8,
-		tempo: 100
+		'energy': 0.5,
+		'valence': 0.2,
+		'danceability': 0.4,
+		'acousticness': 0.4,
+		'instrumentalness': 0.3,
+		'speechiness': 0.05,
+		'loudness': -8,
+		'tempo': 100
 	}
 };
 
@@ -184,102 +185,102 @@ const MOOD_AUDIO_TARGETS = {
 const ACTIVITY_AUDIO_TARGETS = {
 	// High-energy EDM, hip-hop, pop, rock.
 	workout: {
-		energy: 0.9,
-		danceability: 0.8,
-		loudness: -5,
-		speechiness: 0.10,
-		tempo: 140
+		'energy': 0.9,
+		'danceability': 0.8,
+		'loudness': -5,
+		'speechiness': 0.10,
+		'tempo': 140
 	},
 
 	// Lo-fi beats, ambient, soft electronic.
 	study: {
-		energy: 0.3,
-		instrumentalness: 0.7,
-		acousticness: 0.6,
-		speechiness: 0.05,
-		liveness: 0.1,
-		tempo: 85
+		'energy': 0.3,
+		'instrumentalness': 0.7,
+		'acousticness': 0.6,
+		'speechiness': 0.05,
+		'liveness': 0.1,
+		'tempo': 85
 	},
 
 	// Dance-pop, EDM, club tracks.
 	party: {
-		energy: 0.8,
-		valence: 0.8,
-		danceability: 0.9,
-		loudness: -4,
-		speechiness: 0.10,
-		tempo: 125
+		'energy': 0.8,
+		'valence': 0.8,
+		'danceability': 0.9,
+		'loudness': -4,
+		'speechiness': 0.10,
+		'tempo': 125
 	},
 
 	// Ambient, soft acoustic, sleep playlists.
 	sleep: {
-		energy: 0.1,
-		acousticness: 0.75,
-		instrumentalness: 0.6,
-		speechiness: 0.0,
-		liveness: 0.05,
-		tempo: 60
+		'energy': 0.1,
+		'acousticness': 0.75,
+		'instrumentalness': 0.6,
+		'speechiness': 0.0,
+		'liveness': 0.05,
+		'tempo': 60
 	},
 
 	// Driving pop, alt-rock, synth-pop.
 	driving: {
-		energy: 0.6,
-		valence: 0.6,
-		danceability: 0.5,
-		loudness: -6,
-		speechiness: 0.10,
-		tempo: 110
+		'energy': 0.6,
+		'valence': 0.6,
+		'danceability': 0.5,
+		'loudness': -6,
+		'speechiness': 0.10,
+		'tempo': 110
 	},
 
 	// Meditation/ambient soundscapes.
 	meditation: {
-		energy: 0.2,
-		acousticness: 0.85,
-		instrumentalness: 0.85,
-		speechiness: 0.0,
-		liveness: 0.05,
-		tempo: 60
+		'energy': 0.2,
+		'acousticness': 0.85,
+		'instrumentalness': 0.85,
+		'speechiness': 0.0,
+		'liveness': 0.05,
+		'tempo': 60
 	},
 
 	// Chill pop, upbeat indie, soft electronic.
 	cooking: {
-		energy: 0.5,
-		valence: 0.7,
-		danceability: 0.5,
-		acousticness: 0.35,
-		speechiness: 0.10,
-		tempo: 100
+		'energy': 0.5,
+		'valence': 0.7,
+		'danceability': 0.5,
+		'acousticness': 0.35,
+		'speechiness': 0.10,
+		'tempo': 100
 	},
 
 	// Upbeat pop, dance-pop, rhythmic indie.
 	cleaning: {
-		energy: 0.75,
-		valence: 0.7,
-		danceability: 0.7,
-		loudness: -5,
-		speechiness: 0.10,
-		tempo: 125
+		'energy': 0.75,
+		'valence': 0.7,
+		'danceability': 0.7,
+		'loudness': -5,
+		'speechiness': 0.10,
+		'tempo': 125
 	},
 
 	// Indie-pop, soft electronic, light rock.
 	walking: {
-		energy: 0.55,
-		valence: 0.6,
-		danceability: 0.6,
-		acousticness: 0.3,
-		speechiness: 0.05,
-		tempo: 115
+		'energy': 0.55,
+		'valence': 0.6,
+		'danceability': 0.6,
+		'acousticness': 0.3,
+		'speechiness': 0.05,
+		'tempo': 115
 	},
 
 	// Minimal electronic, downtempo, ambient techno.
 	coding: {
-		energy: 0.35,
-		valence: 0.35,
-		danceability: 0.3,
-		instrumentalness: 0.7,
-		acousticness: 0.3,
-		speechiness: 0.05,
-		tempo: 90
+		'energy': 0.35,
+		'valence': 0.35,
+		'danceability': 0.3,
+		'instrumentalness': 0.7,
+		'acousticness': 0.3,
+		'speechiness': 0.05,
+		'tempo': 90
 	}
 };
 
@@ -411,6 +412,7 @@ async function searchArtist(artistName) {
 
 	const cache = getCache();
 	const cacheKey = `artist:${artistName}`.toUpperCase();
+	const updateProgress = getUpdateProgress();
 
 	// Check cache
 	if (cache?.has(cacheKey)) {
@@ -419,8 +421,10 @@ async function searchArtist(artistName) {
 		return cached;
 	}
 
-	console.log(`searchArtist: Searching for "${artistName}"`);
 	const normalizedSearch = normalize(artistName);
+	console.log(`searchArtist: Searching for artist="${artistName}", normalized="${normalizedSearch}"`);
+	updateProgress(`ReccoBeats: Searching for artist "${artistName}"...`, undefined);
+	
 	const headers = createHeaders();
 	let page = 0;
 	let maxPages = 1; // Will be updated from API response
@@ -429,12 +433,13 @@ async function searchArtist(artistName) {
 	while (page < maxPages && page < maxPagesLimit) {
 		try {
 			const url = `${RECCOBEATS_API_BASE}/artist/search?searchText=${encodeURIComponent(artistName)}&page=${page}&size=50`;
-			//console.log(`searchArtist: GET ${url}`);
+			console.log(`searchArtist: GET ${url} (searching for normalized="${normalizedSearch}")`);
 
 			const res = await rateLimitedFetch(url, { method: 'GET', headers });
 
 			if (!res.ok) {
-				console.warn(`searchArtist: HTTP ${res.status} for "${artistName}"`);
+				console.warn(`searchArtist: HTTP ${res.status} for artist="${artistName}", normalized="${normalizedSearch}"`);
+				updateProgress(`ReccoBeats: Artist "${artistName}" not found (HTTP ${res.status})`, undefined);
 				break;
 			}
 
@@ -447,26 +452,29 @@ async function searchArtist(artistName) {
 				maxPages = totalPages;
 			}
 
-			console.log(`searchArtist: Page ${page + 1}/${totalPages}, ${content.length} results`);
+			console.log(`searchArtist: Page ${page + 1}/${totalPages}, ${content.length} results for artist="${artistName}"`);
 
 			const match = content.find(a => normalize(a.name || '') === normalizedSearch);
 
 			if (match) {
 				const result = { id: match.id, name: match.name };
 				cache?.set(cacheKey, result);
-				console.log(`searchArtist: Found "${match.name}" (ID: ${match.id})`);
+				console.log(`searchArtist: Found match - searched="${artistName}", normalized="${normalizedSearch}", matched="${match.name}" (ID: ${match.id})`);
+				updateProgress(`ReccoBeats: Found artist "${match.name}"`, undefined);
 				return result;
 			}
 
 			// Move to next page
 			page++;
 		} catch (e) {
-			console.error(`searchArtist: Error for "${artistName}":`, e.message);
+			console.error(`searchArtist: Error for artist="${artistName}", normalized="${normalizedSearch}":`, e.message);
+			updateProgress(`ReccoBeats: Error searching for artist "${artistName}"`, undefined);
 			break;
 		}
 	}
 
-	console.log(`searchArtist: No match found for "${artistName}" after ${page} pages`);
+	console.log(`searchArtist: No match found after ${page} pages - artist="${artistName}", normalized="${normalizedSearch}"`);
+	updateProgress(`ReccoBeats: Artist "${artistName}" not found - ensure artist name matches official spelling`, undefined);
 	cache?.set(cacheKey, null);
 	return null;
 }
@@ -490,16 +498,19 @@ async function searchAlbum(albumName) {
 
 	const cache = getCache();
 	const cacheKey = `album:${albumName}`.toUpperCase();
+	const updateProgress = getUpdateProgress();
 
 	// Check cache
 	if (cache?.has(cacheKey)) {
 		const cached = cache.get(cacheKey);
-		console.log(`searchAlbum: Cache hit for "${albumName}"`);
+		console.log(`searchAlbum: Cache hit for album="${albumName}"`);
 		return cached;
 	}
 
-	console.log(`searchAlbum: Searching for "${albumName}"`);
 	const normalizedSearch = normalize(albumName);
+	console.log(`searchAlbum: Searching for album="${albumName}", normalized="${normalizedSearch}"`);
+	updateProgress(`ReccoBeats: Searching for album "${albumName}"...`, undefined);
+	
 	const headers = createHeaders();
 	let page = 0;
 	let maxPages = 1; // Will be updated from API response
@@ -508,12 +519,13 @@ async function searchAlbum(albumName) {
 	while (page < maxPages && page < maxPagesLimit) {
 		try {
 			const url = `${RECCOBEATS_API_BASE}/album/search?searchText=${encodeURIComponent(albumName)}&page=${page}&size=50`;
-			//console.log(`searchAlbum: GET ${url}`);
+			console.log(`searchAlbum: GET ${url} (searching for normalized="${normalizedSearch}")`);
 
 			const res = await rateLimitedFetch(url, { method: 'GET', headers });
 
 			if (!res.ok) {
-				console.warn(`searchAlbum: HTTP ${res.status} for "${albumName}"`);
+				console.warn(`searchAlbum: HTTP ${res.status} for album="${albumName}", normalized="${normalizedSearch}"`);
+				updateProgress(`ReccoBeats: Album "${albumName}" not found (HTTP ${res.status})`, undefined);
 				break;
 			}
 
@@ -523,7 +535,7 @@ async function searchAlbum(albumName) {
 			if (totalPages > maxPages)
 				maxPages = totalPages;
 
-			console.log(`searchAlbum: Page ${page + 1}/${totalPages}, ${content.length} results`);
+			console.log(`searchAlbum: Page ${page + 1}/${totalPages}, ${content.length} results for album="${albumName}"`);
 
 			// Find exact match (case-insensitive, normalized)
 			const match = content.find(a => normalize(a.name || '') === normalizedSearch);
@@ -537,24 +549,28 @@ async function searchAlbum(albumName) {
 
 				// Cache result
 				cache?.set(cacheKey, result);
-				console.log(`searchAlbum: Found "${match.name}" by ${result.artistName} (ID: ${match.id})`);
+				console.log(`searchAlbum: Found match - searched="${albumName}", normalized="${normalizedSearch}", matched="${match.name}" by ${result.artistName} (ID: ${match.id})`);
+				updateProgress(`ReccoBeats: Found album "${match.name}"`, undefined);
 				return result;
 			}
 
 			// Check if we've exhausted all pages
 			if (page >= totalPages - 1) {
-				console.log(`searchAlbum: No exact match for "${albumName}" after ${totalPages} pages`);
+				console.log(`searchAlbum: No exact match after ${totalPages} pages - album="${albumName}", normalized="${normalizedSearch}"`);
 				break;
 			}
 
 			page++;
 		} catch (e) {
-			console.error(`searchAlbum: Error searching for "${albumName}":`, e.message);
+			console.error(`searchAlbum: Error searching for album="${albumName}", normalized="${normalizedSearch}":`, e.message);
+			updateProgress(`ReccoBeats: Error searching for album "${albumName}"`, undefined);
 			break;
 		}
 	}
 
 	// Cache null result to avoid repeated lookups
+	console.log(`searchAlbum: No match found - album="${albumName}", normalized="${normalizedSearch}"`);
+	updateProgress(`ReccoBeats: Album "${albumName}" not found - ensure album name matches official release`, undefined);
 	cache?.set(cacheKey, null);
 	return null;
 }
@@ -578,11 +594,18 @@ async function findAlbumInArtist(artistId, albumName) {
 
 	const cache = getCache();
 	const cacheKey = `artistalbums:${artistId}`.toUpperCase();
+	const updateProgress = getUpdateProgress();
 
 	// If no albumName is provided, we can return cached full list
 	if (!albumName && cache?.has(cacheKey)) {
 		console.log(`findAlbumInArtist: Cache hit for artist ID ${artistId}`);
 		return cache.get(cacheKey) || [];
+	}
+
+	const normalizedSearch = albumName ? normalize(albumName) : null;
+	if (albumName) {
+		console.log(`findAlbumInArtist: Searching in artist ${artistId} for album="${albumName}", normalized="${normalizedSearch}"`);
+		updateProgress(`ReccoBeats: Searching artist's albums for "${albumName}"...`, undefined);
 	}
 
 	const headers = createHeaders();
@@ -591,18 +614,20 @@ async function findAlbumInArtist(artistId, albumName) {
 	const maxPagesLimit = 50; // Safety limit to prevent infinite loops
 	const size = 50;
 
-	const normalizedSearch = albumName ? normalize(albumName) : null;
 	let allAlbums = [];
 
 	while (page < maxPages && page < maxPagesLimit) {
 		try {
 			const url = `${RECCOBEATS_API_BASE}/artist/${artistId}/album?page=${page}&size=${size}`;
-			//console.log(`findAlbumInArtist: GET ${url}`);
+			console.log(`findAlbumInArtist: GET ${url} ${albumName ? `(searching for normalized="${normalizedSearch}")` : '(listing all albums)'}`);
 
 			const res = await rateLimitedFetch(url, { method: 'GET', headers });
 
 			if (!res.ok) {
-				console.warn(`findAlbumInArtist: HTTP ${res.status} for artist ${artistId}`);
+				console.warn(`findAlbumInArtist: HTTP ${res.status} for artist ${artistId}${albumName ? `, album="${albumName}"` : ''}`);
+				if (albumName) {
+					updateProgress(`ReccoBeats: Error retrieving albums for artist (HTTP ${res.status})`, undefined);
+				}
 				break;
 			}
 
@@ -615,27 +640,36 @@ async function findAlbumInArtist(artistId, albumName) {
 				maxPages = totalPages;
 			}
 
-			console.log(`findAlbumInArtist: Page ${page + 1}/${totalPages} returned ${content.length} albums`);
+			console.log(`findAlbumInArtist: Page ${page + 1}/${totalPages} returned ${content.length} albums for artist ${artistId}`);
 
 			// Accumulate all albums (for caching)
 			allAlbums = allAlbums.concat(content);
 
 			// If searching for a specific album, try to match
 			if (normalizedSearch) {
-				const match = content.find(a => matchMonkeyHelpers.cleanAlbumName(normalize(a.name || '')) === normalizedSearch);
-
-				if (match) {
-					const result = { id: match.id, name: match.name };
-					// Don't cache partial results when searching - only cache full album list
-					console.log(`findAlbumInArtist: Found album "${match.name}" (ID: ${match.id})`);
-					return result;
+				const cleanedNormalized = matchMonkeyHelpers.cleanAlbumName(normalizedSearch);
+				
+				for (const a of content) {
+					const albumNameRaw = a.name || '';
+					const albumNormalized = normalize(albumNameRaw);
+					const albumCleaned = matchMonkeyHelpers.cleanAlbumName(albumNormalized);
+					
+					if (albumCleaned === cleanedNormalized) {
+						const result = { id: a.id, name: a.name };
+						console.log(`findAlbumInArtist: Found match - searched="${albumName}", normalized="${normalizedSearch}", cleaned="${cleanedNormalized}", matched="${a.name}" (ID: ${a.id})`);
+						updateProgress(`ReccoBeats: Found album "${a.name}"`, undefined);
+						return result;
+					}
 				}
 			}
 
 			// Move to next page
 			page++;
 		} catch (e) {
-			console.error(`findAlbumInArtist: Error fetching albums for artist ${artistId}:`, e.message);
+			console.error(`findAlbumInArtist: Error fetching albums for artist ${artistId}${albumName ? `, album="${albumName}"` : ''}:`, e.message);
+			if (albumName) {
+				updateProgress(`ReccoBeats: Error searching for album "${albumName}"`, undefined);
+			}
 			break;
 		}
 	}
@@ -644,11 +678,12 @@ async function findAlbumInArtist(artistId, albumName) {
 	cache?.set(cacheKey, allAlbums);
 
 	if (normalizedSearch) {
-		console.log(`findAlbumInArtist: No match for "${albumName}" after ${page} pages`);
+		console.log(`findAlbumInArtist: No match found after ${page} pages - artist ${artistId}, album="${albumName}", normalized="${normalizedSearch}"`);
+		updateProgress(`ReccoBeats: Album "${albumName}" not found in artist's discography`, undefined);
 		return null;
 	}
 
-	console.log(`findAlbumInArtist: Found total ${allAlbums.length} albums for artist ${artistId}`);
+	console.log(`findAlbumInArtist: Retrieved total ${allAlbums.length} albums for artist ${artistId}`);
 	return allAlbums;
 }
 
@@ -691,7 +726,7 @@ async function findAlbumId(artist, album) {
 	// Step 2: Find the album in the artist
 	const albumInfo = await findAlbumInArtist(artistInfo.id, album);
 	if (!albumInfo) {
-		console.log(`findAlbumId: Album "${album}" not found`);
+		console.log(`findAlbumId: Album "${album}" not found, try searching for it`);
 		cache?.set(cacheKey, null);
 		return null;
 	}
@@ -732,7 +767,7 @@ async function getAlbumTracks(albumId) {
 
 	try {
 		const url = `${RECCOBEATS_API_BASE}/album/${albumId}/track`;
-		//console.log(`getAlbumTracks: GET ${url}`);
+		console.log(`getAlbumTracks: GET ${url} (fetching tracks for album ID ${albumId})`);
 
 		const res = await rateLimitedFetch(url, { method: 'GET', headers });
 
@@ -764,19 +799,39 @@ async function getAlbumTracks(albumId) {
  * @returns {Promise<object|null>} Track object or null if not found
  */
 async function findTrackInAlbum(albumId, trackTitle) {
+	const updateProgress = getUpdateProgress();
+	
+	const normalizedSearch = normalize(trackTitle);
+	const cleanedSearch = matchMonkeyHelpers.cleanTrackName(normalizedSearch);
+	
+	console.log(`findTrackInAlbum: Searching album ${albumId} for track="${trackTitle}", normalized="${normalizedSearch}", cleaned="${cleanedSearch}"`);
+	updateProgress(`ReccoBeats: Searching album for track "${trackTitle}"...`, undefined);
+	
 	const tracks = await getAlbumTracks(albumId);
-	if (!tracks.length) return null;
-
-	const normalizedTitle = normalize(trackTitle);
-
-	// Try to match by trackTitle, name, or title fields
-	const match = tracks.find(t => t && normalize(matchMonkeyHelpers.cleanTrackName(t.trackTitle)) === normalizedTitle);
-
-	if (match) {
-		console.log(`findTrackInAlbum: Found track "${trackTitle}" (ID: ${match.id})`);
+	if (!tracks.length) {
+		console.log(`findTrackInAlbum: No tracks found in album ${albumId}`);
+		updateProgress(`ReccoBeats: No tracks found in album`, undefined);
+		return null;
 	}
 
-	return match || null;
+	// Try to match by trackTitle, name, or title fields
+	for (const t of tracks) {
+		if (!t) continue;
+		
+		const trackRaw = t.trackTitle || t.name || t.title || '';
+		const trackNormalized = normalize(trackRaw);
+		const trackCleaned = matchMonkeyHelpers.cleanTrackName(trackNormalized);
+		
+		if (trackCleaned === cleanedSearch) {
+			console.log(`findTrackInAlbum: Found match - searched="${trackTitle}", normalized="${normalizedSearch}", cleaned="${cleanedSearch}", matched="${trackRaw}" (ID: ${t.id})`);
+			updateProgress(`ReccoBeats: Found track "${trackTitle}"`, undefined);
+			return t;
+		}
+	}
+
+	console.log(`findTrackInAlbum: No match found in ${tracks.length} tracks - track="${trackTitle}", normalized="${normalizedSearch}", cleaned="${cleanedSearch}"`);
+	updateProgress(`ReccoBeats: Track "${trackTitle}" not found in album - ensure track name matches official release`, undefined);
+	return null;
 }
 
 /**
@@ -792,57 +847,70 @@ async function findTrackInAlbum(albumId, trackTitle) {
  */
 async function findTrackId(artist, title, album) {
 	if (!album || !title) {
-		console.log(`findTrackId: Missing album or title for "${artist} - ${title}"`);
+		console.log(`findTrackId: Missing required parameters - artist="${artist}", title="${title}", album="${album}"`);
 		return null;
 	}
 
 	const cache = getCache();
 	const cacheKey = `trackid:${artist}:${title}:${album}`.toUpperCase();
+	const updateProgress = getUpdateProgress();
 
 	// Check cache
 	if (cache?.has(cacheKey)) {
 		const cached = cache.get(cacheKey);
 		if (cached !== undefined) {
-			console.log(`findTrackId: Cache hit for "${artist} - ${title}" -> ${cached || 'null'}`);
+			console.log(`findTrackId: Cache hit for artist="${artist}", title="${title}", album="${album}" -> ${cached || 'null'}`);
 			return cached;
 		}
 	}
 
-	console.log(`findTrackId: Looking up "${artist} - ${title}" from album "${album}"`);
+	console.log(`findTrackId: Starting lookup - artist="${artist}", title="${title}", album="${album}"`);
+	updateProgress(`ReccoBeats: Looking up "${artist} - ${title}" (Album: ${album})...`, undefined);
 
 	// Step 1: Search for the artist
+	console.log(`findTrackId: Step 1/4 - Searching for artist "${artist}"`);
 	const artistInfo = await searchArtist(artist);
 	if (!artistInfo) {
-		console.log(`findTrackId: Artist "${artist}" not found`);
+		console.log(`findTrackId: FAILED at Step 1/4 - Artist not found: artist="${artist}"`);
+		updateProgress(`ReccoBeats: Artist "${artist}" not found - verify artist name is spelled exactly as on official releases`, undefined);
 		cache?.set(cacheKey, null);
 		return null;
 	}
+	console.log(`findTrackId: Step 1/4 SUCCESS - Found artist "${artistInfo.name}" (ID: ${artistInfo.id})`);
 
 	// Step 2: Search for the album
+	console.log(`findTrackId: Step 2/4 - Searching for album "${album}" in artist ${artistInfo.id}`);
 	let albumInfo = await findAlbumInArtist(artistInfo.id, album);
 	if (!albumInfo) {
-		console.log(`findTrackId: Album "${album}" not found, try searching for it`);
+		console.log(`findTrackId: Step 2/4 - Album not found in artist discography, trying global search: album="${album}"`);
+		updateProgress(`ReccoBeats: Album "${album}" not found in artist discography, searching globally...`, undefined);
 		// Step 3: Search for the album
 		albumInfo = await searchAlbum(album);
 	}
 
 	if (!albumInfo) {
-		console.log(`findTrackId: Album "${album}" not found`);
+		console.log(`findTrackId: FAILED at Step 2/4 - Album not found: artist="${artist}", album="${album}"`);
+		updateProgress(`ReccoBeats: Album "${album}" not found - verify album name matches official release title`, undefined);
 		cache?.set(cacheKey, null);
 		return null;
 	}
+	console.log(`findTrackId: Step 2/4 SUCCESS - Found album "${albumInfo.name}" (ID: ${albumInfo.id})`);
 
 	// Step 4: Find the track in the album
+	console.log(`findTrackId: Step 3/4 - Searching for track "${title}" in album ${albumInfo.id}`);
 	const track = await findTrackInAlbum(albumInfo.id, title);
 	if (!track) {
-		console.log(`findTrackId: Track "${title}" not found in album "${album}"`);
+		console.log(`findTrackId: FAILED at Step 3/4 - Track not found: artist="${artist}", album="${album}", title="${title}"`);
+		updateProgress(`ReccoBeats: Track "${title}" not found - verify track name matches official release`, undefined);
 		cache?.set(cacheKey, null);
 		return null;
 	}
 
 	const trackId = track.id;
 	cache?.set(cacheKey, trackId);
-	console.log(`findTrackId: Found track ID ${trackId} for "${artist} - ${title}"`);
+	console.log(`findTrackId: Step 3/4 SUCCESS - Found track "${track.trackTitle || title}" (ID: ${trackId})`);
+	console.log(`findTrackId: COMPLETE - Successfully found track ID ${trackId} for artist="${artist}", album="${album}", title="${title}"`);
+	updateProgress(`ReccoBeats: Successfully found "${title}"`, undefined);
 	return trackId;
 }
 
@@ -859,21 +927,44 @@ async function findTrackIdsBatch(seeds) {
 	const results = [];
 	const totalSeeds = seeds.length;
 
-	console.log(`findTrackIdsBatch: Processing ${totalSeeds} seed track(s)`);
+	console.log(`findTrackIdsBatch: Starting batch lookup for ${totalSeeds} seed track(s)`);
+	console.log(`findTrackIdsBatch: Seeds:`, seeds.map((s, i) => `[${i + 1}] artist="${s.artist}", title="${s.title}", album="${s.album}"`).join('\n  '));
+	
+	updateProgress(`ReccoBeats: Looking up ${totalSeeds} seed track(s) - requires exact artist, album, and track names...`, 0.1);
 
 	for (let i = 0; i < totalSeeds; i++) {
 		const seed = seeds[i];
 
 		// Update progress
 		const progress = 0.1 + ((i + 1) / totalSeeds) * 0.2;
-		updateProgress(`Looking up track ${i + 1}/${totalSeeds}: "${seed.title}"...`, progress);
+		console.log(`findTrackIdsBatch: Processing track ${i + 1}/${totalSeeds} - artist="${seed.artist}", title="${seed.title}", album="${seed.album}"`);
+		updateProgress(`ReccoBeats: Looking up track ${i + 1}/${totalSeeds}: "${seed.artist} - ${seed.title}"...`, progress);
 
 		const trackId = await findTrackId(seed.artist, seed.title, seed.album);
 		results.push({ seed, trackId });
+		
+		if (!trackId) {
+			console.log(`findTrackIdsBatch: Track ${i + 1}/${totalSeeds} NOT FOUND - artist="${seed.artist}", title="${seed.title}", album="${seed.album}"`);
+			updateProgress(`ReccoBeats: Track ${i + 1}/${totalSeeds} not found: "${seed.title}" (Album: ${seed.album})`, progress);
+		} else {
+			console.log(`findTrackIdsBatch: Track ${i + 1}/${totalSeeds} FOUND - ID: ${trackId}`);
+		}
 	}
 
 	const foundCount = results.filter(r => r.trackId).length;
-	console.log(`findTrackIdsBatch: Found ${foundCount}/${totalSeeds} track IDs`);
+	const notFoundCount = totalSeeds - foundCount;
+	
+	console.log(`findTrackIdsBatch: COMPLETE - Found ${foundCount}/${totalSeeds} track IDs`);
+	if (notFoundCount > 0) {
+		const notFoundTracks = results.filter(r => !r.trackId).map(r => `artist="${r.seed.artist}", title="${r.seed.title}", album="${r.seed.album}"`);
+		console.log(`findTrackIdsBatch: Not found (${notFoundCount}):`, notFoundTracks.join('\n  '));
+	}
+	
+	if (notFoundCount > 0) {
+		updateProgress(`ReccoBeats: Found ${foundCount}/${totalSeeds} tracks (${notFoundCount} not found - check tags match official names)`, 0.3);
+	} else {
+		updateProgress(`ReccoBeats: Successfully found all ${foundCount} tracks`, 0.3);
+	}
 
 	return results;
 }
@@ -1169,11 +1260,6 @@ function getLogAudioFeatures(audioFeatures) {
 
 }
 
-
-// =============================================================================
-// RECOMMENDATION API
-// =============================================================================
-
 /**
  * Fetch track recommendations from ReccoBeats.
  * 
@@ -1223,28 +1309,26 @@ async function fetchRecommendations(seedIds, audioTargets = {}, limit = 100) {
 			}
 		}
 
-		const res = await rateLimitedFetch(url.toString(), { method: 'GET', headers });
+		console.log(`fetchRecommendations: GET ${url.toString()}`);
+		const res = await rateLimitedFetch(url, { method: 'GET', headers });
 
 		if (!res.ok) {
-			console.error(`fetchRecommendations: HTTP ${res.status}`);
+			console.warn(`fetchRecommendations: HTTP ${res.status} for "${seeds.join(', ')}"`);
 			return [];
 		}
 
 		const data = await res.json();
-		const tracks = data?.content || [];
-
-		console.log(`fetchRecommendations: Retrieved ${tracks.length} recommendations`);
+		const content = data?.content || [];
 
 		// Cache result
-		cache?.set(cacheKey, tracks);
-		return tracks;
-
+		cache?.set(cacheKey, content);
+		console.log(`fetchRecommendations: Found ${content.length} tracks`);
+		return content;
 	} catch (e) {
-		console.error('fetchRecommendations: Error:', e.message);
+		console.error(`fetchRecommendations: Error fetching recommendations:`, e.message);
 		return [];
 	}
 }
-
 // =============================================================================
 // HIGH-LEVEL DISCOVERY FUNCTIONS
 // =============================================================================
@@ -1521,41 +1605,39 @@ function calculateAudioFeatureMatch(track, target, weights = null) {
 }
 
 // =============================================================================
-// MODULE EXPORTS
+// EXPORT TO WINDOW NAMESPACE
 // =============================================================================
 
-// Export to window namespace for MM5
 window.matchMonkeyReccoBeatsAPI = {
-	// Main discovery functions
+	// High-level discovery functions
 	getReccoRecommendations,
 	getMoodRecommendations,
 	getActivityRecommendations,
-
-	// Low-level API functions
+	
+	// Track/album lookup and audio features
+	searchArtist,
 	searchAlbum,
+	findAlbumInArtist,
+	findAlbumId,
 	getAlbumTracks,
-	getAudioFeatures,
 	findTrackInAlbum,
 	findTrackId,
 	findTrackIdsBatch,
 	fetchTrackAudioFeatures,
+	getAudioFeatures,
+	
+	// Recommendation and utility functions
 	fetchRecommendations,
-
-	// Artist search (for future use)
-	searchArtist,
-
-	// Utility functions
 	filterTracksByAudioFeatures,
 	calculateAudioFeatureMatch,
 	calculateAverageFeatures,
 	blendFeatures,
-
-	// Audio target presets
+	getLogAudioFeatures,
+	
+	// Presets and constants
 	MOOD_AUDIO_TARGETS,
 	ACTIVITY_AUDIO_TARGETS,
 	AUDIO_FEATURE_NAMES,
-
-	// Constants
 	RECCOBEATS_API_BASE,
 	API_TIMEOUT_MS,
 };
