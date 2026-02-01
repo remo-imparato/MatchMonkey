@@ -89,23 +89,17 @@
 						<div data-id="PreferHighQuality" data-control-class="Checkbox" data-tip="When possible, prefer higher bitrate / better quality versions of tracks.">Prefer high quality versions?</div>
 					</div>
 
-				</div>
-			</fieldset>
-
-			<!-- Rating Filter -->
-			<fieldset>
-				<legend>Rating filter</legend>
-				<div class="uiRows">
 					<div class="uiRow">
 						<label class="inline">Minimum rating:</label>
 						<div data-id="MinRating"
 							 data-control-class="Rating"
-							 data-tip="Set the minimum track rating to include in results. Use stars to choose threshold; unknown ratings can be included separately."
+							 data-tip="Set the minimum track rating to include in discovery results. Use stars to choose threshold."
 							 data-init-params='{"starWidth":"1.75em","tabbable":true,"useUnknown":true,"position":"left"}'></div>
 					</div>
 					<div class="uiRow">
-						<div data-id="IncludeUnrated" data-control-class="Checkbox" data-tip="Include tracks with no rating (unknown) when enabled.">Include unrated tracks?</div>
+						<div data-id="IncludeUnrated" data-control-class="Checkbox" data-tip="Include tracks with no rating (unknown) in discovery results.">Include unrated tracks?</div>
 					</div>
+
 				</div>
 			</fieldset>
 
@@ -215,6 +209,16 @@
 							 data-control-class="Edit"
 							 data-tip="Maximum number of tracks to add during a single Auto-queue operation."
 							 data-init-params="{type:'number',min:1,max:200}"></div>
+					</div>
+					<div class="uiRow">
+						<label class="inline">Auto minimum rating:</label>
+						<div data-id="AutoModeMinRating"
+							 data-control-class="Rating"
+							 data-tip="Set the minimum track rating to include in auto-queue results. Use stars to choose threshold."
+							 data-init-params='{"starWidth":"1.75em","tabbable":true,"useUnknown":true,"position":"left"}'></div>
+					</div>
+					<div class="uiRow">
+						<div data-id="AutoModeIncludeUnrated" data-control-class="Checkbox" data-tip="Include tracks with no rating (unknown) in auto-queue results.">Include unrated tracks?</div>
 					</div>
 					<div class="uiRow">
 						<div data-id="SkipDuplicates" data-control-class="Checkbox" data-tip="Prevent adding tracks that already exist in the current Now Playing queue when Auto-queue is active.">Skip duplicates in queue?</div>

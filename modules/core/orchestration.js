@@ -81,8 +81,8 @@ window.matchMonkeyOrchestration = {
 					bestEnabled: boolSetting('PreferHighQuality', true),
 					randomize: true,
 					showConfirm: false,
-					minRating: intSetting('MinRating', 0),
-					allowUnknown: boolSetting('IncludeUnrated', true),
+					minRating: intSetting('AutoModeMinRating', 0),
+					allowUnknown: boolSetting('AutoModeIncludeUnrated', true),
 					autoMode: true,
 					discoveryMode,
 				};
