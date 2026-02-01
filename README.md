@@ -42,9 +42,10 @@ You can run discovery by Track, Artist, Genre or Acoustics (ReccoBeats AI) — c
 
 ## Documentation
 
-- **Quick Start**: `docs/QUICKSTART.md`
-- **Full Guide**: `docs/USER_GUIDE.md`
-- **Examples**: `docs/EXAMPLES_TUTORIAL.md`
+- **Quick Start**: [Quick Start](docs/QUICK_START.md)
+- **Quick Reference**: [Quick Reference](docs/QUICK_REFERENCE.md)
+- **Full Guide**: [Full Guide](docs/USER_GUIDE.md)
+- **Examples**: [Examples](docs/EXAMPLES_TUTORIAL.md)
 
 ---
 
@@ -86,8 +87,6 @@ The hybrid mode combines:
 - `1.0` = Your taste with mood filtering
 
 **Example**: Select Pink Floyd tracks → Run "energetic" mood → Get energetic progressive rock!
-
-For detailed documentation, see [ReccoBeats Integration Guide](docs/RECCOBEATS_INTEGRATION.md).
 
 ### Usage guide & examples
 
