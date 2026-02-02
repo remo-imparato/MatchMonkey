@@ -58,6 +58,14 @@ function initLastfmRunCache() {
  * Call at the end of runMatchMonkey operation.
  */
 function clearLastfmRunCache() {
+	// Clear each Map before nullifying to free memory
+	if (lastfmRunCache) {
+		lastfmRunCache.similarArtists?.clear();
+		lastfmRunCache.topTracks?.clear();
+		lastfmRunCache._similarTracks?.clear();
+		lastfmRunCache._artistInfo?.clear();
+		lastfmRunCache._reccobeats?.clear();
+	}
 	lastfmRunCache = null;
 }
 
@@ -69,9 +77,15 @@ function clearLastfmRunCache() {
 function getCachedSimilarArtists(artistName) {
 	if (!lastfmRunCache?.similarArtists) return null;
 	const key = cacheKeyArtist(artistName);
-	return lastfmRunCache.similarArtists.has(key) 
+	const cached = lastfmRunCache.similarArtists.has(key) 
 		? lastfmRunCache.similarArtists.get(key) 
 		: null;
+	
+	if (cached !== null) {
+		console.log(`Cache HIT: Similar artists for "${artistName}" (${cached.length} artists)`);
+	}
+	
+	return cached;
 }
 
 /**
@@ -83,6 +97,7 @@ function cacheSimilarArtists(artistName, artists) {
 	if (!lastfmRunCache?.similarArtists) return;
 	const key = cacheKeyArtist(artistName);
 	lastfmRunCache.similarArtists.set(key, artists || []);
+	console.log(`Cache STORE: Similar artists for "${artistName}" (${(artists || []).length} artists)`);
 }
 
 /**
@@ -95,9 +110,15 @@ function cacheSimilarArtists(artistName, artists) {
 function getCachedTopTracks(artistName, limit, withPlaycount = false) {
 	if (!lastfmRunCache?.topTracks) return null;
 	const key = cacheKeyTopTracks(artistName, limit, withPlaycount);
-	return lastfmRunCache.topTracks.has(key) 
+	const cached = lastfmRunCache.topTracks.has(key) 
 		? lastfmRunCache.topTracks.get(key) 
 		: null;
+	
+	if (cached !== null) {
+		console.log(`Cache HIT: Top tracks for "${artistName}" limit=${limit} withPlaycount=${withPlaycount} (${cached.length} tracks)`);
+	}
+	
+	return cached;
 }
 
 /**
@@ -111,6 +132,7 @@ function cacheTopTracks(artistName, limit, withPlaycount, tracks) {
 	if (!lastfmRunCache?.topTracks) return;
 	const key = cacheKeyTopTracks(artistName, limit, withPlaycount);
 	lastfmRunCache.topTracks.set(key, tracks || []);
+	console.log(`Cache STORE: Top tracks for "${artistName}" limit=${limit} withPlaycount=${withPlaycount} (${(tracks || []).length} tracks)`);
 }
 
 /**

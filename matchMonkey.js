@@ -276,6 +276,68 @@
 		}
 
 		// ============================================================================
+		// CACHE MANAGEMENT
+		// ============================================================================
+
+		/**
+		 * Clear all API caches (Last.fm and ReccoBeats).
+		 * 
+		 * The cache module stores both Last.fm and ReccoBeats responses in a single
+		 * cache structure with separate Maps for each type:
+		 * - similarArtists: Last.fm similar artists
+		 * - topTracks: Last.fm top tracks
+		 * - _similarTracks: Last.fm similar tracks
+		 * - _artistInfo: Last.fm artist info
+		 * - _reccobeats: ReccoBeats API responses
+		 * 
+		 * @returns {object} Result object with success status and stats
+		 */
+		function clearCache() {
+			console.log('Match Monkey: Clearing API caches...');
+			
+			try {
+				if (!window.lastfmCache) {
+					console.warn('Match Monkey: Cache module not available');
+					return { 
+						success: false, 
+						error: 'Cache module not available',
+						stats: null
+					};
+				}
+
+				// Get stats before clearing
+				const statsBefore = window.lastfmCache.getStats?.() || {};
+				console.log('Match Monkey: Cache stats before clear:', statsBefore);
+
+				// Clear the cache (this now properly clears all Maps)
+				window.lastfmCache.clear();
+
+				// Get stats after clearing
+				const statsAfter = window.lastfmCache.getStats?.() || {};
+				console.log('Match Monkey: Cache stats after clear:', statsAfter);
+
+				console.log('Match Monkey: Last.fm and ReccoBeats caches cleared successfully');
+				
+				return { 
+					success: true, 
+					error: null,
+					stats: {
+						before: statsBefore,
+						after: statsAfter
+					}
+				};
+				
+			} catch (e) {
+				console.error('Match Monkey: Error clearing cache:', e);
+				return { 
+					success: false, 
+					error: e.message || String(e),
+					stats: null
+				};
+			}
+		}
+
+		// ============================================================================
 		// AUTO-MODE SETUP
 		// ============================================================================
 
@@ -312,7 +374,7 @@
 
 					// Otherwise, read from settings and normalize to lowercase
 					const autoModeSetting = getSetting('AutoModeDiscovery', 'track');
-					const mode = autoModeSetting.toLowerCase(); // ✅ Normalize to lowercase
+					const mode = autoModeSetting.toLowerCase();
 
 					console.log(`Match Monkey Auto-Mode: Using ${mode} discovery from settings`);
 					return orchestration.generateSimilarPlaylist(modules, autoModeFlag, mode, actualThreshold);
@@ -522,6 +584,9 @@
 			runMoodActivityPlaylist,
 			toggleAuto,
 			isAutoEnabled,
+			
+			// Cache management
+			clearCache,
 
 			// Discovery modes (for external use)
 			DISCOVERY_MODES,

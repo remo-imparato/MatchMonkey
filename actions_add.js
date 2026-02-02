@@ -13,7 +13,8 @@
  * - SimilarReccoRun: Find similar tracks using ReccoBeats (requires seed tracks)
  * - SimilarMood*: Find tracks by mood preset
  * - SimilarActivity*: Find tracks by activity preset
- * - SimilarArtistsToggleAuto: Toggle auto-queue mode on/off
+ * - MatchMonkeyToggleAuto: Toggle auto-queue mode on/off
+ * - MatchMonkeyClearCache: Clear Last.fm and ReccoBeats API response caches
  * 
  * @author Remo Imparato
 
@@ -451,6 +452,55 @@ actions.matchMonkeyToggleAuto = {
 };
 
 // ============================================================================
+// CLEAR CACHE ACTION
+// ============================================================================
+
+/**
+ * Clear API Cache action
+ * Clears Last.fm and ReccoBeats API response caches
+ */
+actions.matchMonkeyClearCache = {
+	title: _('Clear &Cache'),
+	icon: 'delete',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('Clear Last.fm and ReccoBeats API response caches'),
+
+	execute: function () {
+		try {
+			// Call the clearCache function exposed by matchMonkey
+			if (window.matchMonkey && typeof window.matchMonkey.clearCache === 'function') {
+				const result = window.matchMonkey.clearCache();
+				
+				if (result.success) {
+					// Show success notification
+					if (typeof uitools !== 'undefined' && uitools.toastMessage && uitools.toastMessage.show) {
+						uitools.toastMessage.show('API caches cleared successfully', { type: 'success', duration: 3000 });
+					}
+				} else {
+					// Show error notification
+					if (typeof uitools !== 'undefined' && uitools.toastMessage && uitools.toastMessage.show) {
+						uitools.toastMessage.show('Failed to clear cache: ' + (result.error || 'Unknown error'), { type: 'error', duration: 5000 });
+					}
+				}
+			} else {
+				console.error('Match Monkey: clearCache function not available');
+				// Show warning notification
+				if (typeof uitools !== 'undefined' && uitools.toastMessage && uitools.toastMessage.show) {
+					uitools.toastMessage.show('Cache clearing not available - add-on may not be loaded', { type: 'warning', duration: 5000 });
+				}
+			}
+		} catch (e) {
+			console.error('Match Monkey: Error clearing cache:', e);
+			// Show error notification
+			if (typeof uitools !== 'undefined' && uitools.toastMessage && uitools.toastMessage.show) {
+				uitools.toastMessage.show('Error clearing cache: ' + e.message, { type: 'error', duration: 5000 });
+			}
+		}
+	}
+};
+// ============================================================================
 // TOOLS MENU REGISTRATION - Using Submenu
 // ============================================================================
 
@@ -512,7 +562,9 @@ _menuItems.tools.action.submenu.push({
 				order: 70
 			},
 			{ separator: true, order: 80 },
-			{ action: actions.matchMonkeyToggleAuto, order: 90 }
+			{ action: actions.matchMonkeyToggleAuto, order: 90 },
+			//{ separator: true, order: 100 },
+			//{ action: actions.matchMonkeyClearCache, order: 110 }
 		]
 	},
 	order: 40,
