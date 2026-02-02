@@ -86,6 +86,7 @@ window.matchMonkeyOrchestration = {
 					autoMode: true,
 					discoveryMode,
 				};
+				console.log(`Match Monkey Auto-Mode: Rating filter - minRating=${config_.minRating}, allowUnknown=${config_.allowUnknown}`);
 			} else {
 				const maxTracks = intSetting('MaxPlaylistTracks', 0);
 
@@ -105,6 +106,7 @@ window.matchMonkeyOrchestration = {
 					autoMode: false,
 					discoveryMode,
 				};
+				console.log(`Match Monkey Manual-Mode: Rating filter - minRating=${config_.minRating}, allowUnknown=${config_.allowUnknown}`);
 			}
 
 			// Add mood/activity context if present or from settings
@@ -580,6 +582,7 @@ window.matchMonkeyOrchestration = {
 
 		const totalCandidates = candidates.length;
 		console.log(`Match Monkey: Matching ${totalCandidates} candidates to library`);
+		console.log(`Match Monkey: Rating filter - minRating=${config.minRating}, allowUnknown=${config.allowUnknown}`);
 		updateProgress(`Searching local library for ${totalCandidates} artists...`, 0.55);
 
 		let artistsMatched = 0;
@@ -635,6 +638,7 @@ window.matchMonkeyOrchestration = {
 						{
 							best: config.bestEnabled,
 							minRating: config.minRating,
+							allowUnknown: config.allowUnknown,
 						}
 					);
 				}

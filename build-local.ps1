@@ -143,6 +143,16 @@ try {
 	Write-Host "  Configuration initialized in init.js on first startup" -ForegroundColor Gray
 	Write-Host "  Note: Local builds use version $version. GitHub builds use version from info.json." -ForegroundColor Yellow
 
+	# Attempt to run/open the generated .mmip package
+	try {
+		Write-Host "`nLaunching package to run installer..." -ForegroundColor Cyan
+		Start-Process -FilePath $packageName -ErrorAction Stop
+		Write-Host "Package launched. Follow the installer prompts in MediaMonkey to install the add-on." -ForegroundColor Green
+	} catch {
+		Write-Host "Could not launch package automatically. You can install it manually by double-clicking the file:" -ForegroundColor Yellow
+		Write-Host "  $packageName" -ForegroundColor White
+	}
+
 } finally {
 	# Cleanup staging directory
 	if (Test-Path $stagingDir) {

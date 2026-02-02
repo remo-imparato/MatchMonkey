@@ -32,6 +32,8 @@
  * - AutoModeSimilarLimit -> AutoModeSimilarLimit
  * - AutoModeTracksPerArtist -> AutoModeTracksPerArtist
  * - AutoModeMaxTracks -> AutoModeMaxTracks
+ * - AutoModeMinRating -> AutoModeMinRating
+ * - AutoModeIncludeUnrated -> AutoModeIncludeUnrated
  * - SkipDuplicates -> SkipDuplicates
  * - EnqueueMode -> EnqueueMode
  * - ClearQueueFirst -> ClearQueueFirst
@@ -126,6 +128,12 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function (sett, 
 		UI.AutoModeSimilarLimit.controlClass.value = cfg.AutoModeSimilarLimit || 10;
 		UI.AutoModeTracksPerArtist.controlClass.value = cfg.AutoModeTracksPerArtist || 5;
 		UI.AutoModeMaxTracks.controlClass.value = cfg.AutoModeMaxTracks || 30;
+		
+		// === Auto-Mode Rating Filter ===
+		const autoRatingValue = parseInt(cfg.AutoModeMinRating, 10) || 0;
+		this._setRatingControl(UI.AutoModeMinRating, autoRatingValue);
+		UI.AutoModeIncludeUnrated.controlClass.checked = cfg.AutoModeIncludeUnrated !== false; // Default true
+		
 		UI.SkipDuplicates.controlClass.checked = cfg.SkipDuplicates !== false; // Default true
 
 		// === Queue Behavior ===
@@ -137,6 +145,9 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function (sett, 
 		UI.ArtistBlacklist.controlClass.value = cfg.ArtistBlacklist || '';
 		UI.GenreBlacklist.controlClass.value = cfg.GenreBlacklist || '';
 		UI.TitleExclusions.controlClass.value = cfg.TitleExclusions || '';
+
+		// === Cache Management ===
+		this._setupClearCacheButton(pnl);
 
 		console.log('Match Monkey Options: Settings loaded successfully');
 
@@ -240,6 +251,89 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setupAutoModeCheckbox = func
 };
 
 /**
+ * Helper to setup Clear Cache button with click handler.
+ */
+optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setupClearCacheButton = function (pnl) {
+	try {
+		const button = pnl.querySelector('#ClearCacheButton');
+		const statusSpan = pnl.querySelector('#ClearCacheStatus');
+
+		if (!button) {
+			console.warn('Match Monkey Options: Clear Cache button not found');
+			return;
+		}
+
+		const updateStatus = (message, isError = false) => {
+			if (statusSpan) {
+				statusSpan.textContent = message;
+				statusSpan.style.color = isError ? 'var(--error-color, #d32f2f)' : 'var(--success-color, #4caf50)';
+				
+				// Clear message after 3 seconds
+				setTimeout(() => {
+					statusSpan.textContent = '';
+				}, 3000);
+			}
+		};
+
+		const handleClearCache = async () => {
+			try {
+				button.disabled = true;
+				button.textContent = 'Clearing...';
+				updateStatus('Clearing API caches...');
+
+				console.log('Match Monkey Options: Starting cache clear operation');
+
+				let cacheCleared = false;
+
+				if (window.lastfmCache) {
+					try {
+						const statsBefore = window.lastfmCache.getStats?.() || {};
+						console.log('Match Monkey Options: Cache stats before clear:', statsBefore);
+
+						window.lastfmCache.init();
+						window.lastfmCache.clear();
+						
+						const statsAfter = window.lastfmCache.getStats?.() || {};
+						console.log('Match Monkey Options: Cache stats after clear:', statsAfter);
+						
+						cacheCleared = true;
+						console.log('Match Monkey Options: Last.fm and ReccoBeats caches cleared successfully');
+					} catch (cacheError) {
+						console.error('Match Monkey Options: Error clearing caches:', cacheError);
+						updateStatus('Error clearing caches: ' + cacheError.message, true);
+						return;
+					}
+				} else {
+					console.warn('Match Monkey Options: window.lastfmCache not available');
+					updateStatus('Cache module not available', true);
+					return;
+				}
+
+				if (cacheCleared) {
+					updateStatus('API caches cleared successfully');
+				}
+
+			} catch (e) {
+				console.error('Match Monkey Options: Error in handleClearCache:', e);
+				updateStatus('Error: ' + e.message, true);
+			} finally {
+				button.disabled = false;
+				button.textContent = 'Clear API Cache (Last.fm & ReccoBeats)';
+			}
+		};
+
+		// Add click listener
+		app.listen(button, 'click', handleClearCache);
+
+		console.log('Match Monkey Options: Clear Cache button initialized');
+
+	} catch (e) {
+		console.error('Match Monkey Options: Error setting up Clear Cache button:', e);
+	}
+};
+
+
+/**
  * Save handler - persists UI control values to settings.
  */
 optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
@@ -303,6 +397,14 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 		this.config.AutoModeSimilarLimit = parseInt(UI.AutoModeSimilarLimit.controlClass.value, 10) || 10;
 		this.config.AutoModeTracksPerArtist = parseInt(UI.AutoModeTracksPerArtist.controlClass.value, 10) || 5;
 		this.config.AutoModeMaxTracks = parseInt(UI.AutoModeMaxTracks.controlClass.value, 10) || 30;
+		
+		// === Auto-Mode Rating Filter ===
+		const rawAutoRating = Number.isFinite(UI.AutoModeMinRating.controlClass.value)
+			? Math.max(0, Math.min(100, UI.AutoModeMinRating.controlClass.value))
+			: 0;
+		this.config.AutoModeMinRating = rawAutoRating;
+		this.config.AutoModeIncludeUnrated = UI.AutoModeIncludeUnrated.controlClass.checked;
+		
 		this.config.SkipDuplicates = UI.SkipDuplicates.controlClass.checked;
 
 		// === Queue Behavior ===

@@ -103,6 +103,27 @@
 				</div>
 			</fieldset>
 
+			<!-- Queue Behavior -->
+			<fieldset>
+				<legend>Queue behavior (playlist creation override)</legend>
+				<div class="uiRows">
+					<div class="uiRow">
+						<div data-id="EnqueueMode" data-control-class="Checkbox" data-tip="If enabled, add results to Now Playing (queue) instead of creating a playlist.">Enqueue to Now Playing instead of creating playlist?</div>
+					</div>
+					<div class="uiRow">
+						<div data-id="ClearQueueFirst" data-control-class="Checkbox" data-tip="If checked, clear the current Now Playing queue before adding results.">Clear queue before adding?</div>
+					</div>
+					<div class="uiRow">
+						<label class="inline">After completion:</label>
+						<div data-id="NavigateAfter" data-control-class="Dropdown" data-tip="Choose where the app should navigate after playlist/queue creation.">
+							<option>Navigate to new playlist</option>
+							<option>Navigate to now playing</option>
+							<option>Stay in current view</option>
+						</div>
+					</div>
+				</div>
+			</fieldset>
+
 		</div>
 
 		<!-- RIGHT COLUMN -->
@@ -226,27 +247,6 @@
 				</div>
 			</fieldset>
 
-			<!-- Queue Behavior -->
-			<fieldset>
-				<legend>Queue behavior (playlist creation override)</legend>
-				<div class="uiRows">
-					<div class="uiRow">
-						<div data-id="EnqueueMode" data-control-class="Checkbox" data-tip="If enabled, add results to Now Playing (queue) instead of creating a playlist.">Enqueue to Now Playing instead of creating playlist?</div>
-					</div>
-					<div class="uiRow">
-						<div data-id="ClearQueueFirst" data-control-class="Checkbox" data-tip="If checked, clear the current Now Playing queue before adding results.">Clear queue before adding?</div>
-					</div>
-					<div class="uiRow">
-						<label class="inline">After completion:</label>
-						<div data-id="NavigateAfter" data-control-class="Dropdown" data-tip="Choose where the app should navigate after playlist/queue creation.">
-							<option>Navigate to new playlist</option>
-							<option>Navigate to now playing</option>
-							<option>Stay in current view</option>
-						</div>
-					</div>
-				</div>
-			</fieldset>
-
 			<!-- Filters (Advanced) -->
 			<fieldset style="display:none;">
 				<legend>Filters (advanced) {do not use}</legend>
@@ -271,6 +271,25 @@
 							 data-control-class="Edit"
 							 data-tip="Comma-separated words - tracks containing these words in the title will be excluded (e.g., Live, Remix)."
 							 data-init-params='{"hint":"e.g., Live, Remix, Demo"}'></div>
+					</div>
+				</div>
+			</fieldset>
+
+			<!-- API Cache Management -->
+			<fieldset>
+				<legend>API Cache Management</legend>
+				<div class="uiRows">
+					<div class="uiRow" style="margin-bottom:0.5em;">
+						<span style="font-size:0.95em;color:var(--text-secondary,#666);">
+							MatchMonkey caches API responses from Last.fm and ReccoBeats to improve performance and reduce API calls. 
+							Clear the cache if you experience stale data or want to force fresh API requests.
+						</span>
+					</div>
+					<div class="uiRow">
+						<button id="ClearCacheButton" type="button" style="padding:0.5em 1.5em;cursor:pointer;">
+							Clear API Cache (Last.fm & ReccoBeats)
+						</button>
+						<span id="ClearCacheStatus" style="margin-left:1em;color:var(--text-secondary,#666);"></span>
 					</div>
 				</div>
 			</fieldset>
