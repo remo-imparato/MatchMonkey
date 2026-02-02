@@ -113,8 +113,6 @@ window.matchMonkey.runMatchMonkey(false, 'genre');
 
 **Configuration**:
 - `MoodActivityBlendRatio`: 0.0 (all mood) to 1.0 (all seed), default: 0.5
-- `DefaultMood`: energetic, relaxed, happy, sad, focused
-- `HybridMode`: Combine ReccoBeats + Last.fm (default: true)
 - `SimilarArtistsLimit`: Affects seed component size
 
 **Blend Ratio Details**:
@@ -149,8 +147,6 @@ Same as mood-based but with activity optimization:
 
 **Configuration**:
 - `MoodActivityBlendRatio`: Same as mood mode
-- `DefaultActivity`: workout, study, party, sleep, driving
-- `HybridMode`: Enable hybrid mode (default: true)
 
 **Best For**:
 - Activity-specific playlists
@@ -484,7 +480,6 @@ UseLastfmRanking: true
 ```
 Mode: Mood
 MoodActivityBlendRatio: 0.5
-HybridMode: true
 IncludeSeedArtist: true
 ```
 
@@ -492,7 +487,6 @@ IncludeSeedArtist: true
 ```
 Mode: Activity
 MoodActivityBlendRatio: 0.6
-HybridMode: true
 ```
 
 ### Endless Background Music

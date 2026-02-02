@@ -148,10 +148,6 @@ Access settings via **Tools → Options → Similar Artists**
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| **MoodDiscoveryEnabled** | Enable mood-based discovery | ☐ |
-| **DefaultMood** | Default mood (energetic, relaxed, happy, sad, focused) | energetic |
-| **DefaultActivity** | Default activity (workout, study, party, sleep, driving) | workout |
-| **HybridMode** | Combine ReccoBeats + Last.fm (recommended) | ☑ |
 | **MoodActivityBlendRatio** | Seed vs mood balance (0=all mood, 0.5=balanced, 1=all seed) | 0.5 |
 
 ### Playlist Creation
@@ -223,7 +219,6 @@ The add-on intelligently handles common artist name prefix patterns:
 3. **Activity Context** ** - Use activity-based discovery for studying, working, or relaxing
 4. **Seed Multiple Tracks** - Select multiple tracks for more diverse recommendations
 5. **Ranking Mode** - Enable "Select highest ranked by Last.fm" for popular tracks
-6. **Hybrid Mode** ** - Keep HybridMode enabled for best mood/activity recommendations
 
 ---
 

@@ -95,9 +95,9 @@ function start() {
 		IncludeSeedArtist: true,        // Include seed artist tracks
 
 		// === Discovery Limits (Manual Mode) ===
-		SimilarArtistsLimit: 20,        // Max similar artists per seed from Last.fm
+		SimilarArtistsLimit: 30,        // Max similar artists per seed from Last.fm
 		TrackSimilarLimit: 100,         // Max similar tracks per seed from Last.fm (track-based discovery)
-		TracksPerArtist: 30,            // Max tracks per artist from library
+		TracksPerArtist: 20,            // Max tracks per artist from library
 		MaxPlaylistTracks: 0,           // Final limit (0 = unlimited, add all found)
 
 		// === Track Selection ===
@@ -126,7 +126,7 @@ function start() {
 		DefaultMood: '',                // Default mood: energetic, relaxed, happy, sad, focused
 		DefaultActivity: '',            // Default activity: workout, study, party, sleep, driving
 		MoodActivityBlendRatio: 0.5,    // Blend ratio: 0.5 = 50% seeds + 50% mood (0=all mood, 1=all seeds)
-		HybridMode: true,               // Combine ReccoBeats + Last.fm
+		HybridMode: false,               // Combine ReccoBeats + Last.fm
 
 		// === Filters ===
 		ArtistBlacklist: '',            // Comma-separated blacklisted artists

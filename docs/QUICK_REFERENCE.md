@@ -96,9 +96,6 @@ MatchMonkey supports the following discovery modes:
 
 | Setting | Type | Default | Effect |
 |---------|------|---------|--------|
-| **DefaultMood** | Dropdown | energetic | Default mood preset |
-| **DefaultActivity** | Dropdown | workout | Default activity preset |
-| **HybridMode** | Boolean | true | Combine ReccoBeats + Last.fm |
 | **MoodActivityBlendRatio** | Slider | 0.5 | Seed vs mood balance (0.0-1.0) |
 
 **Mood Options**: energetic, relaxed, happy, sad, focused
