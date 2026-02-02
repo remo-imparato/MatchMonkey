@@ -32,13 +32,6 @@ MatchMonkey offers **5 distinct discovery modes**, each optimized for different 
 - Building artist-focused playlists
 - Genre exploration
 
-**Example**:
-```javascript
-// Input: Pink Floyd tracks selected
-// Output: Progressive rock artists (Yes, Genesis, King Crimson, etc.)
-window.matchMonkey.runMatchMonkey(false, 'artist');
-```
-
 ---
 
 #### B. Track-Based Discovery
@@ -62,13 +55,6 @@ window.matchMonkey.runMatchMonkey(false, 'artist');
 - Musically similar tracks across genres
 - Cross-artist discovery
 
-**Example**:
-```javascript
-// Input: "Bohemian Rhapsody" selected
-// Output: Epic rock songs, different versions, similar compositions
-window.matchMonkey.runMatchMonkey(false, 'track');
-```
-
 ---
 
 #### C. Genre-Based Discovery
@@ -84,60 +70,45 @@ window.matchMonkey.runMatchMonkey(false, 'track');
 **Configuration**:
 - `SimilarArtistsLimit`: Total artists to collect (default: 20)
 - Distributes across multiple genres
-- Respects genre blacklist
 
 **Best For**:
 - Broad genre exploration
 - Discovering top artists in genres
 - Genre-consistent playlists
 
-**Example**:
-```javascript
-// Input: Jazz tracks selected
-// Output: Top jazz artists (Miles Davis, John Coltrane, etc.)
-window.matchMonkey.runMatchMonkey(false, 'genre');
-```
-
 ---
 
 #### D. Mood-Based Discovery (ReccoBeats)
-**Algorithm**: ReccoBeats + Last.fm hybrid with seed awareness
+**Algorithm**: ReccoBeats
 
 **Process**:
 1. Extract seed artists from selection
-2. Get similar artists via Last.fm (seed component)
+2. Find acoustic features of the selection (seed component)
 3. Query ReccoBeats for mood-appropriate tracks
 4. **Blend both pools** using configurable ratio
 5. Interleave results for optimal mixing
 6. Match against local library
 
 **Configuration**:
-- `MoodActivityBlendRatio`: 0.0 (all mood) to 1.0 (all seed), default: 0.5
+- `MoodActivityBlendRatio`: 0.0 (all seed) to 1.0 (all mood/activity), default: 0.5
 - `SimilarArtistsLimit`: Affects seed component size
 
 **Blend Ratio Details**:
-- `0.0`: Pure mood discovery (ignores seeds)
-- `0.3`: 30% seed-based, 70% mood-based
+- `0.0`: All seed influence (your taste)
+- `0.3`: 70% seed-based, 30% mood-based
 - `0.5`: **Balanced** (recommended) - 50/50 split
-- `0.7`: 70% seed-based, 30% mood-based
-- `1.0`: Pure seed-based with mood filtering
+- `0.7`: 30% seed-based, 70% mood-based
+- `1.0`: All mood/activity influence
 
 **Best For**:
 - Emotional context playlists
 - Mood-aware music selection
 - Personalized discovery with mood constraints
 
-**Example**:
-```javascript
-// Input: Rock tracks selected, blend ratio 0.5
-// Output: 50% progressive rock + 50% energetic music
-window.matchMonkey.runMoodActivityPlaylist('energetic', null);
-```
-
 ---
 
 #### E. Activity-Based Discovery (ReccoBeats)
-**Algorithm**: ReccoBeats + Last.fm hybrid with duration awareness
+**Algorithm**: ReccoBeats
 
 **Process**:
 Same as mood-based but with activity optimization:
@@ -152,13 +123,6 @@ Same as mood-based but with activity optimization:
 - Activity-specific playlists
 - Duration-constrained sessions
 - Context-aware music (workout, study, etc.)
-
-**Example**:
-```javascript
-// Input: Metal tracks selected, duration 90 minutes
-// Output: 90-minute workout mix (heavy metal emphasis)
-window.matchMonkey.runMoodActivityPlaylist(null, 'workout');
-```
 
 ---
 
@@ -203,22 +167,6 @@ window.matchMonkey.runMoodActivityPlaylist(null, 'workout');
 - **IncludeUnrated** (boolean): Allow unrated tracks
 - Applied after library matching, before final selection
 
-#### Blacklist Filters
-- **ArtistBlacklist**: Comma-separated artist names to exclude
-  - Case-insensitive matching
-  - Applied during discovery phase
-  - Example: "Christmas Artists, Holiday Music"
-
-- **GenreBlacklist**: Comma-separated genres to exclude
-  - Checks track genre metadata
-  - Case-insensitive matching
-  - Example: "Christmas, Holiday, Kids"
-
-- **TitleExclusions**: Comma-separated words to exclude from titles
-  - Partial matching within title
-  - Case-insensitive
-  - Example: "Live, Remix, Demo, Karaoke"
-
 #### Quality Preference
 - **PreferHighQuality**: When enabled:
   - Selects highest bitrate when duplicates exist
@@ -256,7 +204,7 @@ window.matchMonkey.runMoodActivityPlaylist(null, 'workout');
 
 **Trigger Condition**:
 - Monitors Now Playing queue
-- Triggers when ? 2 tracks remain
+- Triggers when 2 or fewer tracks remain
 - Prevents gaps in playback
 
 **Process**:
@@ -306,7 +254,7 @@ window.matchMonkey.runMoodActivityPlaylist(null, 'workout');
 
 **C. Do Not Create Playlist**
 - Skips playlist creation
-- Must have `EnqueueMode` enabled
+- Requires enqueue mode enabled
 - Adds directly to Now Playing
 
 #### Parent Playlist Organization
@@ -350,26 +298,7 @@ window.matchMonkey.runMoodActivityPlaylist(null, 'workout');
 
 ---
 
-### 8. Progress Tracking
-
-**Real-Time Progress Indicators**:
-- Background task system (MediaMonkey 5 API)
-- Progress bar with percentage
-- Descriptive status messages
-- Example messages:
-  - "Finding similar artists to Pink Floyd..."
-  - "Searching local library..."
-  - "Building playlist..."
-
-**Console Logging**:
-- Detailed operation logs
-- API call tracking
-- Performance metrics
-- Error messages
-
----
-
-### 9. Caching System
+### 8. Caching System
 
 **Per-Session Caching**:
 - **Scope**: Single add-on run
@@ -386,12 +315,12 @@ window.matchMonkey.runMoodActivityPlaylist(null, 'workout');
 
 **Cache Clearing**:
 - Automatically cleared on MediaMonkey restart
-- Cleared after each `runMatchMonkey()` completion
+- Cleared after each discovery run
 - Forces fresh data on new session
 
 ---
 
-### 10. Seed Artist Inclusion
+### 9. Seed Artist Inclusion
 
 **Configuration**: `IncludeSeedArtist`
 
@@ -411,161 +340,36 @@ window.matchMonkey.runMoodActivityPlaylist(null, 'workout');
 
 ---
 
-## Configuration Matrix
-
-### Discovery Mode vs Settings
-
-| Setting | Artist | Track | Genre | Mood | Activity |
-|---------|--------|-------|-------|------|----------|
-| SimilarArtistsLimit | ? Primary | ? Not used | ? Primary | ? Seed component | ? Seed component |
-| TrackSimilarLimit | ? Not used | ? Primary | ? Not used | ? Not used | ? Not used |
-| TracksPerArtist | ? Used | ? Used | ? Used | ? Used | ? Used |
-| IncludeSeedArtist | ? Used | ? Used | ? Used | ? Used | ? Used |
-| MoodActivityBlendRatio | ? Not used | ? Not used | ? Not used | ? Primary | ? Primary |
-
----
-
-## Performance Characteristics
-
-### Speed Comparison
-
-| Mode | Speed | API Calls | Cache Benefit |
-|------|-------|-----------|---------------|
-| Artist | Fast | Low | High |
-| Track | Medium | Medium | Medium |
-| Genre | Medium | Medium | Medium |
-| Mood | Medium | Medium-High | High |
-| Activity | Medium | Medium-High | High |
-
-### Resource Usage
-
-| Setting | CPU | Memory | Network |
-|---------|-----|--------|---------|
-| High Similar Limit | Low | Medium | High |
-| High Tracks/Artist | Medium | Medium | Low |
-| High Track Similar Limit | Low | Medium | Very High |
-| Mood/Activity | Medium | Medium | High |
-
----
-
 ## Use Case Recommendations
 
-### Quick Familiar Playlist
-```
-Mode: Artist
-SimilarArtistsLimit: 10
-TracksPerArtist: 20
-IncludeSeedArtist: true
-ShuffleResults: true
-```
-
-### Deep Discovery
-```
-Mode: Track
-TrackSimilarLimit: 200
-TracksPerArtist: 40
-IncludeSeedArtist: false
-ShuffleResults: true
-```
-
-### Genre Exploration
-```
-Mode: Genre
-SimilarArtistsLimit: 30
-TracksPerArtist: 30
-UseLastfmRanking: true
-```
-
-### Mood-Based Personalized
-```
-Mode: Mood
-MoodActivityBlendRatio: 0.5
-IncludeSeedArtist: true
-```
-
-### Activity-Optimized
-```
-Mode: Activity
-MoodActivityBlendRatio: 0.6
-```
-
-### Endless Background Music
-```
-AutoModeEnabled: true
-AutoModeDiscovery: Track
-AutoModeSeedLimit: 2
-AutoModeMaxTracks: 30
-```
-
----
-
-## Integration Points
-
-### MediaMonkey 5 APIs Used
-- `app.player` - Playback monitoring
-- `app.playlists` - Playlist management
-- `uitools.getSelectedTracklist()` - Track selection
-- `backgroundTasks` - Progress tracking
-- `app.getValue/setValue` - Settings storage
-
-### External APIs
-- **Last.fm API v2.0**
-  - `artist.getSimilar`
-  - `track.getSimilar`
-  - `tag.getTopArtists`
-  - `artist.getInfo`
-  - `artist.getTopTracks`
-
-- **ReccoBeats API v1**
-  - `/recommendations/mood`
-  - `/recommendations/activity`
+- **Quick Familiar Playlist**: Use Artist mode with moderate limits and include seed artists
+- **Deep Discovery**: Use Track mode with higher limits and exclude seed artists for maximum variety
+- **Genre Exploration**: Use Genre mode with higher artist limits and Last.fm ranking
+- **Mood-Based Personalized**: Use Mood mode with balanced blend ratio (0.5) and include seed artists
+- **Activity-Optimized**: Use Activity mode with blend ratio slightly favoring your seeds (0.6)
+- **Endless Background Music**: Enable Auto-Queue with Track mode and moderate limits
 
 ---
 
 ## Compatibility Notes
 
 - **Requires**: MediaMonkey 5.0+
-- **Platform**: Windows only
-- **Database**: SQLite (MediaMonkey's database)
 - **Internet**: Required for API calls
-- **APIs**: Last.fm (free), ReccoBeats (check their terms)
-
----
-
-## Future Enhancement Possibilities
-
-1. **Multi-seed weighting**: Weight different seeds differently
-2. **Time-of-day awareness**: Adapt to listening time
-3. **Listening history integration**: Learn from playback patterns
-4. **Collaborative filtering**: User preference learning
-5. **Custom mood creation**: User-defined mood characteristics
-6. **Spotify/Deezer integration**: Additional discovery sources
-7. **BPM filtering**: Tempo range constraints
-8. **Playlist duration targeting**: Hit exact time targets
-9. **Artist diversity**: Ensure no artist dominates
-10. **Language filtering**: Filter by track language
-
----
-
-## Complete Settings Reference
-
-See [Configuration Settings](#configuration-settings) section in QUICK_REFERENCE.md for detailed settings documentation.
+- **APIs**: Last.fm and ReccoBeats
 
 ---
 
 ## Documentation Links
 
-- **Quick Start**: `docs/QUICKSTART.md`
-- **Quick Reference**: `docs/QUICK_REFERENCE.md`
-- **ReccoBeats Guide**: `docs/RECCOBEATS_INTEGRATION.md`
-- **Examples**: `docs/EXAMPLES_TUTORIAL.md`
-- **UI Guide**: `docs/UI_CONFIGURATION_GUIDE.md`
-- **Implementation**: `docs/IMPLEMENTATION_SUMMARY.md`
+- [Quick Start](QUICK_START.md) — Get started in 2 minutes
+- [Quick Reference](QUICK_REFERENCE.md) — Complete settings reference
+- [User Guide](USER_GUIDE.md) — Detailed usage guide
+- [Examples & Tutorial](EXAMPLES_TUTORIAL.md) — Real-world examples
 
 ---
 
 ## Support
 
-- **Issues**: https://github.com/remo-imparato/SimilarArtistsMM5/issues
-- **Email**: rimparato@hotmail.com
-- **Ko-fi**: https://ko-fi.com/remoimparato
+- Report issues: [GitHub Issues](https://github.com/remo-imparato/SimilarArtistsMM5/issues)
+- Download updates: [GitHub Releases](https://github.com/remo-imparato/SimilarArtistsMM5/releases)
+- Support the project: [Ko-fi](https://ko-fi.com/remoimparato)

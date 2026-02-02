@@ -89,7 +89,7 @@ These are the most useful settings to adjust if you want to change Match Monkey'
 
 - Mood/Activity blend ratio
   - Controls how much the playlist follows your seeds vs. the mood/activity target.
-  - Lower values = more anchored to your seed tracks acoustics. Higher values = more purely mood/activity preset focused.
+  - Lower values = more anchored to your seed tracks. Higher values = more purely mood/activity preset focused.
 
 - Auto-Queue settings
   - Enable or disable automatic queueing and choose the discovery mode and limits used by Auto-Queue.
@@ -141,8 +141,9 @@ Open MediaMonkey → Tools → Options → Match Monkey and adjust discovery mod
 
 ## Need more help?
 
-- Open an issue on the project repository if something isn't working as expected.
-- Use the console (Developer tools) to view messages if you are comfortable checking for errors.
+- Report issues or request features: [GitHub Issues](https://github.com/remo-imparato/SimilarArtistsMM5/issues)
+- Download the latest version: [GitHub Releases](https://github.com/remo-imparato/SimilarArtistsMM5/releases)
+- Support the project: [Ko-fi](https://ko-fi.com/remoimparato)
 
 ---
 

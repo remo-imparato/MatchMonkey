@@ -14,7 +14,7 @@
    - Example: AC/DC, Metallica, Foo Fighters tracks
 
 2. **Configure Settings (optional)**:
-   - In Tools → Options → Similar Artists, set a balanced blend ratio so results mix your taste with workout characteristics
+   - In Tools → Options → Match Monkey, set a balanced blend ratio so results mix your taste with workout characteristics
    - Adjust similar artists limit, tracks per artist and max playlist size to control variety and length
 
 3. **Generate Playlist**:
@@ -32,8 +32,8 @@
 **Steps**:
 
 1. **Configure for Pure Mood Discovery**:
-   - In the add-on settings, set the blend ratio to favour the mood (pure mood = low seed influence)
-   - Choose the `focused` or `relaxed` mood and reduce tracks-per-artist if you want a concise list
+   - In the add-on settings, set the blend ratio to favor the mood (1.0 = all mood/activity)
+   - Choose the focused or relaxed mood and reduce tracks-per-artist if you want a concise list
 
 2. **Generate Playlist** (no need to select tracks):
    - Run the Mood playlist for the chosen mood from the UI
@@ -53,11 +53,11 @@
    - Select 5–10 tracks you're loving right now (indie pop/rock works well for this example)
 
 2. **Configure for Seed-Heavy**:
-   - Set the blend ratio to favour your seeds (higher percent seed influence)
+   - Set the blend ratio to favor your seeds (0.0 = all seed)
    - Optionally enable including seed artist results
 
 3. **Generate Playlist**:
-   - Run the Mood playlist for the `happy` mood from the UI
+   - Run the Mood playlist for the happy mood from the UI
 
 4. **Result**:
    - A playlist that closely matches your style but filtered to emphasise happy characteristics
@@ -70,32 +70,32 @@
 
 - Play your morning favorites and select them
 - Increase blend ratio slightly toward seeds to maintain familiarity
-- Run the `energetic` mood playlist
+- Run the energetic mood playlist
 
-Result: Energetic indie/rock tuned for your morning routine
+**Result**: Energetic indie/rock tuned for your morning routine
 
 ### Example 2: Evening Wind-Down
 
 - Select comforting, mellow tracks
 - Use a moderate blend ratio to prefer familiar artists while adding relaxing elements
-- Run the `relaxed` mood playlist
+- Run the relaxed mood playlist
 
-Result: Mellow, familiar music suitable for winding down
+**Result**: Mellow, familiar music suitable for winding down
 
 ### Example 3: Discover New Party Music
 
 - Optionally select popular or diverse tracks, or leave selection empty for broader discovery
 - Use a low seed blend ratio to prioritise party characteristics
-- Run the `party` activity playlist
+- Run the party activity playlist
 
-Result: Fresh, danceable tracks with a mix of popular and new artists
+**Result**: Fresh, danceable tracks with a mix of popular and new artists
 
 ### Example 4: Genre + Mood Exploration
 
 - Select multiple artists from a target genre (e.g., Progressive Rock)
-- Use a balanced blend ratio and request the `energetic` mood
+- Use a balanced blend ratio and request the energetic mood
 
-Result: Energetic selections within the chosen genre
+**Result**: Energetic selections within the chosen genre
 
 ---
 
@@ -105,10 +105,10 @@ Result: Energetic selections within the chosen genre
 
 Try different ratios to see what works best:
 
-- High seed influence (0.7–0.9): mostly your taste with subtle mood filtering
+- High seed influence (0.0–0.3): mostly your taste with subtle mood filtering
 - Balanced (0.4–0.6): mix of familiar and new — a good starting point
-- Low seed influence (0.2–0.3): mostly mood/activity-driven discovery
-- Pure mood (0.0): ignore seeds and rely entirely on mood/activity characteristics
+- Low seed influence (0.7–0.9): mostly mood/activity-driven discovery
+- Pure mood (1.0): ignore seeds and rely entirely on mood/activity characteristics
 
 ---
 
@@ -150,10 +150,10 @@ Explore a genre with mood variations:
 
 ### Blend Ratio Tips
 
-- Safe exploration: 0.7–0.8 — your style with subtle mood
+- Safe exploration: 0.2–0.3 — your style with subtle mood
 - Balanced: 0.4–0.6 — a good middle ground
-- Adventure: 0.2–0.3 — mostly new discoveries
-- Pure discovery: 0.0 — ignore seeds completely
+- Adventure: 0.7–0.8 — mostly new discoveries
+- Pure discovery: 1.0 — ignore seeds completely
 
 ### Mood/Activity Selection Tips
 
@@ -188,16 +188,6 @@ Explore a genre with mood variations:
 
 ---
 
-## Tips for Best Results
-
-(Repeated tips; keep for convenience.)
-
-- Start with a small tight seed set (3–5 tracks)
-- Use balanced blend ratios for predictable variety
-- Tune discovery limits for speed vs variety
-
----
-
 ## Next Steps
 
 1. Experiment with different blend ratios and modes
@@ -206,7 +196,17 @@ Explore a genre with mood variations:
 
 ---
 
-For more information, see:
-- Quick Reference
-- User Guide
-- ReccoBeats Integration Guide
+## Learn More
+
+- [Quick Start](QUICK_START.md) — Get started quickly
+- [Quick Reference](QUICK_REFERENCE.md) — Complete settings reference  
+- [User Guide](USER_GUIDE.md) — Detailed usage guide
+- [Features](FEATURES.md) — Full feature documentation
+
+---
+
+## Support
+
+- Report issues: [GitHub Issues](https://github.com/remo-imparato/SimilarArtistsMM5/issues)
+- Download updates: [GitHub Releases](https://github.com/remo-imparato/SimilarArtistsMM5/releases)
+- Support the project: [Ko-fi](https://ko-fi.com/remoimparato)

@@ -20,9 +20,7 @@
 - ✨ **Seed-Aware Discovery**: Blends your current listening with mood/activity recommendations
 - ✨ **Configurable Blend Ratio**: Control balance between seed artists and mood recommendations (0.0-1.0)
 - ✨ **Intelligent Mixing**: Interleaves seed-based and mood-based artists for optimal variety
-- ✨ **Hybrid Discovery**: Combine ReccoBeats recommendations with Last.fm artist expansion
 - ✨ **Intelligent Caching**: ReccoBeats responses cached for faster subsequent queries
-- 📚 **Documentation**: Comprehensive [ReccoBeats Integration Guide](docs/RECCOBEATS_INTEGRATION.md)
 
 ### Version 2.0 (Recent updates)
 

@@ -1,6 +1,6 @@
 ﻿# MatchMonkey for MediaMonkey 5/2024
 
-**Automatically generate playlists or queue tracks from similar artists using Last.fm and optional ReccoBeats recommendations.**
+**Automatically generate playlists or queue tracks from similar artist, track, genre, or acoustices using Last.fm and  ReccoBeats recommendations.**
 
 [![MediaMonkey](https://img.shields.io/badge/MediaMonkey-5.0%2B-green.svg)](https://www.mediamonkey.com/)
 
@@ -17,10 +17,9 @@ You can run discovery by Track, Artist, Genre or Acoustics (ReccoBeats AI) — c
 ### Key Features
 
 - 🎵 **Smart Discovery**: Query Last.fm for similar artists or similar tracks based on selected or currently-playing music
+- 🎭 **Mood & Activity Playlists**: Use ReccoBeats audio profiles for moods/activities—best results are obtained when seed tracks are relevant
 - 🔎 **Search by Track, Artist, Genre & Acoustics**: Search by track title, by artist, by genre/tags, or use ReccoBeats "acoustics" recommendations to discover matching tracks in your library
 - 🎯 **Intelligent Matching**: Multi-pass fuzzy matching finds tracks in your local library (exact → normalized → partial)
-- 🎭 **Mood & Activity Playlists** *(NEW, seed-aware)*: Use ReccoBeats audio profiles for moods/activities—best results are obtained when seed tracks are available
-- 🤝 **Hybrid Discovery (manual/flow-specific)**: ReccoBeats and Last.fm are both supported. Some discovery flows use ReccoBeats audio recommendations and Last.fm for artist expansion; there is no single always-on automatic merge of both services
 - 📋 **Flexible Output**: Create new playlists, overwrite existing ones, or queue tracks directly to Now Playing
 - 🤖 **Auto-Queue / Endless music**: Auto-mode can automatically queue similar tracks when Now Playing is nearing the end
 - 🧭 **Deduplication**: Removes duplicate songs by `artist|title`. Current implementation keeps the first matching candidate; enhanced selection (bitrate/rating prioritization) is planned
@@ -42,11 +41,13 @@ You can run discovery by Track, Artist, Genre or Acoustics (ReccoBeats AI) — c
 
 ## 🚀 Installation
 
-1. Download the latest release from the [Releases](https://github.com/remo-imparato/SimilarArtistsMM5/releases) page
-2. In MediaMonkey 5, go to **Tools → Extensions**
-3. Click **Install Extension** and select the downloaded `.mmip` file
+1. Download the latest `.mmip` file from the [Releases](https://github.com/remo-imparato/SimilarArtistsMM5/releases) page
+2. In MediaMonkey 5, go to **Tools → Addons**
+3. Click **Install addon from file** and select the downloaded `.mmip` file
 4. Restart MediaMonkey 5
-5. Configure the add-on via **Tools → Options → Similar Artists**
+5. Configure the add-on via **Tools → Options → Match Monkey**
+
+Alternatively, you can browse for addons by clicking **Find more Addons** in the Tools → Addons menu.
 
 ---
 
@@ -58,7 +59,7 @@ You can run discovery by Track, Artist, Genre or Acoustics (ReccoBeats AI) — c
 2. Choose the discovery mode you want to use (Track, Artist, Genre, Acoustics, Mood, Activity) in the UI or context menu
 3. Run the add-on via:
    - **Toolbar button** (if enabled)
-   - **Tools → Similar Artists** menu
+   - **Tools → Match Monkey** menu
 4. The add-on will:
    - Query Last.fm (or use the selected discovery mode)
    - Search your library for matching tracks
@@ -76,23 +77,15 @@ You can run discovery by Track, Artist, Genre or Acoustics (ReccoBeats AI) — c
 
 ### Mood & Activity Playlists (usage)
 
-The hybrid mode combines:
-1. **Your Listening Context** - Artists similar to what you're playing (seed-based)
-2. **ReccoBeats AI** - Mood/activity-appropriate track recommendations
-3. **Last.fm** - Similar artist expansion and popularity data
-4. **Your Library** - Local track matching with quality filters
-
 **Blend Ratio**: Configure how much of your current listening vs mood recommendations (default 50/50)
-- `0.0` = Pure mood discovery
-- `0.5` = Balanced (your taste + mood)
-- `1.0` = Your taste with mood filtering
-
-**Example**: Select Pink Floyd tracks → Run "energetic" mood → Get energetic progressive rock!
+- 0.0 = All seed influence (your taste)
+- 0.5 = Balanced (your taste + mood)
+- 1.0 = All mood/activity influence
 
 ### Usage guide & examples
 
 - Single-track selection
-  - Select a single track in any library pane and run `Tools → Similar Artists`.
+  - Select a single track in any library pane and run `Tools → Match Monkey`.
   - The add-on uses the selected track's artist as the seed. If enabled, the original seed track can be included in results.
 
 - Multiple-track selection
@@ -109,8 +102,8 @@ The hybrid mode combines:
 - Quick enqueue to Now Playing: enable `Automatically enqueue` in settings or run in auto-mode (see below) to add tracks directly to the queue.
 
 - Notes on behavior
-  - Seed deduplication: duplicate seed artists are removed automatically and any configured blacklist is applied.
-  - Confirmation (Show confirmation prompt): When enabled the add-on opens a "Select Playlist" dialog before creating or adding tracks. See the README section above for confirmation behavior details.
+  - Seed deduplication: duplicate seed artists are removed automatically.
+  - Confirmation (Show confirmation prompt): When enabled the add-on opens a "Select Playlist" dialog before creating or adding tracks.
 
 ### Auto-Queue (Auto-mode)
 
@@ -130,7 +123,7 @@ Auto-mode details and tips
 
 ## ⚙️ Configuration
 
-Access settings via **Tools → Options → Similar Artists**
+Access settings via **Tools → Options → Match Monkey**
 
 ### General Options
 
@@ -215,19 +208,19 @@ The add-on intelligently handles common artist name prefix patterns:
 ## 💡 Tips & Tricks
 
 1. **Use Auto-Queue Mode** - Enable it in settings for endless music discovery
-2. **Mood Playlists** ** - Try `runMoodActivityPlaylist('energetic', null)` for instant workout mixes
-3. **Activity Context** ** - Use activity-based discovery for studying, working, or relaxing
+2. **Mood Playlists** - Create mood-based playlists for specific emotional contexts
+3. **Activity Context** - Use activity-based discovery for studying, working, or relaxing
 4. **Seed Multiple Tracks** - Select multiple tracks for more diverse recommendations
 5. **Ranking Mode** - Enable "Select highest ranked by Last.fm" for popular tracks
 
 ---
 
-## Support
+## 🆘 Support
 
-- **Issues**: https://github.com/remo-imparato/SimilarArtistsMM5/issues
+- **Report Issues**: [GitHub Issues](https://github.com/remo-imparato/SimilarArtistsMM5/issues)
 - **Email**: rimparato@hotmail.com
-- **Ko-fi**: https://ko-fi.com/remoimparato
-- 
+- **Donate**: [Ko-fi](https://ko-fi.com/remoimparato)
+
 ---
 
 ## 📝 License

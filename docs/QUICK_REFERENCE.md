@@ -40,10 +40,9 @@ MatchMonkey supports the following discovery modes:
 ### Enable Mood/Activity Discovery
 
 1. Open MediaMonkey 5
-2. Go to Tools ? Options ? Similar Artists
+2. Go to Tools → Options → Match Monkey
 3. Enable mood/activity discovery
 4. Set blend ratio to a balanced value (middle position)
-5. Choose default mood and activity if desired
 
 ### Generate Playlists
 
@@ -96,7 +95,7 @@ MatchMonkey supports the following discovery modes:
 
 | Setting | Type | Default | Effect |
 |---------|------|---------|--------|
-| **MoodActivityBlendRatio** | Slider | 0.5 | Seed vs mood balance (0.0-1.0) |
+| **MoodActivityBlendRatio** | Slider | 0.5 | 0.0 = all seed, 1.0 = all mood/activity |
 
 **Mood Options**: energetic, relaxed, happy, sad, focused
 **Activity Options**: workout, study, party, sleep, driving
@@ -124,16 +123,6 @@ MatchMonkey supports the following discovery modes:
 | **EnqueueMode** | Boolean | false | Add to Now Playing |
 | **ClearQueueFirst** | Boolean | false | Clear queue before adding |
 | **NavigateAfter** | Dropdown | Navigate to new | Where to navigate after |
-
----
-
-### Filters (Advanced)
-
-| Setting | Type | Default | Effect |
-|---------|------|---------|--------|
-| **ArtistBlacklist** | String | (empty) | Excluded artists (comma-separated) |
-| **GenreBlacklist** | String | (empty) | Excluded genres (comma-separated) |
-| **TitleExclusions** | String | (empty) | Excluded title words (comma-separated) |
 
 ---
 
@@ -176,8 +165,7 @@ MatchMonkey supports the following discovery modes:
 1. **No internet**: APIs require online access
 2. **No seeds selected**: Select tracks first (except genre/mood pure discovery)
 3. **Rating filter too high**: Lower MinRating or enable IncludeUnrated
-4. **Blacklist too restrictive**: Check ArtistBlacklist and GenreBlacklist
-5. **No library matches**: Try different seeds or discovery mode
+4. **No library matches**: Try different seeds or discovery mode
 
 ### Results Too Random
 
@@ -220,7 +208,6 @@ MatchMonkey supports the following discovery modes:
 2. **Queue not low enough**: Needs 2 or fewer tracks left
 3. **Limits too restrictive**: Check AutoModeSeedLimit, AutoModeSimilarLimit
 4. **No seeds available**: Needs tracks in Now Playing history
-5. **Check console**: F12 for error messages
 
 ---
 
@@ -237,14 +224,14 @@ MatchMonkey supports the following discovery modes:
 
 ## Documentation
 
-- **Quick Start**: `docs/QUICKSTART.md`
-- **Full Guide**: `docs/USER_GUIDE.md`
-- **Examples**: `docs/EXAMPLES_TUTORIAL.md`
+- [Quick Start](QUICK_START.md) — Get started in 2 minutes
+- [User Guide](USER_GUIDE.md) — Complete usage guide
+- [Examples & Tutorial](EXAMPLES_TUTORIAL.md) — Real-world examples
 
 ---
 
 ## Support
 
-- **Issues**: https://github.com/remo-imparato/SimilarArtistsMM5/issues
-- **Email**: rimparato@hotmail.com
-- **Ko-fi**: https://ko-fi.com/remoimparato
+- Report issues: [GitHub Issues](https://github.com/remo-imparato/SimilarArtistsMM5/issues)
+- Download updates: [GitHub Releases](https://github.com/remo-imparato/SimilarArtistsMM5/releases)
+- Support the project: [Ko-fi](https://ko-fi.com/remoimparato)
