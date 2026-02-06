@@ -451,10 +451,6 @@ actions.matchMonkeyToggleAuto = {
 	}
 };
 
-// ============================================================================
-// CLEAR CACHE ACTION
-// ============================================================================
-
 /**
  * Clear API Cache action
  * Clears Last.fm and ReccoBeats API response caches
@@ -472,7 +468,7 @@ actions.matchMonkeyClearCache = {
 			// Call the clearCache function exposed by matchMonkey
 			if (window.matchMonkey && typeof window.matchMonkey.clearCache === 'function') {
 				const result = window.matchMonkey.clearCache();
-				
+
 				if (result.success) {
 					// Show success notification
 					if (typeof uitools !== 'undefined' && uitools.toastMessage && uitools.toastMessage.show) {
@@ -500,9 +496,54 @@ actions.matchMonkeyClearCache = {
 		}
 	}
 };
+
+// ============================================================================
+// VIEW MISSED RESULTS ACTION
+// ============================================================================
+
+/**
+ * View Missed Results action
+ * Opens the Missed Results dialog
+ */
+actions.matchMonkeyViewMissedResults = {
+	title: _('View &Missed Results'),
+	icon: 'search',
+	hotkeyAble: true,
+	visible: true,
+	disabled: false,
+	tooltip: _('View tracks recommended but not found in library'),
+
+	execute: function () {
+		try {
+			console.log('Match Monkey: Opening missed results dialog');
+
+			if (typeof uitools !== 'undefined' && uitools.openDialog) {
+				uitools.openDialog('dlgMissedResults', {
+					modal: true
+				});
+			} else {
+				console.error('Match Monkey: uitools.openDialog not available');
+
+				// Show error notification
+				if (typeof uitools !== 'undefined' && uitools.toastMessage && uitools.toastMessage.show) {
+					uitools.toastMessage.show('Failed to open missed results dialog', { type: 'error', duration: 5000 });
+				}
+			}
+		} catch (e) {
+			console.error('Match Monkey: Error opening missed results dialog:', e);
+
+			// Show error notification
+			if (typeof uitools !== 'undefined' && uitools.toastMessage && uitools.toastMessage.show) {
+				uitools.toastMessage.show('Error opening dialog: ' + e.message, { type: 'error', duration: 5000 });
+			}
+		}
+	}
+};
+
 // ============================================================================
 // TOOLS MENU REGISTRATION - Using Submenu
 // ============================================================================
+
 
 // Mood submenu items
 var moodSubmenuItems = [
@@ -563,8 +604,9 @@ _menuItems.tools.action.submenu.push({
 			},
 			{ separator: true, order: 80 },
 			{ action: actions.matchMonkeyToggleAuto, order: 90 },
-			//{ separator: true, order: 100 },
-			//{ action: actions.matchMonkeyClearCache, order: 110 }
+			{ separator: true, order: 95 },
+			{ action: actions.matchMonkeyViewMissedResults, order: 96 },
+			//{ action: actions.matchMonkeyClearCache, order: 100 }
 		]
 	},
 	order: 40,
@@ -593,7 +635,7 @@ if (!window.menus) {
 				{ action: actions.similarArtistsRun, order: 20 },
 				{ action: actions.similarGenreRun, order: 30 },
 				{ separator: true, order: 40 },
-				{ action: actions.similarReccoRun, order:50 },
+				{ action: actions.similarReccoRun, order: 50 },
 				{
 					action: {
 						title: _('&Mood'),

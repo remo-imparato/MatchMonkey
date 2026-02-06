@@ -82,6 +82,27 @@ Alternatively, you can browse for addons by clicking **Find more Addons** in the
 - 0.5 = Balanced (your taste + mood)
 - 1.0 = All mood/activity influence
 
+### Missed Results Tracking
+
+MatchMonkey tracks recommended tracks that weren't found in your local library. This helps you:
+
+- **Identify gaps** in your music collection
+- **Discover popular tracks** you might want to add
+- **Track recurring recommendations** across different discovery sessions
+- **Export results** for shopping lists or streaming services
+
+**View Missed Results:**
+1. Go to **Tools → Match Monkey → View Missed Results**
+2. Or check the count in **Tools → Options → Match Monkey → Missed Results**
+
+**Features:**
+- Shows artist, title, album, popularity score (playcount), and occurrence count
+- Tracks how many times the same track was recommended (regardless of source)
+- Copy results to clipboard (tab-separated for easy import to spreadsheet)
+- Clear old results when needed
+
+**Note:** Popularity scores come from Last.fm (playcount) or ReccoBeats APIs when available.
+
 ### Usage guide & examples
 
 - Single-track selection
@@ -171,6 +192,31 @@ Access settings via **Tools → Options → Match Monkey**
 | **Automatically enqueue** | Queue tracks instead of creating playlists |
 | **Clear list before enqueue** | Clear Now Playing before adding tracks |
 | **Ignore recently played** | Skip tracks already in Now Playing queue |
+
+---
+
+## 🔄 Changelog
+
+### Version 2.2 (Missed Results Tracking) *(NEW)*
+
+- ✨ **Missed Results Tracking**: Track recommendations not found in your library
+- ✨ **Occurrence Counting**: See how many times the same track was recommended
+- ✨ **Popularity Scores**: View Last.fm playcount or ReccoBeats popularity for missed tracks
+- ✨ **Cross-Source Deduplication**: Same track from different APIs counted as one with occurrence counter
+- ✨ **View & Export**: Browse missed results in a dedicated dialog, export to clipboard
+- ✨ **Menu Integration**: Access missed results from Tools > Match Monkey menu
+
+### Version 2.1 (ReccoBeats Integration)
+
+- ✨ **ReccoBeats API Integration**: AI-powered mood and activity-based playlists
+- ✨ **Mood Playlists**: Generate playlists for energetic, relaxed, happy, sad, focused moods
+- ✨ **Activity Playlists**: Create context-aware playlists for workout, study, party, sleep, driving
+- ✨ **Seed-Aware Discovery**: Blends your current listening with mood/activity recommendations
+- ✨ **Configurable Blend Ratio**: Control balance between seed artists and mood recommendations (0.0-1.0)
+- ✨ **Intelligent Mixing**: Interleaves seed-based and mood-based artists for optimal variety
+- ✨ **Intelligent Caching**: ReccoBeats responses cached for faster subsequent queries
+
+### Version 2.0 (Recent updates)
 
 ---
 

@@ -12,6 +12,8 @@
  * Each strategy returns a list of artist/track candidates to search in the local library.
  * All strategies respect user-configured limits and preferences.
  * 
+ * Tracks missed recommendations (not found in library) for user review.
+ * 
 
  * 
  * @author Remo Imparato
@@ -91,10 +93,14 @@ async function discoverByArtist(modules, seeds, config) {
 				addArtistCandidate(artistName, seenArtists, blacklist, candidates);
 			}
 
-			// Add similar artists
+			// Add similar artists with match score as popularity indicator
 			for (const artist of similar.slice(0, config.similarLimit || 20)) {
 				if (artist?.name) {
-					addArtistCandidate(artist.name, seenArtists, blacklist, candidates);
+					const candidateEntry = addArtistCandidate(artist.name, seenArtists, blacklist, candidates);
+					// Store match score for popularity tracking
+					if (candidateEntry && artist.match) {
+						candidateEntry.matchScore = artist.match;
+					}
 				}
 			}
 
@@ -396,6 +402,7 @@ function buildReccoCandidates(result, blacklist, seenArtists) {
 
 	for (const rec of result.recommendations) {
 		const trackTitle = rec.trackTitle;
+		const popularity = rec.popularity || 0; // Extract ReccoBeats popularity (0-100)
 
 		// Ensure artists array exists
 		if (!rec.artists || !Array.isArray(rec.artists)) continue;
@@ -416,7 +423,7 @@ function buildReccoCandidates(result, blacklist, seenArtists) {
 				candidates.push({
 					artist: artistName,
 					tracks: trackTitle
-						? [{ title: trackTitle, match: 1.0 }]
+						? [{ title: trackTitle, match: 1.0, popularity: popularity }]
 						: []
 				});
 			}
@@ -432,7 +439,7 @@ function buildReccoCandidates(result, blacklist, seenArtists) {
 						t => t.title.toUpperCase() === trackTitle.toUpperCase()
 					)
 				) {
-					existing.tracks.push({ title: trackTitle, match: 1.0 });
+					existing.tracks.push({ title: trackTitle, match: 1.0, popularity: popularity });
 				}
 			}
 		}

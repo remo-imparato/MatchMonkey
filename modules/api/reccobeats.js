@@ -433,7 +433,6 @@ async function searchArtist(artistName) {
 	while (page < maxPages && page < maxPagesLimit) {
 		try {
 			const url = `${RECCOBEATS_API_BASE}/artist/search?searchText=${encodeURIComponent(artistName)}&page=${page}&size=50`;
-			console.log(`searchArtist: GET ${url} (searching for normalized="${normalizedSearch}")`);
 
 			const res = await rateLimitedFetch(url, { method: 'GET', headers });
 
@@ -519,7 +518,6 @@ async function searchAlbum(albumName) {
 	while (page < maxPages && page < maxPagesLimit) {
 		try {
 			const url = `${RECCOBEATS_API_BASE}/album/search?searchText=${encodeURIComponent(albumName)}&page=${page}&size=50`;
-			console.log(`searchAlbum: GET ${url} (searching for normalized="${normalizedSearch}")`);
 
 			const res = await rateLimitedFetch(url, { method: 'GET', headers });
 
@@ -557,6 +555,10 @@ async function searchAlbum(albumName) {
 			// Check if we've exhausted all pages
 			if (page >= totalPages - 1) {
 				console.log(`searchAlbum: No exact match after ${totalPages} pages - album="${albumName}", normalized="${normalizedSearch}"`);
+				break;
+			}
+			if (page > 50) {
+				console.log(`searchAlbum: Search aported, searched ${page} pages of ${totalPages} - album="${albumName}", normalized="${normalizedSearch}"`);
 				break;
 			}
 
@@ -619,7 +621,6 @@ async function findAlbumInArtist(artistId, albumName) {
 	while (page < maxPages && page < maxPagesLimit) {
 		try {
 			const url = `${RECCOBEATS_API_BASE}/artist/${artistId}/album?page=${page}&size=${size}`;
-			console.log(`findAlbumInArtist: GET ${url} ${albumName ? `(searching for normalized="${normalizedSearch}")` : '(listing all albums)'}`);
 
 			const res = await rateLimitedFetch(url, { method: 'GET', headers });
 
@@ -767,8 +768,6 @@ async function getAlbumTracks(albumId) {
 
 	try {
 		const url = `${RECCOBEATS_API_BASE}/album/${albumId}/track`;
-		console.log(`getAlbumTracks: GET ${url} (fetching tracks for album ID ${albumId})`);
-
 		const res = await rateLimitedFetch(url, { method: 'GET', headers });
 
 		if (!res.ok) {
@@ -1309,7 +1308,6 @@ async function fetchRecommendations(seedIds, audioTargets = {}, limit = 100) {
 			}
 		}
 
-		console.log(`fetchRecommendations: GET ${url.toString()}`);
 		const res = await rateLimitedFetch(url, { method: 'GET', headers });
 
 		if (!res.ok) {

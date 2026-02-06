@@ -1,0 +1,53 @@
+<!-- MatchMonkey Missed Results Dialog -->
+<html class="dialog">
+<script src="file:///mminit.js"></script>
+<script src="dlgMissedResults.js"></script>
+<script type="module" src="file:///commonControls.js"></script>
+
+<body data-defaultSize='70em,45em' data-minimalSize='50em,30em'>
+	<div class="flex fill column" data-id="missedResultsContent">
+		<div class="padding">
+			<h2>Missed Recommendations</h2>
+			<p>These tracks were highly recommended but not found in your local library:</p>
+		</div>
+
+		<!-- Statistics Summary -->
+		<div class="padding" data-id="statsSection" style="background: var(--panel-background, #f8f8f8); border-radius: 4px; margin: 0 1em;">
+			<div style="display: flex; gap: 2.5em; align-items: center; flex-wrap: wrap; font-size: 0.9em; color: var(--text-secondary, #666);">
+				<div>
+					<strong>Total Tracks:</strong> <span data-id="totalCount">0</span>
+				</div>
+				<div>
+					<strong>Unique Artists:</strong> <span data-id="uniqueArtistsCount">0</span>
+				</div>
+				<div>
+					<strong>Total Occurrences:</strong> <span data-id="totalOccurrencesCount">0</span>
+				</div>
+				<div>
+					<strong>Avg Recommendation:</strong> <span data-id="avgPopularity">0%</span>
+				</div>
+			</div>
+			<div style="margin-top: 0.5em; padding-top: 0.5em; border-top: 1px solid var(--border-color, #ddd);">
+				<span style="font-size: 0.9em; color: var(--text-secondary, #666);">
+					<strong>Tip:</strong> Click column headers to sort. Popularity is shown as 0-100% normalized from Last.fm playcount or ReccoBeats popularity scores.
+				</span>
+			</div>
+		</div>
+
+		<!-- Results Grid -->
+		<div class="flex fill padding" style="min-height: 0;">
+			<div data-id="gvMissedResults" class="fill"
+					 data-control-class="GridView"
+					 data-init-params='{"showHeader": true, "multiSelect": true, "isSortable": true}'></div>
+		</div>
+
+		<!-- Action Buttons -->
+		<div data-control-class="Buttons" class="static padding" style="justify-content: space-between;">
+			<div data-id="btnCopyAll">Copy All to Clipboard</div>
+			<div data-id="btnCopySelected">Copy Selected</div>
+			<div data-id="btnClear">Clear List</div>
+			<div data-id="btnClose">Close</div>
+		</div>
+	</div>
+</body>
+</html>
