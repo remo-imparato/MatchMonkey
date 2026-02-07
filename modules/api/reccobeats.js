@@ -558,7 +558,7 @@ async function searchAlbum(albumName) {
 				break;
 			}
 			if (page > 50) {
-				console.log(`searchAlbum: Search aported, searched ${page} pages of ${totalPages} - album="${albumName}", normalized="${normalizedSearch}"`);
+				console.log(`searchAlbum: Search aborted, searched ${page} pages of ${totalPages} - album="${albumName}", normalized="${normalizedSearch}"`);
 				break;
 			}
 

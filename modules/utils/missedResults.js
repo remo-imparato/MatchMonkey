@@ -273,7 +273,6 @@ window.matchMonkeyMissedResults = {
 	add,
 	addBatch,
 	getByArtist,
-	getStats,
 	clear,
 	STORAGE_KEY,
 	MAX_RESULTS,
