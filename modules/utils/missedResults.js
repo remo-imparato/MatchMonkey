@@ -137,15 +137,19 @@ function add(artist, title, album = '', popularity = 0, additionalInfo = {}) {
 			? matchMonkeyHelpers.cleanTrackName(title).toUpperCase()
 			: title.toUpperCase();
 
-		const existingIndex = results.findIndex(r => {
-			const rCleanArtist = (typeof matchMonkeyHelpers?.cleanArtistName === 'function')
+		// Pre-compute cleaned values for efficient comparison
+		const cleanedResults = results.map(r => ({
+			cleanArtist: (typeof matchMonkeyHelpers?.cleanArtistName === 'function')
 				? matchMonkeyHelpers.cleanArtistName(r.artist).toUpperCase()
-				: r.artist.toUpperCase();
-			const rCleanTitle = (typeof matchMonkeyHelpers?.cleanTrackName === 'function')
+				: r.artist.toUpperCase(),
+			cleanTitle: (typeof matchMonkeyHelpers?.cleanTrackName === 'function')
 				? matchMonkeyHelpers.cleanTrackName(r.title).toUpperCase()
-				: r.title.toUpperCase();
-			return rCleanArtist === cleanArtist && rCleanTitle === cleanTitle;
-		});
+				: r.title.toUpperCase()
+		}));
+
+		const existingIndex = cleanedResults.findIndex(r =>
+			r.cleanArtist === cleanArtist && r.cleanTitle === cleanTitle
+		);
 
 		if (existingIndex >= 0) {
 			// Update existing entry - increment occurrences and update popularity if higher
