@@ -34,13 +34,6 @@ const fieldDefs = {
 		},
 		columnType: 'title'
 	},
-	album: {
-		title: 'Album',
-		bindData: (div, item) => {
-			div.innerText = item.album || '';
-		},
-		columnType: 'album'
-	},
 	popularity: {
 		title: 'Recommendation %',
 		bindData: (div, item) => {
@@ -266,7 +259,7 @@ function copyToClipboard(results) {
 	}
 
 	// Build tab-separated text
-	let text = 'Artist\tTitle\tAlbum\tPopularity %\tTimes Seen\tSource\n';
+	let text = 'Artist\tTitle\tPopularity %\tTimes Seen\tSource\n';
 
 	results.forEach(result => {
 		const popularity = result.popularity || 0;
@@ -274,7 +267,7 @@ function copyToClipboard(results) {
 		const source = result.additionalInfo?.source || 'Unknown';
 		const pop = popularity > 0 ? `${popularity}%` : '-';
 		
-		text += `${result.artist || ''}\t${result.title || ''}\t${result.album || ''}\t${pop}\t${occurrences}\t${source}\n`;
+		text += `${result.artist || ''}\t${result.title || ''}\t${pop}\t${occurrences}\t${source}\n`;
 	});
 
 	copyTextToClipboard(text, results.length);
