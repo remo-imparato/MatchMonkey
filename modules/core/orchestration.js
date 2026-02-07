@@ -21,7 +21,7 @@ window.matchMonkeyOrchestration = {
 	 * Normalize popularity from a track object.
 	 * Handles both ReccoBeats popularity (0-100 scale) and Last.fm playcount (converted to 0-100 scale).
 	 * 
-	 * @param {object|string} track - Track object with popularity or playcount data
+	 * @param {object} track - Track object with popularity or playcount data
 	 * @returns {object} Object with { popularity: number, rawPlaycount: number }
 	 */
 	normalizePopularityFromTrack(track) {
