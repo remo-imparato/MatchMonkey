@@ -96,10 +96,14 @@ async function discoverByArtist(modules, seeds, config) {
 			// Add similar artists with match score as popularity indicator
 			for (const artist of similar.slice(0, config.similarLimit || 20)) {
 				if (artist?.name) {
-					const candidateEntry = addArtistCandidate(artist.name, seenArtists, blacklist, candidates);
+					// Add or update the artist candidate entry
+					addArtistCandidate(artist.name, seenArtists, blacklist, candidates);
 					// Store match score for popularity tracking
-					if (candidateEntry && artist.match) {
-						candidateEntry.matchScore = artist.match;
+					if (artist.match) {
+						const candidateEntry = candidates.find(c => c.artist === artist.name);
+						if (candidateEntry) {
+							candidateEntry.matchScore = artist.match;
+						}
 					}
 				}
 			}
