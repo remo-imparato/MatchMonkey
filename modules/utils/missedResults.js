@@ -128,10 +128,27 @@ function add(artist, title, album = '', popularity = 0, additionalInfo = {}) {
 	try {
 		const results = getAll(); // Use getAll() which always returns an array
 
-		// Check for duplicates (same artist + title)
-		const existingIndex = results.findIndex(r =>
-			r.artist === artist &&
-			r.title === title
+		// Check for duplicates using canonical cleaners for robust matching
+		// This prevents duplicates caused by punctuation/casing/prefix variants
+		const cleanArtist = (typeof matchMonkeyHelpers?.cleanArtistName === 'function')
+			? matchMonkeyHelpers.cleanArtistName(artist).toUpperCase()
+			: artist.toUpperCase();
+		const cleanTitle = (typeof matchMonkeyHelpers?.cleanTrackName === 'function')
+			? matchMonkeyHelpers.cleanTrackName(title).toUpperCase()
+			: title.toUpperCase();
+
+		// Pre-compute cleaned values for efficient comparison
+		const cleanedResults = results.map(r => ({
+			cleanArtist: (typeof matchMonkeyHelpers?.cleanArtistName === 'function')
+				? matchMonkeyHelpers.cleanArtistName(r.artist).toUpperCase()
+				: r.artist.toUpperCase(),
+			cleanTitle: (typeof matchMonkeyHelpers?.cleanTrackName === 'function')
+				? matchMonkeyHelpers.cleanTrackName(r.title).toUpperCase()
+				: r.title.toUpperCase()
+		}));
+
+		const existingIndex = cleanedResults.findIndex(r =>
+			r.cleanArtist === cleanArtist && r.cleanTitle === cleanTitle
 		);
 
 		if (existingIndex >= 0) {
