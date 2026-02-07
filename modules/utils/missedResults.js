@@ -14,7 +14,7 @@
 'use strict';
 
 const STORAGE_KEY = 'MatchMonkey_MissedResults';
-const MAX_RESULTS = 1000; // Maximum number of missed results to store
+const MAX_RESULTS = 10000; // Maximum number of missed results to store
 
 /**
  * Missed result structure:
@@ -141,11 +141,6 @@ function add(artist, title, album = '', popularity = 0, additionalInfo = {}) {
 			// Update popularity if the new value is higher
 			if (popularity > (results[existingIndex].popularity || 0)) {
 				results[existingIndex].popularity = popularity;
-			}
-			
-			// Update album if it was empty before
-			if (!results[existingIndex].album && album) {
-				results[existingIndex].album = album;
 			}
 			
 			// Merge additional info
