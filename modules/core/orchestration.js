@@ -18,6 +18,44 @@
 
 window.matchMonkeyOrchestration = {
 	/**
+	 * Normalize popularity from a track object.
+	 * Handles both ReccoBeats popularity (0-100 scale) and Last.fm playcount (converted to 0-100 scale).
+	 * 
+	 * @param {object|string} track - Track object with popularity or playcount data
+	 * @returns {object} Object with { popularity: number, rawPlaycount: number }
+	 */
+	normalizePopularityFromTrack(track) {
+		let popularity = 0;
+		let rawPlaycount = 0;
+
+		if (typeof track === 'object' && track !== null) {
+			// ReccoBeats popularity (already 0-100 scale)
+			if (track.popularity != null && !isNaN(track.popularity)) {
+				popularity = Math.round(Number(track.popularity));
+			}
+			// Last.fm playcount (convert to 0-100 scale using log scale)
+			else if (track.playcount != null && !isNaN(track.playcount)) {
+				rawPlaycount = Number(track.playcount);
+				if (rawPlaycount > 0) {
+					//*
+					// Logarithmic scale tuned for high playcounts:
+					// ~500K ≈ 81, 1M ≈ 85, 2M ≈ 89, 3M ≈ 92, 5M ≈ 95, 10M ≈ 99
+					popularity = Math.min(100, Math.round(Math.log10(rawPlaycount + 1) * 14.18));
+					/*/
+					// Logarithmic popularity curve anchored at:
+					// 500K plays ≈ 50, 15M plays ≈ 100
+					const log = Math.log10(rawPlaycount + 1);
+					const raw = 33.85 * log - 143.0;   // your anchored log curve
+					popularity = Math.round(100 / (1 + Math.exp(-(raw - 60) / 8)));
+					//*/
+				}
+			}
+		}
+
+		return { popularity, rawPlaycount };
+	},
+
+	/**
 	 * Main orchestration function that runs the complete MatchMonkey workflow.
 	 * 
 	 * @param {object} modules - Injected module dependencies
@@ -639,31 +677,7 @@ window.matchMonkeyOrchestration = {
 								});
 
 								// Extract and normalize popularity from track data
-								let popularity = 0;
-								let rawPlaycount = 0;
-								if (typeof originalTrack === 'object' && originalTrack !== null) {
-									// ReccoBeats popularity (already 0-100 scale)
-									if (originalTrack.popularity != null && !isNaN(originalTrack.popularity)) {
-										popularity = Math.round(Number(originalTrack.popularity));
-									}
-									// Last.fm playcount (convert to 0-100 scale using log scale)
-									else if (originalTrack.playcount != null && !isNaN(originalTrack.playcount)) {
-										rawPlaycount = Number(originalTrack.playcount);
-										if (rawPlaycount > 0) {
-											//*
-											// Logarithmic scale tuned for high playcounts:
-											// ~500K ≈ 81, 1M ≈ 85, 2M ≈ 89, 3M ≈ 92, 5M ≈ 95, 10M ≈ 99
-											popularity = Math.min(100, Math.round(Math.log10(rawPlaycount + 1) * 14.18));
-											/*/
-											// Logarithmic popularity curve anchored at:
-											// 500K plays ≈ 50, 15M plays ≈ 100
-											const log = Math.log10(rawPlaycount + 1);
-											const raw = 33.85 * log - 143.0;   // your anchored log curve
-											const popularity = Math.round(100 / (1 + Math.exp(-(raw - 60) / 8)));
-											//*/
-										}
-									}
-								}
+								const { popularity, rawPlaycount } = this.normalizePopularityFromTrack(originalTrack);
 
 								// Debug log for first few missed tracks
 								if (missedResults.length < 5) {
@@ -710,31 +724,7 @@ window.matchMonkeyOrchestration = {
 							if (!trackTitle) return;
 
 							// Extract and normalize popularity
-							let popularity = 0;
-							let rawPlaycount = 0;
-							if (typeof t === 'object' && t !== null) {
-								// ReccoBeats popularity (already 0-100 scale)
-								if (t.popularity != null && !isNaN(t.popularity)) {
-									popularity = Math.round(Number(t.popularity));
-								}
-								// Last.fm playcount (convert to 0-100 scale)
-								else if (t.playcount != null && !isNaN(t.playcount)) {
-									rawPlaycount = Number(t.playcount);
-									if (rawPlaycount > 0) {
-										//*
-										// Logarithmic scale tuned for high playcounts:
-										// ~500K ≈ 81, 1M ≈ 85, 2M ≈ 89, 3M ≈ 92, 5M ≈ 95, 10M ≈ 99
-										popularity = Math.min(100, Math.round(Math.log10(rawPlaycount + 1) * 14.18));
-										/*/
-										// Logarithmic popularity curve anchored at:
-										// 500K plays ≈ 50, 15M plays ≈ 100
-										const log = Math.log10(rawPlaycount + 1);
-										const raw = 33.85 * log - 143.0;   // your anchored log curve
-										const popularity = Math.round(100 / (1 + Math.exp(-(raw - 60) / 8)));
-										//*/
-									}
-								}
-							}
+							const { popularity, rawPlaycount } = this.normalizePopularityFromTrack(t);
 
 							// Debug log for first few missed artists
 							if (missedResults.length < 5) {
