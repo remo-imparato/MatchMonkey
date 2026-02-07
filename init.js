@@ -105,6 +105,7 @@ function start() {
 		// === Track Selection ===
 		UseLastfmRanking: true,         // Sort by Last.fm popularity
 		PreferHighQuality: true,        // Prefer higher bitrate/rating versions
+		MinMissedPopularity: 39,        // Minimum popularity for missed recommendations (0-100)
 
 		// === Rating Filter ===
 		MinRating: 0,                   // Minimum rating (0-100)
