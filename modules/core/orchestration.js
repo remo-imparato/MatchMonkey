@@ -782,14 +782,14 @@ window.matchMonkeyOrchestration = {
 		// Batch add missed results - they already have normalized popularity
 		if (missedResults.length > 0 && window.matchMonkeyMissedResults?.addBatch) {
 			const minMissedPopularity = intSetting('MinMissedPopularity', 39);
-			const filteredMissedResults = missedResults.filter(r => (r.popularity || 0) > minMissedPopularity);
+			const filteredMissedResults = missedResults.filter(r => (r.popularity || 0) >= minMissedPopularity);
 
 			if (filteredMissedResults.length > 0) {
-				console.log(`Match Monkey: Adding ${filteredMissedResults.length} missed recommendations to tracker (filtered from ${missedResults.length}, threshold: >${minMissedPopularity}%)`);
+				console.log(`Match Monkey: Adding ${filteredMissedResults.length} missed recommendations to tracker (filtered from ${missedResults.length}, threshold: >=${minMissedPopularity}%)`);
 				window.matchMonkeyMissedResults.addBatch(filteredMissedResults);
 				console.log(`Match Monkey: Tracked ${filteredMissedResults.length} missed recommendations`);
 			} else {
-				console.log(`Match Monkey: No missed recommendations above ${minMissedPopularity}% popularity threshold (${missedResults.length} filtered out)`);
+				console.log(`Match Monkey: No missed recommendations at or above ${minMissedPopularity}% popularity threshold (${missedResults.length} filtered out)`);
 			}
 		}
 
