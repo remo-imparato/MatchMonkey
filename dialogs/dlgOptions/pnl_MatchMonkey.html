@@ -247,6 +247,30 @@
 				</div>
 			</fieldset>
 
+			<!-- Missed Results -->
+			<fieldset>
+				<legend>Missed Recommendations</legend>
+				<div class="uiRows">
+					<div class="uiRow" style="padding:0.5em;background:var(--panel-background,#f8f8f8);border-radius:4px;">
+						<span style="font-size:0.9em;color:var(--text-secondary,#666);">
+							Track recommendations from Last.fm and ReccoBeats that weren't found in your library.
+							This helps identify missing tracks you might want to add to your collection.
+							Use the <strong>View missed results</strong> menu.
+						</span>
+					</div>
+					<div class="uiRow">
+						<div style="display:flex; gap:1em; align-items:center;">
+							<div data-id="btnViewMissedResults" data-control-class="Button" style="padding:0.5em 1em;">
+								View Missed Results
+							</div>
+							<span data-id="missedResultsCount" style="color:var(--text-secondary,#666);">
+								Loading...
+							</span>
+						</div>
+					</div>
+				</div>
+			</fieldset>
+
 			<!-- Filters (Advanced) -->
 			<fieldset style="display:none;">
 				<legend>Filters (advanced) {do not use}</legend>

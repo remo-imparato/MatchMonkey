@@ -146,6 +146,9 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function (sett, 
 		UI.GenreBlacklist.controlClass.value = cfg.GenreBlacklist || '';
 		UI.TitleExclusions.controlClass.value = cfg.TitleExclusions || '';
 
+		// === Missed Results ===
+		this._setupMissedResults(UI);
+
 		console.log('Match Monkey Options: Settings loaded successfully');
 
 	} catch (e) {
@@ -252,10 +255,16 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setupAutoModeCheckbox = func
  */
 optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 	try {
-		// Clean up event listener
+		// Clean up event listeners
 		if (this._autoModeListener) {
 			window.removeEventListener('matchmonkey:automodechanged', this._autoModeListener);
 			this._autoModeListener = null;
+		}
+		
+		if (this._missedResultsListener) {
+			window.removeEventListener('matchmonkey:missedresultadded', this._missedResultsListener);
+			window.removeEventListener('matchmonkey:missedresultscleared', this._missedResultsListener);
+			this._missedResultsListener = null;
 		}
 
 		const UI = getAllUIElements();
@@ -341,5 +350,81 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 
 	} catch (e) {
 		console.error('Match Monkey Options: save error:', e.toString());
+	}
+};
+
+
+/**
+ * Setup missed results section
+ */
+optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setupMissedResults = function(UI) {
+	try {
+		// Update count
+		this._updateMissedResultsCount(UI);
+		
+		// Setup button click handler
+		if (UI.btnViewMissedResults && UI.btnViewMissedResults.controlClass) {
+			app.listen(UI.btnViewMissedResults, 'click', () => {
+				this._openMissedResultsDialog();
+			});
+		}
+		
+		// Listen for updates to the missed results
+		this._missedResultsListener = () => {
+			this._updateMissedResultsCount(UI);
+		};
+		
+		window.addEventListener('matchmonkey:missedresultadded', this._missedResultsListener);
+		window.addEventListener('matchmonkey:missedresultscleared', this._missedResultsListener);
+		
+	} catch (e) {
+		console.error('Match Monkey Options: Error setting up missed results:', e);
+	}
+};
+
+/**
+ * Update missed results count display
+ */
+optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._updateMissedResultsCount = function(UI) {
+	try {
+		if (!UI.missedResultsCount) return;
+		
+		if (window.matchMonkeyMissedResults?.getStats) {
+			const stats = window.matchMonkeyMissedResults.getStats();
+			
+			if (stats.total === 0) {
+				UI.missedResultsCount.innerText = 'No missed results';
+			} else {
+				const plural = stats.total === 1 ? '' : 's';
+				const occPlural = stats.totalOccurrences === 1 ? '' : 's';
+				UI.missedResultsCount.innerText = `${stats.total} unique track${plural}, ${stats.totalOccurrences} occurrence${occPlural}`;
+			}
+		} else {
+			UI.missedResultsCount.innerText = 'Not available';
+		}
+	} catch (e) {
+		console.error('Match Monkey Options: Error updating missed results count:', e);
+		if (UI.missedResultsCount) {
+			UI.missedResultsCount.innerText = 'Error loading count';
+		}
+	}
+};
+
+/**
+ * Open missed results dialog
+ */
+optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._openMissedResultsDialog = function() {
+	try {
+		console.log('Match Monkey Options: Opening missed results dialog');
+		
+		if (typeof uitools !== 'undefined' && uitools.openDialog) {
+			uitools.openDialog('dlgMissedResults', {
+				modal: true
+			});
+		} else {
+			console.error('Match Monkey Options: uitools.openDialog not available');
+		}
+	} catch (e) {
+		console.error('Match Monkey Options: Error opening missed results dialog:', e);
 	}
 };

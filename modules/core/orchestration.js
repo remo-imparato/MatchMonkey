@@ -182,18 +182,18 @@ window.matchMonkeyOrchestration = {
 
 			if (!candidates || candidates.length === 0) {
 				terminateProgressTask(taskId);
-				
+
 				// Provide specific guidance based on discovery mode
 				let errorMsg = `No ${modeName} candidates found.`;
 				let guidance = '';
-				
+
 				if (discoveryMode === 'acoustics' || discoveryMode === 'mood' || discoveryMode === 'activity') {
 					errorMsg = `No tracks found on ReccoBeats.`;
 					guidance = ' Acoustic search requires Artist, Album, and Track tags to match official release names exactly. Check your library metadata for accuracy.';
 				} else {
 					guidance = ' Try different seeds or adjust settings.';
 				}
-				
+
 				showToast(`${errorMsg}${guidance}`, { type: 'info', duration: 7000 });
 				console.log(`Match Monkey: Discovery returned no candidates`);
 				return { success: false, error: `No ${modeName} found.`, tracksAdded: 0 };
@@ -588,6 +588,9 @@ window.matchMonkeyOrchestration = {
 		let artistsMatched = 0;
 		let totalTracksMatched = 0;
 
+		// Track missed results
+		const missedResults = [];
+
 		for (let i = 0; i < totalCandidates; i++) {
 			const candidate = candidates[i];
 			if (!candidate?.artist) continue;
@@ -603,6 +606,7 @@ window.matchMonkeyOrchestration = {
 
 			try {
 				let tracks = [];
+				let searchedSpecificTracks = false; // Track if we searched for specific tracks
 
 				// If candidate has specific tracks, search for those
 				if (candidate.tracks && candidate.tracks.length > 0) {
@@ -611,6 +615,7 @@ window.matchMonkeyOrchestration = {
 					).filter(Boolean);
 
 					if (titles.length > 0) {
+						searchedSpecificTracks = true; // Mark that we searched for specific tracks
 						const foundMap = await db.findLibraryTracksBatch(
 							candidate.artist,
 							titles,
@@ -622,9 +627,64 @@ window.matchMonkeyOrchestration = {
 							}
 						);
 
-						// Collect all found tracks
-						for (const arr of foundMap.values()) {
-							tracks.push(...arr);
+						// Collect all found tracks and track missed ones with popularity
+						for (const [title, foundTracks] of foundMap.entries()) {
+							if (foundTracks && foundTracks.length > 0) {
+								tracks.push(...foundTracks);
+							} else {
+								// Find the original track data to get popularity
+								const originalTrack = candidate.tracks.find(t => {
+									const trackTitle = typeof t === 'string' ? t : (t.title || '');
+									return trackTitle === title;
+								});
+
+								// Extract and normalize popularity from track data
+								let popularity = 0;
+								let rawPlaycount = 0;
+								if (typeof originalTrack === 'object' && originalTrack !== null) {
+									// ReccoBeats popularity (already 0-100 scale)
+									if (originalTrack.popularity != null && !isNaN(originalTrack.popularity)) {
+										popularity = Math.round(Number(originalTrack.popularity));
+									}
+									// Last.fm playcount (convert to 0-100 scale using log scale)
+									else if (originalTrack.playcount != null && !isNaN(originalTrack.playcount)) {
+										rawPlaycount = Number(originalTrack.playcount);
+										if (rawPlaycount > 0) {
+											//*
+											// Logarithmic scale tuned for high playcounts:
+											// ~500K ≈ 81, 1M ≈ 85, 2M ≈ 89, 3M ≈ 92, 5M ≈ 95, 10M ≈ 99
+											popularity = Math.min(100, Math.round(Math.log10(rawPlaycount + 1) * 14.18));
+											/*/
+											// Logarithmic popularity curve anchored at:
+											// 500K plays ≈ 50, 15M plays ≈ 100
+											const log = Math.log10(rawPlaycount + 1);
+											const raw = 33.85 * log - 143.0;   // your anchored log curve
+											const popularity = Math.round(100 / (1 + Math.exp(-(raw - 60) / 8)));
+											//*/
+										}
+									}
+								}
+
+								// Debug log for first few missed tracks
+								if (missedResults.length < 5) {
+									console.log(`Match Monkey: Missed track - "${candidate.artist} - ${title}" (playcount: ${rawPlaycount}, popularity: ${popularity}%)`);
+								}
+
+								// Track as missed result with normalized popularity
+								missedResults.push({
+									artist: candidate.artist,
+									title: title,
+									popularity: popularity,
+									additionalInfo: {
+										source: config.discoveryMode === 'acoustics' ||
+											config.discoveryMode === 'mood' ||
+											config.discoveryMode === 'activity' ? 'ReccoBeats' : 'Last.fm',
+										discoveryMode: config.discoveryMode,
+										playcount: typeof originalTrack === 'object' ? (originalTrack.playcount || 0) : 0,
+										rank: typeof originalTrack === 'object' ? (originalTrack.rank || 0) : 0
+									}
+								});
+							}
 						}
 					}
 				}
@@ -641,6 +701,61 @@ window.matchMonkeyOrchestration = {
 							allowUnknown: config.allowUnknown,
 						}
 					);
+
+					// If no tracks found for artist at all, track the artist's top tracks as missed
+					// BUT only if we didn't already search for specific tracks (to avoid double-tracking)
+					if (tracks.length === 0 && !searchedSpecificTracks && candidate.tracks && candidate.tracks.length > 0) {
+						candidate.tracks.slice(0, 3).forEach(t => {
+							const trackTitle = typeof t === 'string' ? t : (t.title || '');
+							if (!trackTitle) return;
+
+							// Extract and normalize popularity
+							let popularity = 0;
+							let rawPlaycount = 0;
+							if (typeof t === 'object' && t !== null) {
+								// ReccoBeats popularity (already 0-100 scale)
+								if (t.popularity != null && !isNaN(t.popularity)) {
+									popularity = Math.round(Number(t.popularity));
+								}
+								// Last.fm playcount (convert to 0-100 scale)
+								else if (t.playcount != null && !isNaN(t.playcount)) {
+									rawPlaycount = Number(t.playcount);
+									if (rawPlaycount > 0) {
+										//*
+										// Logarithmic scale tuned for high playcounts:
+										// ~500K ≈ 81, 1M ≈ 85, 2M ≈ 89, 3M ≈ 92, 5M ≈ 95, 10M ≈ 99
+										popularity = Math.min(100, Math.round(Math.log10(rawPlaycount + 1) * 14.18));
+										/*/
+										// Logarithmic popularity curve anchored at:
+										// 500K plays ≈ 50, 15M plays ≈ 100
+										const log = Math.log10(rawPlaycount + 1);
+										const raw = 33.85 * log - 143.0;   // your anchored log curve
+										const popularity = Math.round(100 / (1 + Math.exp(-(raw - 60) / 8)));
+										//*/
+									}
+								}
+							}
+
+							// Debug log for first few missed artists
+							if (missedResults.length < 5) {
+								console.log(`Match Monkey: Missed artist fallback - "${candidate.artist} - ${trackTitle}" (playcount: ${rawPlaycount}, popularity: ${popularity}%)`);
+							}
+
+							missedResults.push({
+								artist: candidate.artist,
+								title: trackTitle,
+								popularity: popularity,
+								additionalInfo: {
+									source: config.discoveryMode === 'acoustics' ||
+										config.discoveryMode === 'mood' ||
+										config.discoveryMode === 'activity' ? 'ReccoBeats' : 'Last.fm',
+									discoveryMode: config.discoveryMode,
+									playcount: typeof t === 'object' ? (t.playcount || 0) : 0,
+									rank: typeof t === 'object' ? (t.rank || 0) : 0
+								}
+							});
+						});
+					}
 				}
 
 				// Add unique tracks to results
@@ -661,6 +776,20 @@ window.matchMonkeyOrchestration = {
 
 			} catch (e) {
 				console.warn(`Match Monkey: Error matching "${candidate.artist}":`, e.message);
+			}
+		}
+
+		// Batch add missed results - they already have normalized popularity
+		if (missedResults.length > 0 && window.matchMonkeyMissedResults?.addBatch) {
+			// Filter to keep only results above 39% popularity
+			const filteredMissedResults = missedResults.filter(r => (r.popularity || 0) > 39);
+
+			if (filteredMissedResults.length > 0) {
+				console.log(`Match Monkey: Adding ${filteredMissedResults.length} missed recommendations to tracker (filtered from ${missedResults.length}, threshold: >39%)`);
+				window.matchMonkeyMissedResults.addBatch(filteredMissedResults);
+				console.log(`Match Monkey: Tracked ${filteredMissedResults.length} missed recommendations`);
+			} else {
+				console.log(`Match Monkey: No missed recommendations above 39% popularity threshold (${missedResults.length} filtered out)`);
 			}
 		}
 
