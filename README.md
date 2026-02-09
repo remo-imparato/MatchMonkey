@@ -26,6 +26,7 @@ You can run discovery by Track, Artist, Genre or Acoustics (ReccoBeats AI) — c
 - 🎲 **Randomization**: Optionally shuffle results for variety
 - 🔄 **Prefix Handling**: Handles common name prefix and suffix patterns (e.g., `The Beatles` ⇄ `Beatles, The`) and respects MediaMonkey prefix settings
 - 🛠️ **MM5 Best Practices**: Uses MM5 APIs and persistent track references where available
+- 🛠️ **Save Missed Recommendations**: Copy the list of tracks that were highly recommended but not matched
 
 ---
 
