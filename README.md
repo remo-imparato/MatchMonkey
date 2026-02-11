@@ -22,11 +22,8 @@ You can run discovery by Track, Artist, Genre or Acoustics (ReccoBeats AI) — c
 - 🎯 **Intelligent Matching**: Multi-pass fuzzy matching finds tracks in your local library (exact → normalized → partial)
 - 📋 **Flexible Output**: Create new playlists, overwrite existing ones, or queue tracks directly to Now Playing
 - 🤖 **Auto-Queue / Endless music**: Auto-mode can automatically queue similar tracks when Now Playing is nearing the end
-- 🧭 **Deduplication**: Removes duplicate songs by `artist|title`. Current implementation keeps the first matching candidate; enhanced selection (bitrate/rating prioritization) is planned
 - 🎲 **Randomization**: Optionally shuffle results for variety
-- 🔄 **Prefix Handling**: Handles common name prefix and suffix patterns (e.g., `The Beatles` ⇄ `Beatles, The`) and respects MediaMonkey prefix settings
-- 🛠️ **MM5 Best Practices**: Uses MM5 APIs and persistent track references where available
-- 🛠️ **Save Missed Recommendations**: Copy the list of tracks that were highly recommended but not matched
+-  🛠️ **Save Missed Recommendations**: Copy the list of tracks that were highly recommended but not matched
 
 ---
 
