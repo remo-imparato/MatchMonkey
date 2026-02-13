@@ -16,7 +16,7 @@
  *              and ReccoBeats. Supports automatic mode to queue similar tracks when approaching
  *              end of playlist.
  * 
- * @repository https://github.com/remo-imparato/SimilarArtistsMM5
+ * @repository https://github.com/remo-imparato/MatchMonkey
 
  */
 

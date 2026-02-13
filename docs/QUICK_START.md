@@ -74,7 +74,7 @@ Tools → Options → Match Monkey — adjust discovery mode defaults, limits, m
 - [User Guide](USER_GUIDE.md) — Complete guide with detailed explanations
 - [Quick Reference](QUICK_REFERENCE.md) — Settings reference and tips
 - [Examples & Tutorial](EXAMPLES_TUTORIAL.md) — Real-world usage examples
-- Report issues: [GitHub Issues](https://github.com/remo-imparato/SimilarArtistsMM5/issues)
+- Report issues: [GitHub Issues](https://github.com/remo-imparato/MatchMonkey/issues)
 - Support the project: [Ko-fi](https://ko-fi.com/remoimparato)
 ---
 

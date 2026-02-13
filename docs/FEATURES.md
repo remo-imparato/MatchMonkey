@@ -370,6 +370,6 @@ Same as mood-based but with activity optimization:
 
 ## Support
 
-- Report issues: [GitHub Issues](https://github.com/remo-imparato/SimilarArtistsMM5/issues)
-- Download updates: [GitHub Releases](https://github.com/remo-imparato/SimilarArtistsMM5/releases)
+- Report issues: [GitHub Issues](https://github.com/remo-imparato/MatchMonkey/issues)
+- Download updates: [GitHub Releases](https://github.com/remo-imparato/MatchMonkey/releases)
 - Support the project: [Ko-fi](https://ko-fi.com/remoimparato)

@@ -39,7 +39,7 @@ You can run discovery by Track, Artist, Genre or Acoustics (ReccoBeats AI) — c
 
 ## 🚀 Installation
 
-1. Download the latest `.mmip` file from the [Releases](https://github.com/remo-imparato/SimilarArtistsMM5/releases) page
+1. Download the latest `.mmip` file from the [Releases](https://github.com/remo-imparato/MatchMonkey/releases) page
 2. In MediaMonkey 5, go to **Tools → Addons**
 3. Click **Install addon from file** and select the downloaded `.mmip` file
 4. Restart MediaMonkey 5
@@ -261,7 +261,7 @@ The add-on intelligently handles common artist name prefix patterns:
 
 ## 🆘 Support
 
-- **Report Issues**: [GitHub Issues](https://github.com/remo-imparato/SimilarArtistsMM5/issues)
+- **Report Issues**: [GitHub Issues](https://github.com/remo-imparato/MatchMonkey/issues)
 - **Email**: rimparato@hotmail.com
 - **Donate**: [Ko-fi](https://ko-fi.com/remoimparato)
 
@@ -282,15 +282,15 @@ If you plan to use Match Monkey commercially, please obtain a license:
 
 See the included **LICENSE** (MIT) and **license-commercial.txt** (Commercial EULA) for full terms.
 
-- MIT License (published): https://github.com/remo-imparato/SimilarArtistsMM5/blob/updateMatchMonkey/license-mit.txt
-- Commercial EULA (published): https://github.com/remo-imparato/SimilarArtistsMM5/blob/updateMatchMonkey/license-commercial.txt
+- MIT License (published): https://github.com/remo-imparato/MatchMonkey/blob/updateMatchMonkey/license-mit.txt
+- Commercial EULA (published): https://github.com/remo-imparato/MatchMonkey/blob/updateMatchMonkey/license-commercial.txt
 
 
 ---
 
 ## 🐛 Bug Reports & Feature Requests
 
-Found a bug or have a feature idea? Please open an issue on the [GitHub Issues](https://github.com/remo-imparato/SimilarArtistsMM5/issues) page.
+Found a bug or have a feature idea? Please open an issue on the [GitHub Issues](https://github.com/remo-imparato/MatchMonkey/issues) page.
 
 ---
 

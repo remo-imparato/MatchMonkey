@@ -141,8 +141,8 @@ Open MediaMonkey → Tools → Options → Match Monkey and adjust discovery mod
 
 ## Need more help?
 
-- Report issues or request features: [GitHub Issues](https://github.com/remo-imparato/SimilarArtistsMM5/issues)
-- Download the latest version: [GitHub Releases](https://github.com/remo-imparato/SimilarArtistsMM5/releases)
+- Report issues or request features: [GitHub Issues](https://github.com/remo-imparato/MatchMonkey/issues)
+- Download the latest version: [GitHub Releases](https://github.com/remo-imparato/MatchMonkey/releases)
 - Support the project: [Ko-fi](https://ko-fi.com/remoimparato)
 
 ---
