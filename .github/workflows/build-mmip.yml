@@ -49,14 +49,14 @@ jobs:
           tmpfile=$(mktemp)
           jq --arg v "$VERSION" '.version = $v' info.json > "$tmpfile" && mv "$tmpfile" info.json
 
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Building version: $VERSION"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Building version: ${VERSION}"
 
       - name: Verify MM5 compatibility
         run: |
           # Check info.json for MM5 requirements
           MIN_APP=$(jq -r '.minAppVersion // "5.0.0"' info.json)
-          echo "MM5 Minimum Version: $MIN_APP"
+          echo "MM5 Minimum Version: ${MIN_APP}"
           
           # Verify required files exist (match build-local.ps1)
           ROOT_FILES=(
@@ -91,7 +91,7 @@ jobs:
           done
           
           if [ $MISSING -gt 0 ]; then
-            echo "Build failed: $MISSING required files/directories missing"
+            echo "Build failed: ${MISSING} required files/directories missing"
             exit 1
           fi
           
@@ -128,7 +128,7 @@ jobs:
           }
           EOF
 
-          echo "update_json=update.json" >> $GITHUB_OUTPUT
+          echo "update_json=update.json" >> "$GITHUB_OUTPUT"
           echo "Generated update.json for version ${VERSION}"
 
       - name: Create MMIP package
@@ -165,7 +165,7 @@ jobs:
           echo "? Created license.txt (combined)"
           
           # Core files (include license files)
-          zip -r -q MatchMonkey-${{ steps.bump_version.outputs.version }}.mmip \
+          zip -r -q "MatchMonkey-${{ steps.bump_version.outputs.version }}.mmip" \
             info.json \
             init.js \
             actions_add.js \
@@ -203,12 +203,12 @@ jobs:
           echo "Working directory: $(pwd)"
           echo ""
           echo "=== Package Contents ===" 
-          unzip -l MatchMonkey-${{ steps.bump_version.outputs.version }}.mmip | grep -E '(\.js|\.json|info|init|actions|MatchMonkey|modules/)' | head -30
+          unzip -l "MatchMonkey-${{ steps.bump_version.outputs.version }}.mmip" | grep -E '(\.js|\.json|info|init|actions|MatchMonkey|modules/)' | head -30
           echo ""
           echo "=== Package Details ==="
-          ls -lh MatchMonkey-${{ steps.bump_version.outputs.version }}.mmip
-          sha256sum MatchMonkey-${{ steps.bump_version.outputs.version }}.mmip > MatchMonkey-${{ steps.bump_version.outputs.version }}.mmip.sha256 || true
-          cat MatchMonkey-${{ steps.bump_version.outputs.version }}.mmip.sha256
+          ls -lh "MatchMonkey-${{ steps.bump_version.outputs.version }}.mmip"
+          sha256sum "MatchMonkey-${{ steps.bump_version.outputs.version }}.mmip" > "MatchMonkey-${{ steps.bump_version.outputs.version }}.mmip.sha256" || true
+          cat "MatchMonkey-${{ steps.bump_version.outputs.version }}.mmip.sha256"
 
       - name: Upload artifacts (package + checksum + update.json)
         uses: actions/upload-artifact@v4
@@ -245,11 +245,17 @@ jobs:
             
             ## Features
             - Generate playlists from similar artists, tracks, or genre via Last.fm
-            - Auto-queue similar tracks when approaching playlist
+            - Auto-queue similar tracks when approaching playlist end
             - Extensive filtering and ranking options
             - Full MM5 integration (toolbar, menu, hotkeys)
+            - Missed Results tracking with popularity scores
             
-            **SHA256 Checksum:** See .mmip.sha256 file
+            ## Bug Fixes in this Release
+            - Fixed critical syntax error in Last.fm popularity calculation
+            - Fixed double-tracking of missed results
+            - Standardized popularity scaling for consistent scoring
+            
+            **SHA256 Checksum:** See .mmip.sha256 file attached
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
