@@ -5,14 +5,14 @@
  * Fetches music recommendations using the ReccoBeats API.
  * 
  * Two main workflows:
- * 1. Seed-based (Similar Recco): Select tracks Ã¢â€ â€™ Find on ReccoBeats Ã¢â€ â€™ Get audio features Ã¢â€ â€™ Get recommendations
- * 2. Mood/Activity-based: Use predefined audio targets Ã¢â€ â€™ Get recommendations
+ * 1. Seed-based (Similar Recco): Select tracks -> Find on ReccoBeats -> Get audio features -> Get recommendations
+ * 2. Mood/Activity-based: Use predefined audio targets -> Get recommendations
  * 
  * API Workflow:
- * - Album Search: /v1/album/search Ã¢â€ â€™ Find albums by name
- * - Track Lookup: /v1/album/:id/track Ã¢â€ â€™ Get tracks from album  
- * - Audio Features: /v1/track/:id/audio-features Ã¢â€ â€™ Get audio characteristics
- * - Recommendations: /v1/track/recommendation Ã¢â€ â€™ Get similar tracks
+ * - Album Search: /v1/album/search -> Find albums by name
+ * - Track Lookup: /v1/album/:id/track -> Get tracks from album  
+ * - Audio Features: /v1/track/:id/audio-features -> Get audio characteristics
+ * - Recommendations: /v1/track/recommendation -> Get similar tracks
  * 
  * Caching Strategy:
  * - Per-session cache stored in lastfmCache._reccobeats Map
