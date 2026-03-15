@@ -1032,11 +1032,19 @@ window.matchMonkeyOrchestration = {
 			// Determine %seed% based on discovery mode
 			const seedText = (config.discoveryMode === 'genre' && genreName) ? genreName : seedName;
 
+			// Check if template contains any supported placeholders
+			const hasPlaceholders = /%action%|%seed%|%/.test(playlistTemplate);
+
 			// Replace placeholders
 			playlistName = playlistTemplate
 				.replace(/%action%/g, actionText)
 				.replace(/%seed%/g, seedText)
 				.replace(/%/g, seedText); // Legacy % placeholder for backward compatibility
+
+			// Fallback: if no placeholders were used, append the seed text to avoid duplicate/static names
+			if (!hasPlaceholders && seedText) {
+				playlistName = `${playlistName} ${seedText}`;
+			}
 
 		} else {
 			// Auto-generate name based on discovery mode (when template is empty)
