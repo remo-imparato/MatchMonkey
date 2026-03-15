@@ -39,11 +39,11 @@ window.matchMonkeyOrchestration = {
 				if (rawPlaycount > 0) {
 					//*
 					// Logarithmic scale tuned for high playcounts:
-					// ~500K ˜ 81, 1M ˜ 85, 2M ˜ 89, 3M ˜ 92, 5M ˜ 95, 10M ˜ 99
+					// ~500K ~ 81, 1M ~ 85, 2M ~ 89, 3M ~ 92, 5M ~ 95, 10M ~ 99
 					popularity = Math.min(100, Math.round(Math.log10(rawPlaycount + 1) * 14.18));
 					/*/
 					// Logarithmic popularity curve anchored at:
-					// 500K plays ˜ 50, 15M plays ˜ 100
+					// 500K plays ~ 50, 15M plays ~ 100
 					const log = Math.log10(rawPlaycount + 1);
 					const raw = 33.85 * log - 143.0;   // your anchored log curve
 					popularity = Math.round(100 / (1 + Math.exp(-(raw - 60) / 8)));
