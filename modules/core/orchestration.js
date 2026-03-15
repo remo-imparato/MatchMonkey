@@ -1353,6 +1353,9 @@ window.matchMonkeyOrchestration = {
 	/**
 	 * Build a genre name summary from seed tracks for playlist naming.
 	 * Extracts unique genres from seed tracks and formats them nicely.
+	 * 
+	 * @param {Array} seeds - Seed objects
+	 * @returns {string} Display name for playlist
 	 */
 	buildPlaylistGenreName(seeds) {
 		if (!seeds || seeds.length === 0) return 'Selection';
