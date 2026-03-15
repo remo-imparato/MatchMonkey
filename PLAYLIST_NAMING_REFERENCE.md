@@ -113,15 +113,15 @@ PlaylistName: "% Radio"
 // Result: "The Beatles, Pink Floyd Radio"
 ```
 
-**If you had empty PlaylistName:**
+**If you had empty PlaylistName before upgrading:**
 ```javascript
-// Before:
+// Before (and after upgrade – no change):
 PlaylistName: ''
 
-// After (gets new default):
-PlaylistName: 'Similar %action% (%seed%)'
-
-// Now uses template system with default format
+// Behavior:
+// - Migration code does NOT overwrite an existing empty string
+// - Empty template still means "use pure auto-generation"
+// - Result depends on discovery mode (legacy behavior)
 ```
 
 ## Use Cases
