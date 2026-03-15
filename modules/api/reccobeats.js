@@ -1404,8 +1404,8 @@ async function getReccoRecommendations(seeds, limit = 100) {
 
 	const allRecommendations = [];
 
-	for (let i = 0; i < audioFeatures.length; i++) {
-		const seedFeatures = audioFeatures[i];
+	// Fire off per-seed recommendation requests in parallel to reduce overall latency.
+	const recommendationPromises = audioFeatures.map((seedFeatures, i) => {
 		const seedTrack = foundTracks[i];
 
 		// Reduce to core five audio features
@@ -1421,9 +1421,16 @@ async function getReccoRecommendations(seeds, limit = 100) {
 		updateProgress(`Getting recommendations for seed ${i + 1}/${audioFeatures.length}...`, progressPercent);
 		console.log(`getReccoRecommendations: Processing seed ${i + 1}/${audioFeatures.length} (${seedTrack.seed.artist} - ${seedTrack.seed.title})`);
 
-		const seedRecommendations = await fetchRecommendations([seedTrack.trackId], audioTargets, limit);
+		return fetchRecommendations([seedTrack.trackId], audioTargets, limit)
+			.then((seedRecommendations) => {
+				console.log(`getReccoRecommendations: Received ${seedRecommendations.length} recommendations for seed ${i + 1}`);
+				return seedRecommendations;
+			});
+	});
 
-		console.log(`getReccoRecommendations: Received ${seedRecommendations.length} recommendations for seed ${i + 1}`);
+	const perSeedResults = await Promise.all(recommendationPromises);
+
+	for (const seedRecommendations of perSeedResults) {
 		allRecommendations.push(...seedRecommendations);
 	}
 
