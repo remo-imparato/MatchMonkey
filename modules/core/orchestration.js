@@ -964,11 +964,17 @@ window.matchMonkeyOrchestration = {
 	 * ------------------------
 	 * Users can override auto-naming by setting a custom PlaylistName template:
 	 * 
-	 * - Use '%' as a placeholder for seed names (artists/genres)
+	 * Placeholders:
+	 * - %action% = Discovery type (Artists, Tracks, Genres, Acoustics, mood name, activity name)
+	 * - %seed%   = Seed summary (artist names, genre names, or selection)
+	 * - %        = Legacy placeholder (same as %seed% for backward compatibility)
+	 * 
 	 * - Examples:
-	 *   * "My Mix - %"  ? "My Mix - The Beatles, Pink Floyd"
-	 *   * "% Radio"     ? "The Beatles, Pink Floyd Radio"
-	 *   * "Daily Mix"   ? "Daily Mix The Beatles, Pink Floyd" (% optional)
+	 *   * "Similar %action% (%seed%)"    ? "Similar Artists (The Beatles, Pink Floyd)"
+	 *   * "My %action% Mix - %seed%"     ? "My Artists Mix - The Beatles, Pink Floyd"
+	 *   * "%seed% Radio"                 ? "The Beatles, Pink Floyd Radio"
+	 *   * "Daily %action%"               ? "Daily Artists"
+	 *   * "%"                            ? "The Beatles, Pink Floyd" (legacy)
 	 * 
 	 * Seed Name Format:
 	 * -----------------
@@ -1006,12 +1012,34 @@ window.matchMonkeyOrchestration = {
 
 		// Use custom template if provided by user
 		if (playlistTemplate && playlistTemplate.trim()) {
-			// Simple template replacement: % gets replaced with seed/artist name
-			playlistName = playlistTemplate.indexOf('%') >= 0
-				? playlistTemplate.replace('%', seedName)
-				: `${playlistTemplate} ${seedName}`;
+			// Determine %action% based on discovery mode
+			let actionText = 'Artists'; // Default
+
+			if (config.moodActivityValue && (config.discoveryMode === 'mood' || config.discoveryMode === 'activity')) {
+				// Mood/Activity: Use the capitalized mood/activity value
+				actionText = config.moodActivityValue.charAt(0).toUpperCase() + config.moodActivityValue.slice(1);
+			} else if (config.discoveryMode === 'genre') {
+				actionText = 'Genres';
+			} else if (config.discoveryMode === 'track') {
+				actionText = 'Tracks';
+			} else if (config.discoveryMode === 'acoustics') {
+				actionText = 'Acoustics';
+			} else {
+				// Artist mode (default)
+				actionText = 'Artists';
+			}
+
+			// Determine %seed% based on discovery mode
+			const seedText = (config.discoveryMode === 'genre' && genreName) ? genreName : seedName;
+
+			// Replace placeholders
+			playlistName = playlistTemplate
+				.replace(/%action%/g, actionText)
+				.replace(/%seed%/g, seedText)
+				.replace(/%/g, seedText); // Legacy % placeholder for backward compatibility
+
 		} else {
-			// Auto-generate name based on discovery mode
+			// Auto-generate name based on discovery mode (when template is empty)
 			if (config.moodActivityValue && (config.discoveryMode === 'mood' || config.discoveryMode === 'activity')) {
 				// Mood/Activity: "Similar %mood/activity% (%artist%)"
 				const capitalizedValue = config.moodActivityValue.charAt(0).toUpperCase() + config.moodActivityValue.slice(1);
