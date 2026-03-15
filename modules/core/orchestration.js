@@ -949,9 +949,41 @@ window.matchMonkeyOrchestration = {
 	/**
 	 * Build a playlist from results.
 	 * 
+	 * Playlist Naming Convention:
+	 * ---------------------------
+	 * By default (when PlaylistName setting is empty), playlists are auto-named based on discovery mode:
+	 * 
+	 * - Artist Mode:    "Similar Artists (The Beatles, Pink Floyd, Muse)"
+	 * - Track Mode:     "Similar Tracks (The Beatles, Metallica...)"
+	 * - Genre Mode:     "Similar Genres (Rock, Blues, Jazz)"
+	 * - Acoustics Mode: "Similar Acoustics (Artist Name)"
+	 * - Mood Mode:      "Similar Energetic (Artist Name)"
+	 * - Activity Mode:  "Similar Workout (Artist Name)"
+	 * 
+	 * Custom Template Support:
+	 * ------------------------
+	 * Users can override auto-naming by setting a custom PlaylistName template:
+	 * 
+	 * - Use '%' as a placeholder for seed names (artists/genres)
+	 * - Examples:
+	 *   * "My Mix - %"  ? "My Mix - The Beatles, Pink Floyd"
+	 *   * "% Radio"     ? "The Beatles, Pink Floyd Radio"
+	 *   * "Daily Mix"   ? "Daily Mix The Beatles, Pink Floyd" (% optional)
+	 * 
+	 * Seed Name Format:
+	 * -----------------
+	 * - Shows up to 3 items with ellipsis (...) for more
+	 * - Artist seeds: "Artist1, Artist2, Artist3..." (from buildPlaylistSeedName)
+	 * - Genre seeds:  "Genre1, Genre2, Genre3..." (from buildPlaylistGenreName)
+	 * - Mood/Activity: Uses the mood/activity value (e.g., "Energetic", "Workout")
+	 * 
 	 * @param {object} modules - Module dependencies
 	 * @param {Array} tracks - Track objects for playlist
 	 * @param {object} config - Configuration settings
+	 * @param {string} config.discoveryMode - Discovery mode ('artist', 'track', 'genre', 'acoustics', 'mood', 'activity')
+	 * @param {string} config.seedName - Formatted seed names (artists or "Selection")
+	 * @param {string} config.genreName - Formatted genre names (for genre mode only)
+	 * @param {string} config.moodActivityValue - Mood/activity value if applicable
 	 * @returns {Promise<object>} Result with playlist reference
 	 */
 	//*
@@ -960,7 +992,7 @@ window.matchMonkeyOrchestration = {
 		const { stringSetting } = storage;
 		const { showToast, updateProgress } = notifications;
 
-		const playlistTemplate = stringSetting('PlaylistName', '- Similar to % (#)');
+		const playlistTemplate = stringSetting('PlaylistName', '');
 		const parentName = stringSetting('ParentPlaylist', '');
 		const playlistMode = stringSetting('PlaylistMode', 'Create new playlist');
 		const navigateAfter = stringSetting('NavigateAfter', 'Navigate to new playlist');
@@ -969,26 +1001,35 @@ window.matchMonkeyOrchestration = {
 		const seedName = config.seedName || 'Selection';
 		const genreName = config.genreName || null;
 
-		// Build playlist name based on discovery mode
+		// Build playlist name based on discovery mode (or use custom template if provided)
 		let playlistName;
 
-		if (config.moodActivityValue && (config.discoveryMode === 'mood' || config.discoveryMode === 'activity')) {
-			// Mood/Activity: "Similar %mood/activity% (%artist%)"
-			const capitalizedValue = config.moodActivityValue.charAt(0).toUpperCase() + config.moodActivityValue.slice(1);
-			playlistName = `Similar ${capitalizedValue} (${seedName})`;
-		} else if (config.discoveryMode === 'genre') {
-			// Genre: "Similar Genres (%genre%)"
-			const summary = genreName || seedName;
-			playlistName = `Similar Genres (${summary})`;
-		} else if (config.discoveryMode === 'track') {
-			// Track: "Similar Tracks (%artist%)"
-			playlistName = `Similar Tracks (${seedName})`;
-		} else if (config.discoveryMode === 'acoustics') {
-			// Acoustics: "Similar Acoustics (%artist%)"
-			playlistName = `Similar Acoustics (${seedName})`;
+		// Use custom template if provided by user
+		if (playlistTemplate && playlistTemplate.trim()) {
+			// Simple template replacement: % gets replaced with seed/artist name
+			playlistName = playlistTemplate.indexOf('%') >= 0
+				? playlistTemplate.replace('%', seedName)
+				: `${playlistTemplate} ${seedName}`;
 		} else {
-			// Artist (default): "Similar Artists (%artist%)"
-			playlistName = `Similar Artists (${seedName})`;
+			// Auto-generate name based on discovery mode
+			if (config.moodActivityValue && (config.discoveryMode === 'mood' || config.discoveryMode === 'activity')) {
+				// Mood/Activity: "Similar %mood/activity% (%artist%)"
+				const capitalizedValue = config.moodActivityValue.charAt(0).toUpperCase() + config.moodActivityValue.slice(1);
+				playlistName = `Similar ${capitalizedValue} (${seedName})`;
+			} else if (config.discoveryMode === 'genre') {
+				// Genre: "Similar Genres (%genre%)"
+				const summary = genreName || seedName;
+				playlistName = `Similar Genres (${summary})`;
+			} else if (config.discoveryMode === 'track') {
+				// Track: "Similar Tracks (%artist%)"
+				playlistName = `Similar Tracks (${seedName})`;
+			} else if (config.discoveryMode === 'acoustics') {
+				// Acoustics: "Similar Acoustics (%artist%)"
+				playlistName = `Similar Acoustics (${seedName})`;
+			} else {
+				// Artist (default): "Similar Artists (%artist%)"
+				playlistName = `Similar Artists (${seedName})`;
+			}
 		}
 
 		// Truncate if too long
@@ -1325,8 +1366,19 @@ window.matchMonkeyOrchestration = {
 	 * Build a display name from seed tracks for playlist naming.
 	 * Extracts unique artists from seed tracks and formats them nicely.
 	 * 
-	 * @param {Array} seeds - Seed objects
-	 * @returns {string} Display name for playlist
+	 * Format:
+	 * - 1 artist:   "The Beatles"
+	 * - 2 artists:  "The Beatles, Pink Floyd"
+	 * - 3 artists:  "The Beatles, Pink Floyd, Muse"
+	 * - 4+ artists: "The Beatles, Pink Floyd, Muse..."
+	 * 
+	 * Used in playlist names like:
+	 * - "Similar Artists (The Beatles, Pink Floyd, Muse)"
+	 * - "Similar Tracks (The Beatles, Metallica...)"
+	 * - "Similar Energetic (The Beatles)"
+	 * 
+	 * @param {Array} seeds - Seed objects [{artist, title, genre, album}, ...]
+	 * @returns {string} Display name for playlist (comma-separated artists or "Selection")
 	 */
 	buildPlaylistSeedName(seeds) {
 		if (!seeds || seeds.length === 0) return 'Selection';
@@ -1354,8 +1406,21 @@ window.matchMonkeyOrchestration = {
 	 * Build a genre name summary from seed tracks for playlist naming.
 	 * Extracts unique genres from seed tracks and formats them nicely.
 	 * 
-	 * @param {Array} seeds - Seed objects
-	 * @returns {string} Display name for playlist
+	 * Format:
+	 * - 1 genre:   "Rock"
+	 * - 2 genres:  "Rock, Blues"
+	 * - 3 genres:  "Rock, Blues, Jazz"
+	 * - 4+ genres: "Rock, Blues, Jazz..."
+	 * 
+	 * Used in genre discovery playlist names like:
+	 * - "Similar Genres (Rock, Blues, Jazz)"
+	 * - "Similar Genres (Hip-Hop, Rap...)"
+	 * 
+	 * Note: Prefers using extractGenresFromSeeds() from discoveryStrategies module
+	 * for consistency with genre discovery logic, falls back to inline extraction.
+	 * 
+	 * @param {Array} seeds - Seed objects [{artist, title, genre, album}, ...]
+	 * @returns {string} Display name for playlist (comma-separated genres or "Selection")
 	 */
 	buildPlaylistGenreName(seeds) {
 		if (!seeds || seeds.length === 0) return 'Selection';

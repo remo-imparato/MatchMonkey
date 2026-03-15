@@ -89,7 +89,18 @@ function start() {
 	 */
 	const DEFAULTS = {
 		// === Playlist Creation ===
-		PlaylistName: '- Similar to %', // Template (% = artist name)
+		// PlaylistName: Custom template for playlist names
+		//   - Leave blank (default) to use auto-generated names based on discovery mode:
+		//     * Artists: "Similar Artists (The Beatles, Pink Floyd, Muse)"
+		//     * Tracks:  "Similar Tracks (The Beatles, Metallica...)"
+		//     * Genres:  "Similar Genres (Rock, Blues, Jazz)"
+		//     * Acoustics: "Similar Acoustics (Artist Name)"
+		//     * Mood:    "Similar Energetic (Artist Name)"
+		//     * Activity: "Similar Workout (Artist Name)"
+		//   - Or provide a custom template with % placeholder for seed names:
+		//     * Example: "My Mix - %" → "My Mix - The Beatles, Pink Floyd"
+		//     * Example: "% Radio" → "The Beatles, Pink Floyd Radio"
+		PlaylistName: '',
 		ParentPlaylist: '',             // Parent playlist to organize results under (blank = root level)
 		PlaylistMode: 'Create new playlist', // Create new / Overwrite / Do not create
 		ShowConfirmDialog: false,       // Show playlist selection dialog
