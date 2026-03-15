@@ -93,7 +93,7 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function (sett, 
 		const UI = getAllUIElements(pnl);
 
 		// === Playlist Creation ===
-		UI.PlaylistName.controlClass.value = cfg.PlaylistName || '- Similar to %';
+		UI.PlaylistName.controlClass.value = cfg.PlaylistName !== undefined ? cfg.PlaylistName : '';
 		UI.ParentPlaylist.controlClass.value = cfg.ParentPlaylist || '';
 		UI.PlaylistMode.controlClass.value = cfg.PlaylistMode || 'Create new playlist';
 		UI.ShowConfirmDialog.controlClass.checked = Boolean(cfg.ShowConfirmDialog);
@@ -273,7 +273,7 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 		this.config = app.getValue(SCRIPT_ID, {});
 
 		// === Playlist Creation ===
-		this.config.PlaylistName = UI.PlaylistName.controlClass.value || '- Similar to %';
+		this.config.PlaylistName = UI.PlaylistName.controlClass.value !== undefined ? UI.PlaylistName.controlClass.value : '';
 		this.config.ParentPlaylist = UI.ParentPlaylist.controlClass.value || '';
 		this.config.PlaylistMode = UI.PlaylistMode.controlClass.value || 'Create new playlist';
 		this.config.ShowConfirmDialog = UI.ShowConfirmDialog.controlClass.checked;

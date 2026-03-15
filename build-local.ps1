@@ -3,7 +3,7 @@
 # 
 # Supports MM5 5.0+
 
-cd C:\Users\rimpa\OneDrive\Documents\Code\MatchMonkey\
+cd C:\Users\rimpa\OneDrive\Documents\Code\SimilarArtistsMM5
 
 Write-Host "Building MMIP package locally..." -ForegroundColor Cyan
 
