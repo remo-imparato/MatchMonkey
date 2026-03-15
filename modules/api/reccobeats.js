@@ -1434,12 +1434,14 @@ async function getReccoRecommendations(seeds, limit = 100) {
 		allRecommendations.push(...seedRecommendations);
 	}
 
-	// Step 4: Deduplicate recommendations by track ID
+	// Step 4: Deduplicate recommendations by track ID (fallback to artist/album/title if no ID)
 	console.log(`getReccoRecommendations: Step 4 - Deduplicating ${allRecommendations.length} total recommendations`);
 	const uniqueMap = new Map();
 
 	for (const rec of allRecommendations) {
-		const key = `${rec.artist}|||${rec.album}|||${rec.title}`.toLowerCase();
+		const key = (rec.id != null
+			? String(rec.id).toLowerCase()
+			: `${rec.artist}|||${rec.album}|||${rec.title}`.toLowerCase());
 		if (!uniqueMap.has(key)) {
 			uniqueMap.set(key, rec);
 		}
