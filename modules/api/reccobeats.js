@@ -837,7 +837,7 @@ async function findTrackInAlbum(albumId, trackTitle) {
  * Find a track on ReccoBeats by searching for its album first.
  * This is the main entry point for finding a track ID.
  * 
- * Workflow: Album Search Ã¢â€ â€™ Get Album Tracks Ã¢â€ â€™ Match Track Title
+ * Workflow: Album Search -> Get Album Tracks -> Match Track Title
  * 
  * @param {string} artist - Artist name
  * @param {string} title - Track title
