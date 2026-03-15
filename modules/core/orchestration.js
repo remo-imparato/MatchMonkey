@@ -951,7 +951,13 @@ window.matchMonkeyOrchestration = {
 	 * 
 	 * Playlist Naming Convention:
 	 * ---------------------------
-	 * By default (when PlaylistName setting is empty), playlists are auto-named based on discovery mode:
+	 * Default behavior is template-based: the PlaylistName setting is treated as a
+	 * name template. init.js now seeds this setting with a non-empty default:
+	 * 
+	 *   "Similar %action% (%seed%)"
+	 * 
+	 * This template is then resolved based on the discovery mode and seed summary.
+	 * For example, with the default template:
 	 * 
 	 * - Artist Mode:    "Similar Artists (The Beatles, Pink Floyd, Muse)"
 	 * - Track Mode:     "Similar Tracks (The Beatles, Metallica...)"
@@ -960,9 +966,13 @@ window.matchMonkeyOrchestration = {
 	 * - Mood Mode:      "Similar Energetic (Artist Name)"
 	 * - Activity Mode:  "Similar Workout (Artist Name)"
 	 * 
-	 * Custom Template Support:
-	 * ------------------------
-	 * Users can override auto-naming by setting a custom PlaylistName template:
+	 * Auto-generation without a template only occurs when the user explicitly
+	 * clears the PlaylistName setting to a blank string (''). In that case, the
+	 * playlist name is derived purely from discovery mode and seeds.
+	 * 
+	 * PlaylistName Template Support:
+	 * ------------------------------
+	 * Users can customize naming by setting a PlaylistName template:
 	 * 
 	 * Placeholders:
 	 * - %action% = Discovery type (Artists, Tracks, Genres, Acoustics, mood name, activity name)
