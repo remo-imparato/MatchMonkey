@@ -109,9 +109,9 @@ Test the following scenarios:
 
 ### Existing User with Empty PlaylistName
 - Current: `PlaylistName: ''`
-- After upgrade: Gets new default `'Similar %action% (%seed%)'`
-- Result: Uses template system instead of pure auto-generation
-- Names should be nearly identical to before
+- After upgrade: Remains `PlaylistName: ''` (no template applied)
+- Result: Continues using auto-generated playlist names (same behavior as before)
+- Note: To use the new template system, set a non-empty PlaylistName value or remove the key to pick up the default.
 
 ### Existing User with Custom Template Using %artist%
 - Current: `PlaylistName: "My %artist% Favorites"`
