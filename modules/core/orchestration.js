@@ -39,11 +39,11 @@ window.matchMonkeyOrchestration = {
 				if (rawPlaycount > 0) {
 					//*
 					// Logarithmic scale tuned for high playcounts:
-					// ~500K ˜ 81, 1M ˜ 85, 2M ˜ 89, 3M ˜ 92, 5M ˜ 95, 10M ˜ 99
+					// ~500K Ëœ 81, 1M Ëœ 85, 2M Ëœ 89, 3M Ëœ 92, 5M Ëœ 95, 10M Ëœ 99
 					popularity = Math.min(100, Math.round(Math.log10(rawPlaycount + 1) * 14.18));
 					/*/
 					// Logarithmic popularity curve anchored at:
-					// 500K plays ˜ 50, 15M plays ˜ 100
+					// 500K plays Ëœ 50, 15M plays Ëœ 100
 					const log = Math.log10(rawPlaycount + 1);
 					const raw = 33.85 * log - 143.0;   // your anchored log curve
 					popularity = Math.round(100 / (1 + Math.exp(-(raw - 60) / 8)));
@@ -1357,17 +1357,35 @@ window.matchMonkeyOrchestration = {
 	buildPlaylistGenreName(seeds) {
 		if (!seeds || seeds.length === 0) return 'Selection';
 
-		const genres = new Set();
-		for (const seed of seeds) {
-			if (seed.genre) {
-				const parts = seed.genre.split(';').map(g => g.trim()).filter(Boolean);
-				for (const part of parts) {
-					genres.add(part);
-				}
+		let genreList = [];
+
+		// Prefer shared genre-extraction logic from discoveryStrategies to keep behaviour consistent.
+		if (typeof window !== 'undefined'
+			&& window.matchMonkeyDiscoveryStrategies
+			&& typeof window.matchMonkeyDiscoveryStrategies.extractGenresFromSeeds === 'function') {
+			const extracted = window.matchMonkeyDiscoveryStrategies.extractGenresFromSeeds(seeds);
+			if (Array.isArray(extracted)) {
+				genreList = extracted;
 			}
 		}
 
-		const genreList = Array.from(genres);
+		// Fallback to existing inline extraction logic if the shared helper is unavailable
+		// or did not return an array, preserving current behaviour.
+		if (!Array.isArray(genreList) || genreList.length === 0) {
+			const genres = new Set();
+			for (const seed of seeds) {
+				if (seed && seed.genre) {
+					const parts = String(seed.genre)
+						.split(';')
+						.map(g => g.trim())
+						.filter(Boolean);
+					for (const part of parts) {
+						genres.add(part);
+					}
+				}
+			}
+			genreList = Array.from(genres);
+		}
 
 		if (genreList.length === 0) return 'Selection';
 		if (genreList.length === 1) return genreList[0];
