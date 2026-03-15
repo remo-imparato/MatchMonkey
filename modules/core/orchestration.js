@@ -1,4 +1,4 @@
-ï»¿/**
+/**
  * MatchMonkey Core Orchestration Logic
  * 
  * Main orchestration layer that ties together:
@@ -39,11 +39,11 @@ window.matchMonkeyOrchestration = {
 				if (rawPlaycount > 0) {
 					//*
 					// Logarithmic scale tuned for high playcounts:
-					// ~500K â‰ˆ 81, 1M â‰ˆ 85, 2M â‰ˆ 89, 3M â‰ˆ 92, 5M â‰ˆ 95, 10M â‰ˆ 99
+					// ~500K ˜ 81, 1M ˜ 85, 2M ˜ 89, 3M ˜ 92, 5M ˜ 95, 10M ˜ 99
 					popularity = Math.min(100, Math.round(Math.log10(rawPlaycount + 1) * 14.18));
 					/*/
 					// Logarithmic popularity curve anchored at:
-					// 500K plays â‰ˆ 50, 15M plays â‰ˆ 100
+					// 500K plays ˜ 50, 15M plays ˜ 100
 					const log = Math.log10(rawPlaycount + 1);
 					const raw = 33.85 * log - 143.0;   // your anchored log curve
 					popularity = Math.round(100 / (1 + Math.exp(-(raw - 60) / 8)));
@@ -303,7 +303,7 @@ window.matchMonkeyOrchestration = {
 			}
 
 			console.log(`Match Monkey: Removed ${results.length - dedupedResults.length} duplicates, ${dedupedResults.length} unique tracks remain`);
-			updateProgress(`Removed ${results.length - dedupedResults.length} duplicates â†’ ${dedupedResults.length} unique tracks`, 0.83);
+			updateProgress(`Removed ${results.length - dedupedResults.length} duplicates ? ${dedupedResults.length} unique tracks`, 0.83);
 
 			// Step 5: Apply randomization if enabled
 			if (config_.randomize) {
@@ -375,7 +375,7 @@ window.matchMonkeyOrchestration = {
 				: dedupedResults;
 
 			if (finalResults.length < dedupedResults.length) {
-				console.log(`Match Monkey: Applied limit: ${dedupedResults.length} â†’ ${finalResults.length} tracks`);
+				console.log(`Match Monkey: Applied limit: ${dedupedResults.length} ? ${finalResults.length} tracks`);
 				updateProgress(`Applied limit: ${finalResults.length} of ${dedupedResults.length} tracks`, 0.87);
 			}
 
@@ -395,7 +395,9 @@ window.matchMonkeyOrchestration = {
 					output = await this.queueResults(modules, finalResults, config_);
 				} else {
 					const seedName = seeds.length > 0 ? this.buildPlaylistSeedName(seeds) : config_.moodActivityValue || 'Selection';
+					const genreName = seeds.length > 0 && config_.discoveryMode === 'genre' ? this.buildPlaylistGenreName(seeds) : null;
 					config_.seedName = seedName;
+					config_.genreName = genreName;
 					config_.modeName = modeName;
 					output = await this.buildResultsPlaylist(modules, finalResults, config_);
 				}
@@ -965,29 +967,28 @@ window.matchMonkeyOrchestration = {
 
 		const modeName = config.modeName || 'Similar Artists';
 		const seedName = config.seedName || 'Selection';
+		const genreName = config.genreName || null;
 
-		// Build playlist name from template
+		// Build playlist name based on discovery mode
 		let playlistName;
 
-		if (playlistTemplate.indexOf('%') >= 0) {
-			playlistName = playlistTemplate.replace('%', seedName);
-		} else {
-			playlistName = `${playlistTemplate} ${seedName}`;
-		}
-
-		// Append discovery mode indicator
 		if (config.moodActivityValue && (config.discoveryMode === 'mood' || config.discoveryMode === 'activity')) {
+			// Mood/Activity: "Similar %mood/activity% (%artist%)"
 			const capitalizedValue = config.moodActivityValue.charAt(0).toUpperCase() + config.moodActivityValue.slice(1);
-			const contextLabel = config.moodActivityContext === 'mood' ? 'Mood' : 'Activity';
-			playlistName = `${playlistName} (${contextLabel}: ${capitalizedValue})`;
-		} else if (config.discoveryMode === 'acoustics') {
-			playlistName = `${playlistName} (Similar Acoustics)`;
-		} else if (config.discoveryMode === 'track') {
-			playlistName = `${playlistName} (Similar Tracks)`;
+			playlistName = `Similar ${capitalizedValue} (${seedName})`;
 		} else if (config.discoveryMode === 'genre') {
-			playlistName = `${playlistName} (Similar Genre)`;
+			// Genre: "Similar Genres (%genre%)"
+			const summary = genreName || seedName;
+			playlistName = `Similar Genres (${summary})`;
+		} else if (config.discoveryMode === 'track') {
+			// Track: "Similar Tracks (%artist%)"
+			playlistName = `Similar Tracks (${seedName})`;
+		} else if (config.discoveryMode === 'acoustics') {
+			// Acoustics: "Similar Acoustics (%artist%)"
+			playlistName = `Similar Acoustics (${seedName})`;
 		} else {
-			playlistName = `${playlistName} (${modeName})`;
+			// Artist (default): "Similar Artists (%artist%)"
+			playlistName = `Similar Artists (${seedName})`;
 		}
 
 		// Truncate if too long
@@ -1322,6 +1323,7 @@ window.matchMonkeyOrchestration = {
 
 	/**
 	 * Build a display name from seed tracks for playlist naming.
+	 * Extracts unique artists from seed tracks and formats them nicely.
 	 * 
 	 * @param {Array} seeds - Seed objects
 	 * @returns {string} Display name for playlist
@@ -1343,7 +1345,34 @@ window.matchMonkeyOrchestration = {
 
 		if (artistList.length === 0) return 'Selection';
 		if (artistList.length === 1) return artistList[0];
-		if (artistList.length === 2) return `${artistList[0]} & ${artistList[1]}`;
-		return `${artistList[0]} & Others`;
+		if (artistList.length === 2) return `${artistList[0]}, ${artistList[1]}`;
+		if (artistList.length === 3) return `${artistList[0]}, ${artistList[1]}, ${artistList[2]}`;
+		return `${artistList[0]}, ${artistList[1]}, ${artistList[2]}...`;
+	},
+
+	/**
+	 * Build a genre name summary from seed tracks for playlist naming.
+	 * Extracts unique genres from seed tracks and formats them nicely.
+	 */
+	buildPlaylistGenreName(seeds) {
+		if (!seeds || seeds.length === 0) return 'Selection';
+
+		const genres = new Set();
+		for (const seed of seeds) {
+			if (seed.genre) {
+				const parts = seed.genre.split(';').map(g => g.trim()).filter(Boolean);
+				for (const part of parts) {
+					genres.add(part);
+				}
+			}
+		}
+
+		const genreList = Array.from(genres);
+
+		if (genreList.length === 0) return 'Selection';
+		if (genreList.length === 1) return genreList[0];
+		if (genreList.length === 2) return `${genreList[0]}, ${genreList[1]}`;
+		if (genreList.length === 3) return `${genreList[0]}, ${genreList[1]}, ${genreList[2]}`;
+		return `${genreList[0]}, ${genreList[1]}, ${genreList[2]}...`;
 	},
 };
