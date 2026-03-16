@@ -166,13 +166,50 @@ Access settings via **Tools → Options → Match Monkey**
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| **Playlist name** | Template for new playlists (use `%` for artist name) | `Similar - %` |
+| **Playlist name** | Template for new playlists (see [Playlist Naming](#playlist-naming)) | `Similar %action% (%seed%)` |
 | **Playlist creation** | Create new / Overwrite / Do not create | Create new |
 | **Artist limit** | Max similar artists per seed | 10 |
 | **Tracks/artist** | Max tracks to fetch per artist | 5 |
 | **Tracks/playlist** | Total track limit | 100 |
 | **Select highest rated** | Prioritize higher-rated tracks in your library | ☐ |
 | **Select highest ranked** | Prioritize Last.fm's top tracks | ☐ |
+
+#### Playlist Naming
+
+MatchMonkey uses a flexible template system for playlist names with two dynamic placeholders:
+
+**Placeholders:**
+- `%action%` - Discovery type (Artists, Tracks, Genres, Acoustics, mood name, activity name)
+- `%seed%` - Seed summary (artist names, genre names, or selection)
+- `%` - Legacy placeholder (backward compatible, same as `%seed%`)
+
+**Default Template:** `Similar %action% (%seed%)`
+
+**Examples of Generated Names:**
+- Artist search: `"Similar Artists (The Beatles, Pink Floyd, Muse)"`
+- Track search: `"Similar Tracks (Led Zeppelin, Metallica...)"`
+- Genre search: `"Similar Genres (Rock, Blues, Jazz)"`
+- Acoustics: `"Similar Acoustics (The Beatles)"`
+- Mood (energetic): `"Similar Energetic (Pink Floyd)"`
+- Activity (workout): `"Similar Workout (Metallica)"`
+
+**Custom Template Examples:**
+- `"My %action% Mix - %seed%"` → `"My Artists Mix - The Beatles, Pink Floyd"`
+- `"%seed% Radio"` → `"The Beatles, Pink Floyd Radio"`
+- `"Daily %action%"` → `"Daily Artists"`
+- `"%"` → `"The Beatles, Pink Floyd"` (legacy format)
+
+**Seed Summary Format:**
+- Shows up to 3 items: `"Item1, Item2, Item3"`
+- 4+ items adds ellipsis: `"Item1, Item2, Item3..."`
+- Artist mode: Uses artist names from selection
+- Genre mode: Uses genre names from search
+- Mood/Activity: Uses the mood or activity name
+
+**Notes:**
+- Leave template blank (`''`) to use pure auto-generation without template
+- Playlist names are truncated at 100 characters if needed
+- %action% is always capitalized (e.g., "Artists" not "artists")
 
 ### Filters
 
@@ -195,14 +232,23 @@ Access settings via **Tools → Options → Match Monkey**
 
 ## 🔄 Changelog
 
-### Version 2.2 (Missed Results Tracking) *(NEW)*
+### Version 2.2 (Missed Results Tracking & Playlist Naming) *(NEW)*
 
+**Missed Results Tracking:**
 - ✨ **Missed Results Tracking**: Track recommendations not found in your library
 - ✨ **Occurrence Counting**: See how many times the same track was recommended
 - ✨ **Popularity Scores**: View Last.fm playcount or ReccoBeats popularity for missed tracks
 - ✨ **Cross-Source Deduplication**: Same track from different APIs counted as one with occurrence counter
 - ✨ **View & Export**: Browse missed results in a dedicated dialog, export to clipboard
 - ✨ **Menu Integration**: Access missed results from Tools > Match Monkey menu
+
+**Playlist Naming System:**
+- ✨ **New Placeholder System**: Use `%action%` and `%seed%` for dynamic playlist names
+- ✨ **Discovery Type Display**: `%action%` shows what kind of search (Artists, Tracks, Genres, mood, activity)
+- ✨ **Flexible Templates**: Create custom naming patterns like "My %action% Mix - %seed%"
+- ✨ **Automatic Upgrade**: Old `%artist%` placeholders automatically converted to `%seed%`
+- ✨ **Backward Compatible**: Legacy `%` placeholder still works
+- ✨ **Smart Summaries**: Shows up to 3 artists/genres with ellipsis for more
 
 ### Version 2.1 (ReccoBeats Integration)
 
@@ -256,6 +302,9 @@ The add-on intelligently handles common artist name prefix patterns:
 3. **Activity Context** - Use activity-based discovery for studying, working, or relaxing
 4. **Seed Multiple Tracks** - Select multiple tracks for more diverse recommendations
 5. **Ranking Mode** - Enable "Select highest ranked by Last.fm" for popular tracks
+6. **Custom Playlist Names** - Use `%action%` and `%seed%` placeholders to create personalized naming patterns
+   - Example: `"[Your Name]'s %action% Mix - %seed%"` → `"John's Artists Mix - The Beatles, Pink Floyd"`
+   - Example: `"🎵 %seed% Radio"` → `"🎵 The Beatles, Pink Floyd Radio"`
 
 ---
 
