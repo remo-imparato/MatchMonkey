@@ -4,11 +4,11 @@
 
  * 
  * @author Remo Imparato
- * @version 2.1.0
+ * @version 2.2.0
  * @description Configuration panel for MatchMonkey add-on in MM5 Tools > Options.
  * 
  * Config Property Mapping (UI ID -> Storage Key):
- * - PlaylistName -> PlaylistName
+ * - PlaylistName -> PlaylistName (Supports %action% and %seed% placeholders)
  * - ParentPlaylist -> ParentPlaylist
  * - PlaylistMode -> PlaylistMode
  * - ShowConfirmDialog -> ShowConfirmDialog

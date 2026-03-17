@@ -90,17 +90,23 @@ function start() {
 	const DEFAULTS = {
 		// === Playlist Creation ===
 		// PlaylistName: Custom template for playlist names
-		//   - Leave blank (default) to use auto-generated names based on discovery mode:
-		//     * Artists: "Similar Artists (The Beatles, Pink Floyd, Muse)"
-		//     * Tracks:  "Similar Tracks (The Beatles, Metallica...)"
-		//     * Genres:  "Similar Genres (Rock, Blues, Jazz)"
+		//   - Uses placeholders for dynamic naming:
+		//     * %action% = Discovery type (Artists, Tracks, Genres, Acoustics, mood name, activity name)
+		//     * %seed%   = Seed summary (artist names, genre names, or selection)
+		//   - Default: 'Similar %action% (%seed%)'
+		//   - Examples of what gets generated:
+		//     * Artists:   "Similar Artists (The Beatles, Pink Floyd, Muse)"
+		//     * Tracks:    "Similar Tracks (The Beatles, Metallica...)"
+		//     * Genres:    "Similar Genres (Rock, Blues, Jazz)"
 		//     * Acoustics: "Similar Acoustics (Artist Name)"
-		//     * Mood:    "Similar Energetic (Artist Name)"
-		//     * Activity: "Similar Workout (Artist Name)"
-		//   - Or provide a custom template with % placeholder for seed names:
-		//     * Example: "My Mix - %" → "My Mix - The Beatles, Pink Floyd"
-		//     * Example: "% Radio" → "The Beatles, Pink Floyd Radio"
-		PlaylistName: '',
+		//     * Mood:      "Similar Energetic (Artist Name)"
+		//     * Activity:  "Similar Workout (Artist Name)"
+		//   - Custom template examples:
+		//     * "My %action% Mix - %seed%"     → "My Artists Mix - The Beatles, Pink Floyd"
+		//     * "%seed% Radio"                 → "The Beatles, Pink Floyd Radio"
+		//     * "Daily %action%"               → "Daily Artists"
+		//   - Leave blank ('') to use pure auto-generated names without template
+		PlaylistName: 'Similar %action% (%seed%)',
 		ParentPlaylist: '',             // Parent playlist to organize results under (blank = root level)
 		PlaylistMode: 'Create new playlist', // Create new / Overwrite / Do not create
 		ShowConfirmDialog: false,       // Show playlist selection dialog
@@ -208,6 +214,7 @@ function start() {
 				let migratedKeys = [];
 				let addedKeys = [];
 				let removedKeys = [];
+				let upgradedValues = [];
 
 				// Step 1: Migrate old property names to new names
 				for (const [oldKey, newKey] of Object.entries(MIGRATION_MAP)) {
@@ -217,7 +224,16 @@ function start() {
 					}
 				}
 
-				// Step 2: Add any missing default keys
+				// Step 2: Upgrade existing values (placeholder changes, etc.)
+				if (updatedConfig.PlaylistName && typeof updatedConfig.PlaylistName === 'string') {
+					// Upgrade %artist% placeholder to %seed%
+					if (updatedConfig.PlaylistName.includes('%artist%')) {
+						updatedConfig.PlaylistName = updatedConfig.PlaylistName.replace(/%artist%/g, '%seed%');
+						upgradedValues.push('PlaylistName: %artist% → %seed%');
+					}
+				}
+
+				// Step 3: Add any missing default keys
 				for (const key in DEFAULTS) {
 					if (!(key in updatedConfig)) {
 						updatedConfig[key] = DEFAULTS[key];
@@ -225,17 +241,20 @@ function start() {
 					}
 				}
 
-				// Step 3: Remove deprecated keys (ApiKey is now hardcoded)
+				// Step 4: Remove deprecated keys (ApiKey is now hardcoded)
 				if ('ApiKey' in updatedConfig) {
 					delete updatedConfig.ApiKey;
 					removedKeys.push('ApiKey');
 				}
 
 				// Save if changes were made
-				if (migratedKeys.length > 0 || addedKeys.length > 0 || removedKeys.length > 0) {
+				if (migratedKeys.length > 0 || addedKeys.length > 0 || removedKeys.length > 0 || upgradedValues.length > 0) {
 					app.setValue(SCRIPT_ID, updatedConfig);
 					if (migratedKeys.length > 0) {
 						console.log(`Match Monkey: Migrated ${migratedKeys.length} setting(s):`, migratedKeys.join(', '));
+					}
+					if (upgradedValues.length > 0) {
+						console.log(`Match Monkey: Upgraded ${upgradedValues.length} value(s):`, upgradedValues.join(', '));
 					}
 					if (addedKeys.length > 0) {
 						console.log(`Match Monkey: Added ${addedKeys.length} new setting(s):`, addedKeys.join(', '));

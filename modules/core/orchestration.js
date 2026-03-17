@@ -951,7 +951,13 @@ window.matchMonkeyOrchestration = {
 	 * 
 	 * Playlist Naming Convention:
 	 * ---------------------------
-	 * By default (when PlaylistName setting is empty), playlists are auto-named based on discovery mode:
+	 * Default behavior is template-based: the PlaylistName setting is treated as a
+	 * name template. init.js now seeds this setting with a non-empty default:
+	 * 
+	 *   "Similar %action% (%seed%)"
+	 * 
+	 * This template is then resolved based on the discovery mode and seed summary.
+	 * For example, with the default template:
 	 * 
 	 * - Artist Mode:    "Similar Artists (The Beatles, Pink Floyd, Muse)"
 	 * - Track Mode:     "Similar Tracks (The Beatles, Metallica...)"
@@ -960,15 +966,25 @@ window.matchMonkeyOrchestration = {
 	 * - Mood Mode:      "Similar Energetic (Artist Name)"
 	 * - Activity Mode:  "Similar Workout (Artist Name)"
 	 * 
-	 * Custom Template Support:
-	 * ------------------------
-	 * Users can override auto-naming by setting a custom PlaylistName template:
+	 * Auto-generation without a template only occurs when the user explicitly
+	 * clears the PlaylistName setting to a blank string (''). In that case, the
+	 * playlist name is derived purely from discovery mode and seeds.
 	 * 
-	 * - Use '%' as a placeholder for seed names (artists/genres)
+	 * PlaylistName Template Support:
+	 * ------------------------------
+	 * Users can customize naming by setting a PlaylistName template:
+	 * 
+	 * Placeholders:
+	 * - %action% = Discovery type (Artists, Tracks, Genres, Acoustics, mood name, activity name)
+	 * - %seed%   = Seed summary (artist names, genre names, or selection)
+	 * - %        = Legacy placeholder (same as %seed% for backward compatibility)
+	 * 
 	 * - Examples:
-	 *   * "My Mix - %"  ? "My Mix - The Beatles, Pink Floyd"
-	 *   * "% Radio"     ? "The Beatles, Pink Floyd Radio"
-	 *   * "Daily Mix"   ? "Daily Mix The Beatles, Pink Floyd" (% optional)
+	 *   * "Similar %action% (%seed%)"    ? "Similar Artists (The Beatles, Pink Floyd)"
+	 *   * "My %action% Mix - %seed%"     ? "My Artists Mix - The Beatles, Pink Floyd"
+	 *   * "%seed% Radio"                 ? "The Beatles, Pink Floyd Radio"
+	 *   * "Daily %action%"               ? "Daily Artists"
+	 *   * "%"                            ? "The Beatles, Pink Floyd" (legacy)
 	 * 
 	 * Seed Name Format:
 	 * -----------------
@@ -1006,12 +1022,42 @@ window.matchMonkeyOrchestration = {
 
 		// Use custom template if provided by user
 		if (playlistTemplate && playlistTemplate.trim()) {
-			// Simple template replacement: % gets replaced with seed/artist name
-			playlistName = playlistTemplate.indexOf('%') >= 0
-				? playlistTemplate.replace('%', seedName)
-				: `${playlistTemplate} ${seedName}`;
+			// Determine %action% based on discovery mode
+			let actionText = 'Artists'; // Default
+
+			if (config.moodActivityValue && (config.discoveryMode === 'mood' || config.discoveryMode === 'activity')) {
+				// Mood/Activity: Use the capitalized mood/activity value
+				actionText = config.moodActivityValue.charAt(0).toUpperCase() + config.moodActivityValue.slice(1);
+			} else if (config.discoveryMode === 'genre') {
+				actionText = 'Genres';
+			} else if (config.discoveryMode === 'track') {
+				actionText = 'Tracks';
+			} else if (config.discoveryMode === 'acoustics') {
+				actionText = 'Acoustics';
+			} else {
+				// Artist mode (default)
+				actionText = 'Artists';
+			}
+
+			// Determine %seed% based on discovery mode
+			const seedText = (config.discoveryMode === 'genre' && genreName) ? genreName : seedName;
+
+			// Check if template contains any supported placeholders
+			const hasPlaceholders = /%action%|%seed%|%/.test(playlistTemplate);
+
+			// Replace placeholders
+			playlistName = playlistTemplate
+				.replace(/%action%/g, actionText)
+				.replace(/%seed%/g, seedText)
+				.replace(/%/g, seedText); // Legacy % placeholder for backward compatibility
+
+			// Fallback: if no placeholders were used, append the seed text to avoid duplicate/static names
+			if (!hasPlaceholders && seedText) {
+				playlistName = `${playlistName} ${seedText}`;
+			}
+
 		} else {
-			// Auto-generate name based on discovery mode
+			// Auto-generate name based on discovery mode (when template is empty)
 			if (config.moodActivityValue && (config.discoveryMode === 'mood' || config.discoveryMode === 'activity')) {
 				// Mood/Activity: "Similar %mood/activity% (%artist%)"
 				const capitalizedValue = config.moodActivityValue.charAt(0).toUpperCase() + config.moodActivityValue.slice(1);
