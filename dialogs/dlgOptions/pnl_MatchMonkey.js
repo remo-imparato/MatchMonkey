@@ -21,8 +21,7 @@
  * - UseLastfmRanking -> UseLastfmRanking
  * - PreferHighQuality -> PreferHighQuality
  * - LocalCollection -> LocalCollection (name of MediaMonkey collection to search locally)
- * - ReccobeatsMinPopularity -> ReccobeatsMinPopularity (0-100 integer lower bound for reccobeats popularity)
- * - LastfmMinMatch -> LastfmMinMatch (0.00-99.99 float lower bound for last.fm match percentage)
+ * - ApiMinMatch -> ApiMinMatch (0.00-99.99 float lower bound for API match/popularity filtering)
  * - MinRating -> MinRating
  * - IncludeUnrated -> IncludeUnrated
  * - DefaultMood -> DefaultMood
@@ -129,19 +128,12 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function (sett, 
 		}
 
 		// === API Thresholds ===
-		// Reccobeats popularity: 0-100
-		if (UI.ReccobeatsMinPopularity && UI.ReccobeatsMinPopularity.controlClass) {
-			UI.ReccobeatsMinPopularity.controlClass.value = (cfg.ReccobeatsMinPopularity !== undefined)
-				? Math.max(0, Math.min(100, parseInt(cfg.ReccobeatsMinPopularity, 10) || 0))
-				: 0;
-		}
-
-		// Last.fm match: 0.00 - 99.99 (display as percent with 2 decimals)
-		if (UI.LastfmMinMatch && UI.LastfmMinMatch.controlClass) {
-			const lf = typeof cfg.LastfmMinMatch === 'number' ? cfg.LastfmMinMatch : parseFloat(cfg.LastfmMinMatch);
-			const lfVal = Number.isFinite(lf) ? Math.max(0, Math.min(99.99, lf)) : 0.0;
+		// ApiMinMatch: single threshold for both Last.fm match and ReccoBeats popularity (0.00-99.99%)
+		if (UI.ApiMinMatch && UI.ApiMinMatch.controlClass) {
+			const apiMatch = typeof cfg.ApiMinMatch === 'number' ? cfg.ApiMinMatch : parseFloat(cfg.ApiMinMatch);
+			const apiMatchVal = Number.isFinite(apiMatch) ? Math.max(0, Math.min(99.99, apiMatch)) : 40.0;
 			// Display with two decimals
-			UI.LastfmMinMatch.controlClass.value = lfVal.toFixed(2);
+			UI.ApiMinMatch.controlClass.value = apiMatchVal.toFixed(2);
 		}
 
 		// === Auto-Mode Settings ===
@@ -360,21 +352,13 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 		}
 
 		// === API Thresholds ===
-		// Reccobeats popularity lower bound (integer 0-100)
-		if (UI.ReccobeatsMinPopularity && UI.ReccobeatsMinPopularity.controlClass) {
-			let v = parseInt(UI.ReccobeatsMinPopularity.controlClass.value, 10);
-			if (!Number.isFinite(v)) v = 0;
-			v = Math.max(0, Math.min(100, v));
-			this.config.ReccobeatsMinPopularity = v;
-		}
-
-		// Last.fm match lower bound (float 0.00-99.99)
-		if (UI.LastfmMinMatch && UI.LastfmMinMatch.controlClass) {
-			let lf = parseFloat(String(UI.LastfmMinMatch.controlClass.value).replace(',', '.'));
-			if (!Number.isFinite(lf)) lf = 0.0;
-			lf = Math.max(0.0, Math.min(99.99, lf));
+		// ApiMinMatch: single threshold for both Last.fm match and ReccoBeats popularity (0.00-99.99%)
+		if (UI.ApiMinMatch && UI.ApiMinMatch.controlClass) {
+			let apiMatch = parseFloat(String(UI.ApiMinMatch.controlClass.value).replace(',', '.'));
+			if (!Number.isFinite(apiMatch)) apiMatch = 40.0;
+			apiMatch = Math.max(0.0, Math.min(99.99, apiMatch));
 			// Store as number with two decimals precision
-			this.config.LastfmMinMatch = Math.round(lf * 100) / 100;
+			this.config.ApiMinMatch = Math.round(apiMatch * 100) / 100;
 		}
 
 		// === Queue Behavior ===

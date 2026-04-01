@@ -74,11 +74,27 @@
 					</div>
 
 					<div class="uiRow">
+						<label class="inline">API min match (%):</label>
+						<div data-id="ApiMinMatch"
+							 data-control-class="Edit"
+							 data-tip="Minimum match/popularity threshold (0.00-99.99%). Used for both Last.fm match and ReccoBeats popularity filtering. Recommendations below this threshold are ignored."
+							 data-init-params='{type:"number",min:0,max:99.99,step:0.01}'></div>
+					</div>
+
+					<div class="uiRow">
 						<label class="inline">Max playlist tracks:</label>
 						<div data-id="MaxPlaylistTracks"
 							 data-control-class="Edit"
 							 data-tip="Maximum number of tracks to add to the resulting playlist. Set to 0 for no limit."
 							 data-init-params="{type:'number',min:0,max:10000}"></div>
+					</div>
+
+					<div class="uiRow">
+						<label class="inline">Local collection (optional):</label>
+						<div data-id="LocalCollection"
+							 data-control-class="Edit"
+							 data-tip="Optional: limit local library searches to this collection name. Leave blank to search entire library."
+							 data-init-params='{"hint":"Collection name (exact)"}'></div>
 					</div>
 
 					<div class="uiRow">
@@ -88,30 +104,6 @@
 					<div class="uiRow">
 						<div data-id="PreferHighQuality" data-control-class="Checkbox" data-tip="When possible, prefer higher bitrate / better quality versions of tracks.">Prefer high quality versions?</div>
 					</div>
-
-			<div class="uiRow">
-				<label class="inline">Local collection (optional):</label>
-				<div data-id="LocalCollection"
-					 data-control-class="Edit"
-					 data-tip="Optional: limit local library searches to this collection name. Leave blank to search entire library."
-					 data-init-params='{"hint":"Collection name (exact)"}'></div>
-			</div>
-
-			<div class="uiRow">
-				<label class="inline">ReccoBeats min popularity:</label>
-				<div data-id="ReccobeatsMinPopularity"
-					 data-control-class="Edit"
-					 data-tip="Minimum ReccoBeats popularity (0-100). Recommendations below this will be ignored when matching to your library."
-					 data-init-params='{type:"number",min:0,max:100}'></div>
-			</div>
-
-			<div class="uiRow">
-				<label class="inline">Last.fm min match (%):</label>
-				<div data-id="LastfmMinMatch"
-					 data-control-class="Edit"
-					 data-tip="Minimum Last.fm match percentage (0.00-99.99). Similar items below this threshold are ignored when matching to your library."
-					 data-init-params='{type:"number",min:0,max:99.99,step:0.01}'></div>
-			</div>
 
 					<div class="uiRow">
 						<label class="inline">Minimum rating:</label>

@@ -68,6 +68,7 @@ async function discoverByArtist(modules, seeds, config) {
 	updateProgress(`Querying Last.fm for ${artistCount} seed artist(s)...`, 0.2);
 
 	let totalSimilarFound = 0;
+	let apiFilteredCount = 0; // Track items filtered by API threshold
 
 	for (let i = 0; i < artistCount; i++) {
 		const artistName = uniqueArtists[i];
@@ -96,8 +97,8 @@ async function discoverByArtist(modules, seeds, config) {
 			// Add similar artists with match score as popularity indicator
 			for (const artist of similar.slice(0, config.similarLimit || 20)) {
 				if (artist?.name) {
-					// Respect user-defined Last.fm match threshold if provided
-					const minMatch = config.lastfmMinMatch || 0;
+					// Respect user-defined API match threshold if provided
+					const minMatch = config.apiMinMatch || 0;
 					// Last.fm API returns match as 0.0-1.0, convert to percentage 0-100
 					const rawMatch = Number(artist.match) || 0;
 					const artistMatch = rawMatch <= 1 ? rawMatch * 100 : rawMatch;
@@ -105,6 +106,7 @@ async function discoverByArtist(modules, seeds, config) {
 					if (minMatch > 0 && artistMatch < minMatch) {
 						// Log ALL filtered artists for full process visibility
 						console.log(`Discovery [Artist]: FILTERED by threshold - "${artist.name}" match ${artistMatch.toFixed(1)}% < min ${minMatch}%`);
+						apiFilteredCount++;
 						continue;
 					}
 
@@ -125,7 +127,7 @@ async function discoverByArtist(modules, seeds, config) {
 		}
 	}
 
-	console.log(`Discovery [Artist]: Found ${candidates.length} candidate artists total (${totalSimilarFound} from Last.fm)`);
+	console.log(`Discovery [Artist]: Found ${candidates.length} candidate artists total (${totalSimilarFound} from Last.fm, ${apiFilteredCount} filtered by threshold)`);
 	updateProgress(`Last.fm returned ${totalSimilarFound} similar artists → ${candidates.length} unique candidates`, 0.45);
 
 	// Fetch top tracks for all candidates
@@ -138,7 +140,14 @@ async function discoverByArtist(modules, seeds, config) {
 		updateProgress(`Last.fm: Retrieved ${totalTracks} tracks from ${candidates.length} artists`, 0.6);
 	}
 
-	return candidates;
+	// Return candidates with stats
+	return {
+		candidates,
+		stats: {
+			apiFilteredCount,
+			totalFromApi: totalSimilarFound
+		}
+	};
 }
 
 // ============================================================================
@@ -181,6 +190,7 @@ async function discoverByTrack(modules, seeds, config) {
 	}
 
 	let totalSimilarTracks = 0;
+	let apiFilteredCount = 0; // Track items filtered by API threshold
 
 	for (let i = 0; i < seedLimit; i++) {
 		const seed = seeds[i];
@@ -211,8 +221,8 @@ async function discoverByTrack(modules, seeds, config) {
 				for (const simTrack of similarTracks) {
 					if (!simTrack?.artist || !simTrack?.title) continue;
 
-					// Respect Last.fm match threshold
-					const minMatch = config.lastfmMinMatch || 0;
+					// Respect API match threshold
+					const minMatch = config.apiMinMatch || 0;
 					// Last.fm API returns match as 0.0-1.0, convert to percentage 0-100
 					const rawMatch = Number(simTrack.match) || 0;
 					const m = rawMatch <= 1 ? rawMatch * 100 : rawMatch;
@@ -220,6 +230,7 @@ async function discoverByTrack(modules, seeds, config) {
 					if (minMatch > 0 && m < minMatch) {
 						// Log ALL filtered tracks for full process visibility
 						console.log(`Discovery [Track]: FILTERED by threshold - "${simTrack.artist} - ${simTrack.title}" match ${m.toFixed(1)}% < min ${minMatch}%`);
+						apiFilteredCount++;
 						continue;
 					}
 
@@ -266,10 +277,17 @@ async function discoverByTrack(modules, seeds, config) {
 		});
 	}
 
-	console.log(`Discovery [Track]: Found ${candidates.length} candidate artists from track similarity`);
+	console.log(`Discovery [Track]: Found ${candidates.length} candidate artists from track similarity (${apiFilteredCount} filtered by threshold)`);
 	updateProgress(`Last.fm returned ${totalSimilarTracks} similar tracks → ${candidates.length} artists`, 0.5);
 
-	return candidates;
+	// Return candidates with stats
+	return {
+		candidates,
+		stats: {
+			apiFilteredCount,
+			totalFromApi: totalSimilarTracks
+		}
+	};
 }
 
 // ============================================================================
@@ -414,7 +432,14 @@ async function discoverByGenre(modules, seeds, config) {
 		updateProgress(`Last.fm: Retrieved ${totalTracks} tracks from ${candidates.length} artists`, 0.8);
 	}
 
-	return candidates;
+	// Return candidates with stats (genre mode doesn't filter by API threshold)
+	return {
+		candidates,
+		stats: {
+			apiFilteredCount: 0,
+			totalFromApi: totalArtistsFromTags
+		}
+	};
 }
 
 // ============================================================================
@@ -423,11 +448,13 @@ async function discoverByGenre(modules, seeds, config) {
 
 function buildReccoCandidates(result, blacklist, seenArtists) {
 	if (!result || !Array.isArray(result.recommendations)) {
-		return [];
+		return { candidates: [], apiFilteredCount: 0 };
 	}
 
 	const candidates = [];
-	const minPop = result?.__reccoFilterMinPopularity || 0;
+	// API match threshold (0-99.99%) - used for ReccoBeats popularity (0-100 scale)
+	const minMatch = result?.__apiMinMatch || 0;
+	let apiFilteredCount = 0;
 
 	for (const rec of result.recommendations) {
 		const trackTitle = rec.trackTitle;
@@ -447,10 +474,11 @@ function buildReccoCandidates(result, blacklist, seenArtists) {
 
 			// First time seeing this artist
 			if (!seenArtists.has(artKey)) {
-				// Apply ReccoBeats popularity threshold if configured (ONLY from config)
-				if (minPop > 0 && popularity < minPop) {
+				// Apply API match threshold if configured (popularity 0-100 maps directly to percentage)
+				if (minMatch > 0 && popularity < minMatch) {
 					// Log ALL filtered items for full process visibility
-					console.log(`Discovery [ReccoBeats]: FILTERED by threshold - "${artistName} - ${trackTitle}" popularity ${popularity} < min ${minPop}`);
+					console.log(`Discovery [ReccoBeats]: FILTERED by threshold - "${artistName} - ${trackTitle}" popularity ${popularity} < min ${minMatch}%`);
+					apiFilteredCount++;
 					continue;
 				}
 
@@ -466,9 +494,10 @@ function buildReccoCandidates(result, blacklist, seenArtists) {
 			// Artist already exists → add track if unique
 			else if (trackTitle) {
 				// Also check popularity threshold for additional tracks
-				if (minPop > 0 && popularity < minPop) {
+				if (minMatch > 0 && popularity < minMatch) {
 					// Log ALL filtered items for full process visibility
-					console.log(`Discovery [ReccoBeats]: FILTERED by threshold - "${artistName} - ${trackTitle}" popularity ${popularity} < min ${minPop}`);
+					console.log(`Discovery [ReccoBeats]: FILTERED by threshold - "${artistName} - ${trackTitle}" popularity ${popularity} < min ${minMatch}%`);
+					apiFilteredCount++;
 					continue;
 				}
 
@@ -488,7 +517,7 @@ function buildReccoCandidates(result, blacklist, seenArtists) {
 		}
 	}
 
-	return candidates;
+	return { candidates, apiFilteredCount };
 }
 
 /**
@@ -529,9 +558,9 @@ async function discoverByRecco(modules, seeds, config) {
 		config.similarLimit || 100
 	);
 
-	// Attach configured minimum popularity to result for downstream filtering
+	// Attach configured API match threshold to result for downstream filtering
 	try {
-		result.__reccoFilterMinPopularity = config.reccobeatsMinPopularity || 0;
+		result.__apiMinMatch = config.apiMinMatch || 0;
 	} catch (_) { }
 
 	if (!result.recommendations || result.recommendations.length === 0) {
@@ -545,22 +574,34 @@ async function discoverByRecco(modules, seeds, config) {
 		} else {
 			updateProgress('ReccoBeats: No recommendations found for these tracks', 0.4);
 		}
-		return candidates;
+		return {
+			candidates,
+			stats: { apiFilteredCount: 0, totalFromApi: 0 }
+		};
 	}
 
-	console.log(`Discovery [ReccoBeats]: Received ${result.recommendations.length} recommendations from ${result.foundCount} seed(s)`);
-	updateProgress(`ReccoBeats: Found ${result.recommendations.length} acoustic recommendations from ${result.foundCount}/${result.seedCount} seed(s)`, 0.4);
+	const totalFromApi = result.recommendations.length;
+	console.log(`Discovery [ReccoBeats]: Received ${totalFromApi} recommendations from ${result.foundCount} seed(s)`);
+	updateProgress(`ReccoBeats: Found ${totalFromApi} acoustic recommendations from ${result.foundCount}/${result.seedCount} seed(s)`, 0.4);
 
 	// Step 2: Extract artists from recommendations
-	updateProgress(`Processing ${result.recommendations.length} ReccoBeats recommendations...`, 0.5);
+	updateProgress(`Processing ${totalFromApi} ReccoBeats recommendations...`, 0.5);
 
-	candidates = buildReccoCandidates(result, blacklist, seenArtists);
+	const buildResult = buildReccoCandidates(result, blacklist, seenArtists);
+	candidates = buildResult.candidates;
+	const apiFilteredCount = buildResult.apiFilteredCount;
 
 	const totalTracks = candidates.reduce((sum, c) => sum + (c.tracks?.length || 0), 0);
-	console.log(`Discovery [ReccoBeats]: Built ${candidates.length} candidate artists from acoustic recommendations`);
+	console.log(`Discovery [ReccoBeats]: Built ${candidates.length} candidate artists from acoustic recommendations (${apiFilteredCount} filtered by threshold)`);
 	updateProgress(`ReccoBeats: ${candidates.length} artists with ${totalTracks} tracks from acoustic analysis`, 0.6);
 
-	return candidates;
+	return {
+		candidates,
+		stats: {
+			apiFilteredCount,
+			totalFromApi
+		}
+	};
 }
 
 // ============================================================================
@@ -585,9 +626,11 @@ async function discoverByMood(modules, seeds, config) {
 	const { updateProgress } = notifications;
 	const reccobeatsApi = window.matchMonkeyReccoBeatsAPI;
 
+	const emptyResult = { candidates: [], stats: { apiFilteredCount: 0, totalFromApi: 0 } };
+
 	if (!seeds || seeds.length === 0) {
 		console.warn('Discovery [Mood]: No seed tracks provided');
-		return { recommendations: [], seedCount: 0, foundCount: 0 };
+		return emptyResult;
 	}
 
 	const mood = config.moodActivityValue || 'energetic';
@@ -613,7 +656,7 @@ async function discoverByMood(modules, seeds, config) {
 	if (foundTracks.length === 0) {
 		console.log('Discovery [Mood]: No tracks found on ReccoBeats');
 		updateProgress('ReccoBeats: None of your tracks found - verify Artist, Album, and Track tags match official release names exactly', 0.3);
-		return [];
+		return emptyResult;
 	} else {
 		const notFound = limitedSeeds.length - foundTracks.length;
 		if (notFound > 0) {
@@ -630,7 +673,7 @@ async function discoverByMood(modules, seeds, config) {
 
 	if (!moodPreset) {
 		console.error(`Discovery [Mood]: Unknown mood "${mood}"`);
-		return [];
+		return emptyResult;
 	}
 
 	console.log(`Discovery [Mood]: Using "${mood}" preset with blend ratio ${config.moodSeedBlend}`);
@@ -643,7 +686,7 @@ async function discoverByMood(modules, seeds, config) {
 		//updateProgress(`Mood "${mood}": Using pure mood preset (no seed features)`, 0.35);
 		//audioTargets = moodPreset;
 		updateProgress(`ReccoBeats: No audio features available for found tracks`, 0.35);
-		return [];
+		return emptyResult;
 	} else {
 		updateProgress(`ReccoBeats: Blending ${audioFeatures.length} seed features with "${mood}" preset...`, 0.35);
 		console.log(`Discovery [Mood]: Blending ${audioFeatures.length} seed features with mood preset`);
@@ -676,14 +719,26 @@ async function discoverByMood(modules, seeds, config) {
 	const seenArtists = new Set();
 	const blacklist = buildBlacklist(modules);
 
-	const seedIdRecs = { "recommendations": recommendations }
-	candidates = buildReccoCandidates(seedIdRecs, blacklist, seenArtists);
+	// Pass API match threshold via __apiMinMatch
+	const seedIdRecs = {
+		"recommendations": recommendations,
+		"__apiMinMatch": config.apiMinMatch || 0
+	};
+	const buildResult = buildReccoCandidates(seedIdRecs, blacklist, seenArtists);
+	candidates = buildResult.candidates;
+	const apiFilteredCount = buildResult.apiFilteredCount;
 
 	const totalTracks = candidates.reduce((sum, c) => sum + (c.tracks?.length || 0), 0);
-	console.log(`Discovery [Mood]: Built ${candidates.length} candidate artists for "${mood}" mood`);
+	console.log(`Discovery [Mood]: Built ${candidates.length} candidate artists for "${mood}" mood (${apiFilteredCount} filtered by threshold)`);
 	updateProgress(`Mood "${mood}": ${candidates.length} artists with ${totalTracks} tracks`, 0.6);
 
-	return candidates;
+	return {
+		candidates,
+		stats: {
+			apiFilteredCount,
+			totalFromApi: recommendations.length
+		}
+	};
 }
 
 /**
@@ -704,14 +759,16 @@ async function discoverByActivity(modules, seeds, config) {
 	const { updateProgress } = notifications;
 	const reccobeatsApi = window.matchMonkeyReccoBeatsAPI;
 
+	const emptyResult = { candidates: [], stats: { apiFilteredCount: 0, totalFromApi: 0 } };
+
 	if (!reccobeatsApi) {
 		console.error('Discovery [Activity]: ReccoBeats API not available');
-		return [];
+		return emptyResult;
 	}
 
 	if (!seeds || seeds.length === 0) {
 		console.warn('Discovery [Activity]: No seed tracks provided');
-		return { recommendations: [], seedCount: 0, foundCount: 0 };
+		return emptyResult;
 	}
 
 	const activity = config.moodActivityValue || 'workout';
@@ -737,7 +794,7 @@ async function discoverByActivity(modules, seeds, config) {
 	if (foundTracks.length === 0) {
 		console.log('Discovery [Activity]: No tracks found on ReccoBeats');
 		updateProgress('ReccoBeats: None of your tracks found - verify Artist, Album, and Track tags match official release names exactly', 0.3);
-		return [];
+		return emptyResult;
 	}
 
 	console.log(`Discovery [Activity]: Found ${foundTracks.length}/${limitedSeeds.length} tracks on ReccoBeats`);
@@ -753,7 +810,7 @@ async function discoverByActivity(modules, seeds, config) {
 
 	if (!activityPreset) {
 		console.error(`Discovery [Activity]: Unknown activity "${activity}"`);
-		return [];
+		return emptyResult;
 	}
 
 	console.log(`Discovery [Activity]: Using "${activity}" preset with blend ratio ${config.moodSeedBlend}`);
@@ -766,7 +823,7 @@ async function discoverByActivity(modules, seeds, config) {
 		//	updateProgress(`Activity "${activity}": Using pure activity preset (no seed features)`, 0.35);
 		//	audioTargets = activityPreset;
 		updateProgress(`ReccoBeats: No audio features available for found tracks`, 0.35);
-		return [];
+		return emptyResult;
 
 	} else {
 		updateProgress(`ReccoBeats: Blending ${audioFeatures.length} seed features with "${activity}" preset...`, 0.35);
@@ -800,14 +857,26 @@ async function discoverByActivity(modules, seeds, config) {
 	const seenArtists = new Set();
 	const blacklist = buildBlacklist(modules);
 
-	const seedIdRecs = { "recommendations": recommendations }
-	candidates = buildReccoCandidates(seedIdRecs, blacklist, seenArtists);
+	// Pass API match threshold via __apiMinMatch
+	const seedIdRecs = {
+		"recommendations": recommendations,
+		"__apiMinMatch": config.apiMinMatch || 0
+	};
+	const buildResult = buildReccoCandidates(seedIdRecs, blacklist, seenArtists);
+	candidates = buildResult.candidates;
+	const apiFilteredCount = buildResult.apiFilteredCount;
 
 	const totalTracks = candidates.reduce((sum, c) => sum + (c.tracks?.length || 0), 0);
-	console.log(`Discovery [Activity]: Built ${candidates.length} candidate artists for "${activity}" activity`);
+	console.log(`Discovery [Activity]: Built ${candidates.length} candidate artists for "${activity}" activity (${apiFilteredCount} filtered by threshold)`);
 	updateProgress(`Activity "${activity}": ${candidates.length} artists with ${totalTracks} tracks`, 0.6);
 
-	return candidates;
+	return {
+		candidates,
+		stats: {
+			apiFilteredCount,
+			totalFromApi: recommendations.length
+		}
+	};
 }
 
 // ============================================================================

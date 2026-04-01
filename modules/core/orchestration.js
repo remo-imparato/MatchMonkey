@@ -125,14 +125,13 @@ window.matchMonkeyOrchestration = {
 					discoveryMode,
 				};
 
-				// Read additional user settings: local collection and API thresholds
+				// Read additional user settings: local collection and API threshold
 				try {
 					config_.localCollection = stringSetting('LocalCollection', '');
-					config_.reccobeatsMinPopularity = intSetting('ReccobeatsMinPopularity', 0);
-					// Last.fm match stored as 0.00-99.99 (percentage)
-					const lf = parseFloat(String(getSetting('LastfmMinMatch') ?? '0')) || 0.0;
-					config_.lastfmMinMatch = Math.max(0, Math.min(99.99, Math.round(lf * 100) / 100));
-					console.log(`Match Monkey: Settings - localCollection='${config_.localCollection}', reccoMin=${config_.reccobeatsMinPopularity}, lastfmMin=${config_.lastfmMinMatch}`);
+					// ApiMinMatch: single threshold for both Last.fm match and ReccoBeats popularity (0.00-99.99%)
+					const apiMatch = parseFloat(String(getSetting('ApiMinMatch') ?? '40')) || 40.0;
+					config_.apiMinMatch = Math.max(0, Math.min(99.99, Math.round(apiMatch * 100) / 100));
+					console.log(`Match Monkey: Settings - localCollection='${config_.localCollection}', apiMinMatch=${config_.apiMinMatch}%`);
 				} catch (e) {
 					console.warn('Match Monkey: Failed to read additional settings:', e.message);
 				}
@@ -157,14 +156,13 @@ window.matchMonkeyOrchestration = {
 					discoveryMode,
 				};
 
-				// Read additional user settings: local collection and API thresholds
+				// Read additional user settings: local collection and API threshold
 				try {
 					config_.localCollection = stringSetting('LocalCollection', '');
-					config_.reccobeatsMinPopularity = intSetting('ReccobeatsMinPopularity', 0);
-					// Last.fm match stored as 0.00-99.99 (percentage)
-					const lf = parseFloat(String(getSetting('LastfmMinMatch') ?? '0')) || 0.0;
-					config_.lastfmMinMatch = Math.max(0, Math.min(99.99, Math.round(lf * 100) / 100));
-					console.log(`Match Monkey: Settings - localCollection='${config_.localCollection}', reccoMin=${config_.reccobeatsMinPopularity}, lastfmMin=${config_.lastfmMinMatch}`);
+					// ApiMinMatch: single threshold for both Last.fm match and ReccoBeats popularity (0.00-99.99%)
+					const apiMatch = parseFloat(String(getSetting('ApiMinMatch') ?? '40')) || 40.0;
+					config_.apiMinMatch = Math.max(0, Math.min(99.99, Math.round(apiMatch * 100) / 100));
+					console.log(`Match Monkey: Settings - localCollection='${config_.localCollection}', apiMinMatch=${config_.apiMinMatch}%`);
 				} catch (e) {
 					console.warn('Match Monkey: Failed to read additional settings:', e.message);
 				}
@@ -232,9 +230,13 @@ window.matchMonkeyOrchestration = {
 
 			const discoveryFn = strategies.getDiscoveryStrategy(discoveryMode);
 			let candidates;
+			let discoveryStats = { apiFilteredCount: 0, totalFromApi: 0 };
 
 			try {
-				candidates = await discoveryFn(modules, seeds, config_);
+				const discoveryResult = await discoveryFn(modules, seeds, config_);
+				// Discovery strategies now return {candidates, stats}
+				candidates = discoveryResult.candidates || discoveryResult;
+				discoveryStats = discoveryResult.stats || { apiFilteredCount: 0, totalFromApi: 0 };
 			} catch (discoveryError) {
 				console.error(`Match Monkey: Discovery error:`, discoveryError);
 				terminateProgressTask(taskId);
@@ -261,7 +263,7 @@ window.matchMonkeyOrchestration = {
 				return { success: false, error: `No ${modeName} found.`, tracksAdded: 0 };
 			}
 
-			console.log(`Match Monkey: Discovery found ${candidates.length} candidate(s)`);
+			console.log(`Match Monkey: Discovery found ${candidates.length} candidate(s) (${discoveryStats.apiFilteredCount} filtered by API threshold)`);
 			updateProgress(`Found ${candidates.length} candidate(s)`, 0.5);
 
 			// Step 3: Match candidates to local library
@@ -446,11 +448,41 @@ window.matchMonkeyOrchestration = {
 			terminateProgressTask(taskId);
 			cache?.clear?.();
 
-			// Build success message with stats breakdown if available
+			// Build comprehensive stats for user feedback
+			const statsBreakdown = {
+				added: actualTracksAdded,
+				notInLibrary: matchStats?.notInLibrary || 0,
+				filteredByRating: matchStats?.filteredByRating || 0,
+				apiFiltered: discoveryStats?.apiFilteredCount || 0,
+				totalFromApi: discoveryStats?.totalFromApi || 0
+			};
+
+			// Log comprehensive stats to console
+			console.log(`Match Monkey: User feedback - ${statsBreakdown.added} tracks added`);
+			if (statsBreakdown.notInLibrary > 0) {
+				console.log(`Match Monkey: User feedback - ${statsBreakdown.notInLibrary} recommendations were not found in library`);
+			}
+			if (statsBreakdown.filteredByRating > 0) {
+				console.log(`Match Monkey: User feedback - ${statsBreakdown.filteredByRating} recommendations were skipped (below minRating ${config_.minRating})`);
+			}
+			if (statsBreakdown.apiFiltered > 0) {
+				console.log(`Match Monkey: User feedback - ${statsBreakdown.apiFiltered} recommendations were skipped (below ${config_.apiMinMatch}% API threshold)`);
+			}
+
+			// Build success message with stats breakdown
 			let successMsg = `Successfully added ${actualTracksAdded} ${modeName} track(s) in ${elapsed}s`;
-			if (matchStats && matchStats.notInLibrary > 0) {
-				successMsg += ` (${matchStats.notInLibrary} recommendations not in library)`;
-				console.log(`Match Monkey: User feedback - ${matchStats.notInLibrary} recommendations were not found in library`);
+			const detailParts = [];
+			if (statsBreakdown.notInLibrary > 0) {
+				detailParts.push(`${statsBreakdown.notInLibrary} not in library`);
+			}
+			if (statsBreakdown.filteredByRating > 0) {
+				detailParts.push(`${statsBreakdown.filteredByRating} below rating threshold`);
+			}
+			if (statsBreakdown.apiFiltered > 0) {
+				detailParts.push(`${statsBreakdown.apiFiltered} below API threshold`);
+			}
+			if (detailParts.length > 0) {
+				successMsg += ` (${detailParts.join(', ')})`;
 			}
 
 			// Show success toast with auto-dismiss
@@ -660,8 +692,8 @@ window.matchMonkeyOrchestration = {
 		console.log(`Match Monkey: Rating filter - minRating=${config.minRating}, allowUnknown=${config.allowUnknown}`);
 
 		// Log active API threshold settings for developer visibility
-		if (config.lastfmMinMatch > 0 || config.reccobeatsMinPopularity > 0) {
-			console.log(`Match Monkey: API thresholds - Last.fm min match: ${config.lastfmMinMatch || 0}%, ReccoBeats min popularity: ${config.reccobeatsMinPopularity || 0}`);
+		if (config.apiMinMatch > 0) {
+			console.log(`Match Monkey: API threshold - min match: ${config.apiMinMatch}% (applies to both Last.fm and ReccoBeats)`);
 		}
 		if (config.localCollection) {
 			console.log(`Match Monkey: Collection filter: "${config.localCollection}" (NOTE: not yet implemented in MM5)`);
@@ -672,10 +704,10 @@ window.matchMonkeyOrchestration = {
 		let artistsMatched = 0;
 		let totalTracksMatched = 0;
 
-		// Track missed results - separate counts for not-in-library vs filtered-by-threshold
+		// Track missed results - separate counts for not-in-library vs filtered-by-rating
 		const missedResults = [];
 		let notInLibraryCount = 0;
-		let filteredByThresholdCount = 0;
+		let filteredByRatingCount = 0;
 
 		for (let i = 0; i < totalCandidates; i++) {
 			const candidate = candidates[i];
@@ -728,44 +760,65 @@ window.matchMonkeyOrchestration = {
 								const matchValNorm = matchVal <= 1 ? (matchVal * 100).toFixed(1) : matchVal;
 								console.log(`Match Monkey: MATCHED in library - "${candidate.artist} - ${title}" (API score: ${matchValNorm}%)`);
 							} else {
-								// Find the original track data to get popularity
-								const originalTrack = candidate.tracks.find(t => {
-									const trackTitle = typeof t === 'string' ? t : (t.title || '');
-									return trackTitle === title;
-								});
+								// Track not found with rating filter - check if it exists without rating filter
+								let filteredByRating = false;
+								if (config.minRating > 0) {
+									try {
+										const unratedCheck = await db.findLibraryTracksBatch(
+											candidate.artist,
+											[title],
+											1,
+											{ best: false, minRating: 0, allowUnknown: true, collection: config.localCollection || '' }
+										);
+										const unratedTracks = unratedCheck.get(title);
+										if (unratedTracks && unratedTracks.length > 0) {
+											filteredByRating = true;
+											filteredByRatingCount++;
+											console.log(`Match Monkey: FILTERED BY RATING - "${candidate.artist} - ${title}" exists but below minRating ${config.minRating}`);
+										}
+									} catch (_) { /* ignore check errors */ }
+								}
 
-								// Extract and normalize popularity from track data
-								const { popularity, rawPlaycount } = this.normalizePopularityFromTrack(originalTrack);
+								if (!filteredByRating) {
+									// Find the original track data to get popularity
+									const originalTrack = candidate.tracks.find(t => {
+										const trackTitle = typeof t === 'string' ? t : (t.title || '');
+										return trackTitle === title;
+									});
 
-								// Determine source for logging
-								const source = config.discoveryMode === 'acoustics' ||
-									config.discoveryMode === 'mood' ||
-									config.discoveryMode === 'activity' ? 'ReccoBeats' : 'Last.fm';
+									// Extract and normalize popularity from track data
+									const { popularity, rawPlaycount } = this.normalizePopularityFromTrack(originalTrack);
 
-								// Get match/popularity value for logging
-								const matchVal = typeof originalTrack === 'object'
-									? (originalTrack.popularity || originalTrack.match || 0)
-									: 0;
-								const matchValDisplay = matchVal <= 1 ? (matchVal * 100).toFixed(1) : matchVal;
+									// Determine source for logging
+									const source = config.discoveryMode === 'acoustics' ||
+										config.discoveryMode === 'mood' ||
+										config.discoveryMode === 'activity' ? 'ReccoBeats' : 'Last.fm';
 
-								// Log ALL missed tracks - show source and API value
-								console.log(`Match Monkey: NOT IN LIBRARY - "${candidate.artist} - ${title}" [${source} score: ${matchValDisplay}%, playcount: ${rawPlaycount}]`);
-								notInLibraryCount++;
+									// Get match/popularity value for logging
+									const matchVal = typeof originalTrack === 'object'
+										? (originalTrack.popularity || originalTrack.match || 0)
+										: 0;
+									const matchValDisplay = matchVal <= 1 ? (matchVal * 100).toFixed(1) : matchVal;
 
-								// Track as missed result with normalized popularity
-								missedResults.push({
-									artist: candidate.artist,
-									title: title,
-									popularity: popularity,
-									additionalInfo: {
-										source: source,
-										discoveryMode: config.discoveryMode,
-										playcount: typeof originalTrack === 'object' ? (originalTrack.playcount || 0) : 0,
-										rank: typeof originalTrack === 'object' ? (originalTrack.rank || 0) : 0,
-										match: typeof originalTrack === 'object' ? (Number(originalTrack.match) || 0) : 0,
-										reason: 'not_in_library'
-									}
-								});
+									// Log ALL missed tracks - show source and API value
+									console.log(`Match Monkey: NOT IN LIBRARY - "${candidate.artist} - ${title}" [${source} score: ${matchValDisplay}%, playcount: ${rawPlaycount}]`);
+									notInLibraryCount++;
+
+									// Track as missed result with normalized popularity
+									missedResults.push({
+										artist: candidate.artist,
+										title: title,
+										popularity: popularity,
+										additionalInfo: {
+											source: source,
+											discoveryMode: config.discoveryMode,
+											playcount: typeof originalTrack === 'object' ? (originalTrack.playcount || 0) : 0,
+											rank: typeof originalTrack === 'object' ? (originalTrack.rank || 0) : 0,
+											match: typeof originalTrack === 'object' ? (Number(originalTrack.match) || 0) : 0,
+											reason: 'not_in_library'
+										}
+									});
+								}
 							}
 						}
 					}
@@ -848,21 +901,22 @@ window.matchMonkeyOrchestration = {
 
 		// Batch add missed results - they already have normalized popularity
 		if (missedResults.length > 0 && window.matchMonkeyMissedResults?.addBatch) {
-			// Filter to keep only results above 39% popularity
-			// Filter missed results by configured thresholds per source
-			const reccoMin = config.reccobeatsMinPopularity || 0;
-			const lastfmMin = config.lastfmMinMatch || 0;
+			// Filter missed results by configured API match threshold (applies to both sources)
+			const apiMinMatch = config.apiMinMatch || 0;
 			const filteredMissedResults = missedResults.filter(r => {
 				try {
 					const src = r.additionalInfo?.source || 'Last.fm';
 					if (src === 'ReccoBeats') {
-						return (r.popularity || 0) >= reccoMin;
+						// ReccoBeats popularity is 0-100, same scale as apiMinMatch
+						return (r.popularity || 0) >= apiMinMatch;
 					} else {
-						// Prefer explicit match field when available
+						// Prefer explicit match field when available (Last.fm match already normalized to 0-100)
 						const m = Number(r.additionalInfo?.match || 0);
-						if (m > 0) return m >= lastfmMin;
+						// Normalize if still in 0-1 range
+						const matchNormalized = m <= 1 ? m * 100 : m;
+						if (matchNormalized > 0) return matchNormalized >= apiMinMatch;
 						// Fallback to popularity if no match value
-						return (r.popularity || 0) >= Math.min(100, Math.round(lastfmMin));
+						return (r.popularity || 0) >= apiMinMatch;
 					}
 				} catch (e) { return false; }
 			});
@@ -877,7 +931,7 @@ window.matchMonkeyOrchestration = {
 		}
 
 		console.log(`Match Monkey: Library matching found ${results.length} unique tracks`);
-		console.log(`Match Monkey: Stats - matched: ${totalTracksMatched}, notInLibrary: ${notInLibraryCount}, candidates: ${totalCandidates}`);
+		console.log(`Match Monkey: Stats - matched: ${totalTracksMatched}, notInLibrary: ${notInLibraryCount}, filteredByRating: ${filteredByRatingCount}, candidates: ${totalCandidates}`);
 		updateProgress(`Library: Found ${totalTracksMatched} tracks from ${artistsMatched}/${totalCandidates} artists`, 0.8);
 
 		// Return tracks and stats for user feedback
@@ -886,6 +940,7 @@ window.matchMonkeyOrchestration = {
 			stats: {
 				matched: totalTracksMatched,
 				notInLibrary: notInLibraryCount,
+				filteredByRating: filteredByRatingCount,
 				artistsMatched: artistsMatched,
 				totalCandidates: totalCandidates
 			}
