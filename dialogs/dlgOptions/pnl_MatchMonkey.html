@@ -89,12 +89,14 @@
 							 data-init-params="{type:'number',min:0,max:10000}"></div>
 					</div>
 
-					<div class="uiRow">
+					<!-- HIDDEN: LocalCollection field - Not yet supported in MM5 API -->
+					<!-- TODO: Unhide when MediaMonkey 5 adds collection filtering support -->
+					<div class="uiRow" style="display:none;">
 						<label class="inline">Local collection (optional):</label>
 						<div data-id="LocalCollection"
 							 data-control-class="Edit"
-							 data-tip="Optional: limit local library searches to this collection name. Leave blank to search entire library."
-							 data-init-params='{"hint":"Collection name (exact)"}'></div>
+							 data-tip="NOT YET SUPPORTED IN MM5: This setting will be ignored until MediaMonkey 5 adds collection filtering support to its API. Currently searches entire library regardless of this setting."
+							 data-init-params='{"hint":"Not yet supported"}'></div>
 					</div>
 
 					<div class="uiRow">
