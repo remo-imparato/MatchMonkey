@@ -270,6 +270,7 @@ window.matchMonkeyOrchestration = {
 
 			// Step 3: Match candidates to local library
 			let results;
+			let matchStats = null;
 
 			updateProgress(`Matching candidates to your library...`, 0.6);
 			try {
@@ -281,8 +282,10 @@ window.matchMonkeyOrchestration = {
 					// Mood/Activity mode - search library with audio filtering
 					results = await this.matchMoodActivityToLibrary(modules, candidates[0], config_);
 				} else {
-					// Standard artist/track matching
-					results = await this.matchCandidatesToLibrary(modules, candidates, config_);
+					// Standard artist/track matching - returns {tracks, stats}
+					const matchResult = await this.matchCandidatesToLibrary(modules, candidates, config_);
+					results = matchResult.tracks;
+					matchStats = matchResult.stats;
 				}
 			} catch (matchError) {
 				console.error(`Match Monkey: Library matching error:`, matchError);
@@ -443,8 +446,15 @@ window.matchMonkeyOrchestration = {
 			terminateProgressTask(taskId);
 			cache?.clear?.();
 
+			// Build success message with stats breakdown if available
+			let successMsg = `Successfully added ${actualTracksAdded} ${modeName} track(s) in ${elapsed}s`;
+			if (matchStats && matchStats.notInLibrary > 0) {
+				successMsg += ` (${matchStats.notInLibrary} recommendations not in library)`;
+				console.log(`Match Monkey: User feedback - ${matchStats.notInLibrary} recommendations were not found in library`);
+			}
+
 			// Show success toast with auto-dismiss
-			showToast(`Successfully added ${actualTracksAdded} ${modeName} track(s) in ${elapsed}s`, { type: 'success', duration: 3000 });
+			showToast(successMsg, { type: 'success', duration: 4000 });
 
 			return {
 				success: true,
@@ -637,7 +647,7 @@ window.matchMonkeyOrchestration = {
 	 * @param {object} modules - Module dependencies
 	 * @param {Array} candidates - Array of {artist, tracks[]} from discovery
 	 * @param {object} config - Configuration settings
-	 * @returns {Promise<Array>} Array of matching library track objects
+	 * @returns {Promise<object>} Object with {tracks: Array, stats: {matched, notInLibrary, filteredByThreshold}}
 	 */
 	async matchCandidatesToLibrary(modules, candidates, config) {
 		const { db, ui: { notifications } } = modules;
@@ -648,13 +658,24 @@ window.matchMonkeyOrchestration = {
 		const totalCandidates = candidates.length;
 		console.log(`Match Monkey: Matching ${totalCandidates} candidates to library`);
 		console.log(`Match Monkey: Rating filter - minRating=${config.minRating}, allowUnknown=${config.allowUnknown}`);
+
+		// Log active API threshold settings for developer visibility
+		if (config.lastfmMinMatch > 0 || config.reccobeatsMinPopularity > 0) {
+			console.log(`Match Monkey: API thresholds - Last.fm min match: ${config.lastfmMinMatch || 0}%, ReccoBeats min popularity: ${config.reccobeatsMinPopularity || 0}`);
+		}
+		if (config.localCollection) {
+			console.log(`Match Monkey: Collection filter: "${config.localCollection}" (NOTE: not yet implemented in MM5)`);
+		}
+
 		updateProgress(`Searching local library for ${totalCandidates} artists...`, 0.55);
 
 		let artistsMatched = 0;
 		let totalTracksMatched = 0;
 
-		// Track missed results
+		// Track missed results - separate counts for not-in-library vs filtered-by-threshold
 		const missedResults = [];
+		let notInLibraryCount = 0;
+		let filteredByThresholdCount = 0;
 
 		for (let i = 0; i < totalCandidates; i++) {
 			const candidate = candidates[i];
@@ -697,36 +718,54 @@ window.matchMonkeyOrchestration = {
 						for (const [title, foundTracks] of foundMap.entries()) {
 							if (foundTracks && foundTracks.length > 0) {
 								tracks.push(...foundTracks);
-							} else {
-								// Find the original track data to get popularity
-								const originalTrack = candidate.tracks.find(t => {
-									const trackTitle = typeof t === 'string' ? t : (t.title || '');
-									return trackTitle === title;
-								});
 
-								// Extract and normalize popularity from track data
-								const { popularity, rawPlaycount } = this.normalizePopularityFromTrack(originalTrack);
+																// Log matched track with its API popularity/match value
+																const originalTrack = candidate.tracks.find(t => {
+																	const trackTitle = typeof t === 'string' ? t : (t.title || '');
+																	return trackTitle === title;
+																});
+																const matchVal = typeof originalTrack === 'object' ? (originalTrack.match || originalTrack.popularity || 0) : 0;
+																const matchValNorm = matchVal <= 1 ? (matchVal * 100).toFixed(1) : matchVal;
+																console.log(`Match Monkey: MATCHED in library - "${candidate.artist} - ${title}" (API score: ${matchValNorm}%)`);
+															} else {
+																// Find the original track data to get popularity
+																const originalTrack = candidate.tracks.find(t => {
+																	const trackTitle = typeof t === 'string' ? t : (t.title || '');
+																	return trackTitle === title;
+																});
 
-								// Debug log for first few missed tracks
-								if (missedResults.length < 5) {
-									console.log(`Match Monkey: Missed track - "${candidate.artist} - ${title}" (playcount: ${rawPlaycount}, popularity: ${popularity}%)`);
-								}
+																// Extract and normalize popularity from track data
+																const { popularity, rawPlaycount } = this.normalizePopularityFromTrack(originalTrack);
 
-								// Track as missed result with normalized popularity
-								missedResults.push({
-									artist: candidate.artist,
-									title: title,
-									popularity: popularity,
-									additionalInfo: {
-										source: config.discoveryMode === 'acoustics' ||
-											config.discoveryMode === 'mood' ||
-											config.discoveryMode === 'activity' ? 'ReccoBeats' : 'Last.fm',
-										discoveryMode: config.discoveryMode,
-										playcount: typeof originalTrack === 'object' ? (originalTrack.playcount || 0) : 0,
-										rank: typeof originalTrack === 'object' ? (originalTrack.rank || 0) : 0,
-										match: typeof originalTrack === 'object' ? (Number(originalTrack.match) || 0) : 0
-									}
-								});
+																// Determine source for logging
+																const source = config.discoveryMode === 'acoustics' ||
+																	config.discoveryMode === 'mood' ||
+																	config.discoveryMode === 'activity' ? 'ReccoBeats' : 'Last.fm';
+
+																// Get match/popularity value for logging
+																const matchVal = typeof originalTrack === 'object' 
+																	? (originalTrack.popularity || originalTrack.match || 0) 
+																	: 0;
+																const matchValDisplay = matchVal <= 1 ? (matchVal * 100).toFixed(1) : matchVal;
+
+																// Log ALL missed tracks - show source and API value
+																console.log(`Match Monkey: NOT IN LIBRARY - "${candidate.artist} - ${title}" [${source} score: ${matchValDisplay}%, playcount: ${rawPlaycount}]`);
+																notInLibraryCount++;
+
+																// Track as missed result with normalized popularity
+																missedResults.push({
+																	artist: candidate.artist,
+																	title: title,
+																	popularity: popularity,
+																	additionalInfo: {
+																		source: source,
+																		discoveryMode: config.discoveryMode,
+																		playcount: typeof originalTrack === 'object' ? (originalTrack.playcount || 0) : 0,
+																		rank: typeof originalTrack === 'object' ? (originalTrack.rank || 0) : 0,
+																		match: typeof originalTrack === 'object' ? (Number(originalTrack.match) || 0) : 0,
+																		reason: 'not_in_library'
+																	}
+																});
 							}
 						}
 					}
@@ -749,6 +788,11 @@ window.matchMonkeyOrchestration = {
 					// If no tracks found for artist at all, track the artist's top tracks as missed
 					// BUT only if we didn't already search for specific tracks (to avoid double-tracking)
 					if (tracks.length === 0 && !searchedSpecificTracks && candidate.tracks && candidate.tracks.length > 0) {
+						// Determine source for logging
+						const source = config.discoveryMode === 'acoustics' ||
+							config.discoveryMode === 'mood' ||
+							config.discoveryMode === 'activity' ? 'ReccoBeats' : 'Last.fm';
+
 						candidate.tracks.slice(0, 3).forEach(t => {
 							const trackTitle = typeof t === 'string' ? t : (t.title || '');
 							if (!trackTitle) return;
@@ -756,23 +800,25 @@ window.matchMonkeyOrchestration = {
 							// Extract and normalize popularity
 							const { popularity, rawPlaycount } = this.normalizePopularityFromTrack(t);
 
-							// Debug log for first few missed artists
-							if (missedResults.length < 5) {
-								console.log(`Match Monkey: Missed artist fallback - "${candidate.artist} - ${trackTitle}" (playcount: ${rawPlaycount}, popularity: ${popularity}%)`);
-							}
+							// Get match/popularity value for logging
+							const matchVal = typeof t === 'object' ? (t.popularity || t.match || 0) : 0;
+							const matchValDisplay = matchVal <= 1 ? (matchVal * 100).toFixed(1) : matchVal;
+
+							// Log ALL missed artists - show source and API value
+							console.log(`Match Monkey: ARTIST NOT IN LIBRARY - "${candidate.artist} - ${trackTitle}" [${source} score: ${matchValDisplay}%, playcount: ${rawPlaycount}]`);
+							notInLibraryCount++;
 
 							missedResults.push({
 								artist: candidate.artist,
 								title: trackTitle,
 								popularity: popularity,
 								additionalInfo: {
-									source: config.discoveryMode === 'acoustics' ||
-										config.discoveryMode === 'mood' ||
-										config.discoveryMode === 'activity' ? 'ReccoBeats' : 'Last.fm',
+									source: source,
 									discoveryMode: config.discoveryMode,
 									playcount: typeof t === 'object' ? (t.playcount || 0) : 0,
 									rank: typeof t === 'object' ? (t.rank || 0) : 0,
-									match: typeof t === 'object' ? (Number(t.match) || 0) : 0
+									match: typeof t === 'object' ? (Number(t.match) || 0) : 0,
+									reason: 'not_in_library'
 								}
 							});
 						});
@@ -831,8 +877,19 @@ window.matchMonkeyOrchestration = {
 		}
 
 		console.log(`Match Monkey: Library matching found ${results.length} unique tracks`);
+		console.log(`Match Monkey: Stats - matched: ${totalTracksMatched}, notInLibrary: ${notInLibraryCount}, candidates: ${totalCandidates}`);
 		updateProgress(`Library: Found ${totalTracksMatched} tracks from ${artistsMatched}/${totalCandidates} artists`, 0.8);
-		return results;
+
+		// Return tracks and stats for user feedback
+		return {
+			tracks: results,
+			stats: {
+				matched: totalTracksMatched,
+				notInLibrary: notInLibraryCount,
+				artistsMatched: artistsMatched,
+				totalCandidates: totalCandidates
+			}
+		};
 	},
 
 	/**

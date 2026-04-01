@@ -97,16 +97,17 @@ async function discoverByArtist(modules, seeds, config) {
 			for (const artist of similar.slice(0, config.similarLimit || 20)) {
 				if (artist?.name) {
 					// Respect user-defined Last.fm match threshold if provided
-					try {
-						const minMatch = config.lastfmMinMatch || 0;
-						// Last.fm API returns match as 0.0-1.0, convert to percentage 0-100
-						const rawMatch = Number(artist.match) || 0;
-						const artistMatch = rawMatch <= 1 ? rawMatch * 100 : rawMatch;
-						if (minMatch > 0 && artistMatch < minMatch) {
-							// Skip low-match artists
-							continue;
-						}
-					} catch (_) { }
+					const minMatch = config.lastfmMinMatch || 0;
+					// Last.fm API returns match as 0.0-1.0, convert to percentage 0-100
+					const rawMatch = Number(artist.match) || 0;
+					const artistMatch = rawMatch <= 1 ? rawMatch * 100 : rawMatch;
+
+					if (minMatch > 0 && artistMatch < minMatch) {
+						// Log ALL filtered artists for full process visibility
+						console.log(`Discovery [Artist]: FILTERED by threshold - "${artist.name}" match ${artistMatch.toFixed(1)}% < min ${minMatch}%`);
+						continue;
+					}
+
 					// Add or update the artist candidate entry
 					addArtistCandidate(artist.name, seenArtists, blacklist, candidates);
 					// Store match score for popularity tracking
@@ -207,40 +208,43 @@ async function discoverByTrack(modules, seeds, config) {
 				updateProgress(`Last.fm: Found ${similarTracks.length} tracks similar to "${seed.title}"`, progress);
 
 				// Group by artist
-				for (const simTrack of similarTracks) {
-					if (!simTrack?.artist || !simTrack?.title) continue;
+									for (const simTrack of similarTracks) {
+										if (!simTrack?.artist || !simTrack?.title) continue;
 
-					// Respect Last.fm match threshold
-					try {
-						const minMatch = config.lastfmMinMatch || 0;
-						// Last.fm API returns match as 0.0-1.0, convert to percentage 0-100
-						const rawMatch = Number(simTrack.match) || 0;
-						const m = rawMatch <= 1 ? rawMatch * 100 : rawMatch;
-						if (minMatch > 0 && m < minMatch) continue;
-					} catch (_) { }
+										// Respect Last.fm match threshold
+										const minMatch = config.lastfmMinMatch || 0;
+										// Last.fm API returns match as 0.0-1.0, convert to percentage 0-100
+										const rawMatch = Number(simTrack.match) || 0;
+										const m = rawMatch <= 1 ? rawMatch * 100 : rawMatch;
 
-					const artKey = simTrack.artist.toUpperCase();
-					if (blacklist.has(artKey)) continue;
+										if (minMatch > 0 && m < minMatch) {
+											// Log ALL filtered tracks for full process visibility
+											console.log(`Discovery [Track]: FILTERED by threshold - "${simTrack.artist} - ${simTrack.title}" match ${m.toFixed(1)}% < min ${minMatch}%`);
+											continue;
+										}
 
-					if (!tracksByArtist.has(artKey)) {
-						tracksByArtist.set(artKey, {
-							artistName: simTrack.artist,
-							tracks: []
-						});
-					}
+										const artKey = simTrack.artist.toUpperCase();
+										if (blacklist.has(artKey)) continue;
 
-					const entry = tracksByArtist.get(artKey);
-					const trackKey = simTrack.title.toUpperCase();
+										if (!tracksByArtist.has(artKey)) {
+											tracksByArtist.set(artKey, {
+												artistName: simTrack.artist,
+												tracks: []
+											});
+										}
 
-					// Avoid duplicate tracks
-					if (!entry.tracks.some(t => t.title.toUpperCase() === trackKey)) {
-						entry.tracks.push({
-							title: simTrack.title,
-							match: simTrack.match || 0,
-							playcount: simTrack.playcount || 0
-						});
-					}
-				}
+										const entry = tracksByArtist.get(artKey);
+										const trackKey = simTrack.title.toUpperCase();
+
+										// Avoid duplicate tracks
+										if (!entry.tracks.some(t => t.title.toUpperCase() === trackKey)) {
+											entry.tracks.push({
+												title: simTrack.title,
+												match: simTrack.match || 0,
+												playcount: simTrack.playcount || 0
+											});
+										}
+									}
 
 			} catch (e) {
 				console.error(`Discovery [Track]: Error for "${fixedArtistName} - ${seed.title}":`, e.message);
@@ -423,64 +427,69 @@ function buildReccoCandidates(result, blacklist, seenArtists) {
 	}
 
 	const candidates = [];
+	const minPop = result?.__reccoFilterMinPopularity || 0;
 
-	for (const rec of result.recommendations) {
-		const trackTitle = rec.trackTitle;
-		const popularity = rec.popularity || 0; // Extract ReccoBeats popularity (0-100)
+		for (const rec of result.recommendations) {
+			const trackTitle = rec.trackTitle;
+			const popularity = rec.popularity || 0; // Extract ReccoBeats popularity (0-100)
 
-		// Ensure artists array exists
-		if (!rec.artists || !Array.isArray(rec.artists)) continue;
+			// Ensure artists array exists
+			if (!rec.artists || !Array.isArray(rec.artists)) continue;
 
-		for (const artist of rec.artists) {
-			const artistName = artist?.name;
-			if (!artistName) continue;
+			for (const artist of rec.artists) {
+				const artistName = artist?.name;
+				if (!artistName) continue;
 
-			const artKey = artistName.toUpperCase();
+				const artKey = artistName.toUpperCase();
 
-			// Skip blacklisted artists
-			if (blacklist.has(artKey)) continue;
+				// Skip blacklisted artists
+				if (blacklist.has(artKey)) continue;
 
-			// First time seeing this artist
-			if (!seenArtists.has(artKey)) {
-				// Apply ReccoBeats popularity threshold if configured
-				try {
-					const minPop = (window.matchMonkeySettings?.reccobeatsMinPopularity ?? null) || null;
-					// Also allow passing threshold via config when calling discoverByRecco (attached to result)
-					if (result?.__reccoFilterMinPopularity != null) {
-						if (popularity < result.__reccoFilterMinPopularity) continue;
-					} else if (typeof minPop === 'number' && minPop > 0 && popularity < minPop) {
+				// First time seeing this artist
+				if (!seenArtists.has(artKey)) {
+					// Apply ReccoBeats popularity threshold if configured (ONLY from config)
+					if (minPop > 0 && popularity < minPop) {
+						// Log ALL filtered items for full process visibility
+						console.log(`Discovery [ReccoBeats]: FILTERED by threshold - "${artistName} - ${trackTitle}" popularity ${popularity} < min ${minPop}`);
 						continue;
 					}
-				} catch (_) { }
-				seenArtists.add(artKey);
 
-				candidates.push({
-					artist: artistName,
-					tracks: trackTitle
-						? [{ title: trackTitle, match: 1.0, popularity: popularity }]
-						: []
-				});
-			}
-			// Artist already exists → add track if unique
-			else if (trackTitle) {
-				const existing = candidates.find(
-					c => c.artist.toUpperCase() === artKey
-				);
+					seenArtists.add(artKey);
 
-				if (
-					existing &&
-					!existing.tracks.some(
-						t => t.title.toUpperCase() === trackTitle.toUpperCase()
-					)
-				) {
-					existing.tracks.push({ title: trackTitle, match: 1.0, popularity: popularity });
+					candidates.push({
+						artist: artistName,
+						tracks: trackTitle
+							? [{ title: trackTitle, match: 1.0, popularity: popularity }]
+							: []
+					});
+				}
+				// Artist already exists → add track if unique
+				else if (trackTitle) {
+					// Also check popularity threshold for additional tracks
+					if (minPop > 0 && popularity < minPop) {
+						// Log ALL filtered items for full process visibility
+						console.log(`Discovery [ReccoBeats]: FILTERED by threshold - "${artistName} - ${trackTitle}" popularity ${popularity} < min ${minPop}`);
+						continue;
+					}
+
+					const existing = candidates.find(
+						c => c.artist.toUpperCase() === artKey
+					);
+
+					if (
+						existing &&
+						!existing.tracks.some(
+							t => t.title.toUpperCase() === trackTitle.toUpperCase()
+						)
+					) {
+						existing.tracks.push({ title: trackTitle, match: 1.0, popularity: popularity });
+					}
 				}
 			}
 		}
-	}
 
-	return candidates;
-}
+		return candidates;
+	}
 
 /**
  * ReccoBeats-based discovery strategy.
