@@ -183,6 +183,54 @@ function shuffle(arr) {
 }
 
 /**
+ * Enhanced shuffle that actively disperses tracks from the same artist/album.
+ * Groups tracks by artist, shuffles each artist's tracks, then interleaves them.
+ * This creates better "randomness" perception by avoiding artist clusters.
+ * 
+ * @param {Array} tracks Array of track objects with artist/album properties
+ * @returns {Array} Shuffled array with dispersed artists
+ */
+function shuffleWithDispersion(tracks) {
+	if (!tracks || tracks.length <= 1) return tracks;
+
+	// Group tracks by artist
+	const byArtist = new Map();
+	for (const track of tracks) {
+		const artist = (track.artist || track.Artist || '').toUpperCase();
+		if (!byArtist.has(artist)) {
+			byArtist.set(artist, []);
+		}
+		byArtist.get(artist).push(track);
+	}
+
+	// Shuffle tracks within each artist group
+	const artistBuckets = Array.from(byArtist.values());
+	for (const bucket of artistBuckets) {
+		shuffle(bucket);
+	}
+
+	// Shuffle the order of artist buckets themselves
+	shuffle(artistBuckets);
+
+	// Interleave tracks from different artists
+	const result = [];
+	let maxBucketSize = Math.max(...artistBuckets.map(b => b.length));
+
+	for (let i = 0; i < maxBucketSize; i++) {
+		for (const bucket of artistBuckets) {
+			if (i < bucket.length) {
+				result.push(bucket[i]);
+			}
+		}
+	}
+
+	// Final shuffle to break up any remaining patterns
+	shuffle(result);
+
+	return result;
+}
+
+/**
  * Parse a comma-separated string setting into an array.
  * Accepts either a string (CSV) or an array stored in settings.
  * @param {*} raw Raw setting value (string, array, number, etc).
@@ -263,6 +311,7 @@ window.matchMonkeyHelpers = {
 	cleanTrackName,
 	formatError,
 	shuffle,
+	shuffleWithDispersion,
 	parseListSetting,
 	sleep,
 	escapeSql,

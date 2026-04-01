@@ -75,7 +75,7 @@ window.matchMonkeyOrchestration = {
 
 		const { getSetting, intSetting, boolSetting, stringSetting } = storage;
 		const { showToast, updateProgress, createProgressTask, terminateProgressTask } = notifications;
-		const { formatError, shuffle: shuffleUtil } = helpers;
+		const { formatError, shuffle: shuffleUtil, shuffleWithDispersion } = helpers;
 
 		// Get discovery strategies
 		const strategies = window.matchMonkeyDiscoveryStrategies;
@@ -310,20 +310,12 @@ window.matchMonkeyOrchestration = {
 			}
 
 			console.log(`Match Monkey: Removed ${results.length - dedupedResults.length} duplicates, ${dedupedResults.length} unique tracks remain`);
-			updateProgress(`Removed ${results.length - dedupedResults.length} duplicates ? ${dedupedResults.length} unique tracks`, 0.83);
+			updateProgress(`Removed ${results.length - dedupedResults.length} duplicates → ${dedupedResults.length} unique tracks`, 0.83);
 
-			// Step 5: Apply randomization if enabled
-			if (config_.randomize) {
-				console.log(`Match Monkey: Randomizing ${dedupedResults.length} results`);
-				updateProgress(`Shuffling ${dedupedResults.length} tracks...`, 0.85);
-				shuffleUtil(dedupedResults);
-				updateProgress(`Shuffled ${dedupedResults.length} tracks`, 0.86);
-			}
-
-			// Step 5b: Include seed tracks if enabled
-			// When IncludeSeedArtist is true, we also include the actual seed tracks at the beginning
+			// Step 5: Include seed tracks if enabled (before shuffling)
+			// When IncludeSeedArtist is true, we also include the actual seed tracks
 			if (config_.includeSeedArtist && seeds.length > 0) {
-				updateProgress(`Including seed tracks...`, 0.87);
+				updateProgress(`Including seed tracks...`, 0.84);
 				console.log(`Match Monkey: Including ${seeds.length} seed track(s) in results`);
 
 				const seedTracksToAdd = [];
@@ -369,12 +361,27 @@ window.matchMonkeyOrchestration = {
 					}
 				}
 
-				// Prepend seed tracks to the beginning of results
+				// Add seed tracks to results (will be shuffled together with other tracks if shuffle is enabled)
 				if (seedTracksToAdd.length > 0) {
-					console.log(`Match Monkey: Prepending ${seedTracksToAdd.length} seed track(s) to results`);
-					dedupedResults.unshift(...seedTracksToAdd);
-					updateProgress(`Added ${seedTracksToAdd.length} seed track(s) to results`, 0.88);
+					console.log(`Match Monkey: Adding ${seedTracksToAdd.length} seed track(s) to results pool`);
+					dedupedResults.push(...seedTracksToAdd);
+					updateProgress(`Added ${seedTracksToAdd.length} seed track(s) to results`, 0.85);
 				}
+			}
+
+			// Step 6: Apply randomization if enabled (after adding seed tracks)
+			if (config_.randomize) {
+				console.log(`Match Monkey: Dispersing and randomizing ${dedupedResults.length} results to avoid artist clustering`);
+				updateProgress(`Shuffling ${dedupedResults.length} tracks...`, 0.86);
+
+				// Use enhanced shuffle that disperses tracks from the same artist/album
+				// This creates better perceived randomness by interleaving artists
+				const shuffled = shuffleWithDispersion(dedupedResults);
+				dedupedResults.length = 0;
+				dedupedResults.push(...shuffled);
+
+				console.log(`Match Monkey: Shuffle complete - tracks dispersed across artists`);
+				updateProgress(`Shuffled ${dedupedResults.length} tracks`, 0.87);
 			}
 
 			// Apply final limit
@@ -383,8 +390,8 @@ window.matchMonkeyOrchestration = {
 				: dedupedResults;
 
 			if (finalResults.length < dedupedResults.length) {
-				console.log(`Match Monkey: Applied limit: ${dedupedResults.length} ? ${finalResults.length} tracks`);
-				updateProgress(`Applied limit: ${finalResults.length} of ${dedupedResults.length} tracks`, 0.87);
+				console.log(`Match Monkey: Applied limit: ${dedupedResults.length} → ${finalResults.length} tracks`);
+				updateProgress(`Applied limit: ${finalResults.length} of ${dedupedResults.length} tracks`, 0.88);
 			}
 
 			console.log(`Match Monkey: Final track count: ${finalResults.length}`);
