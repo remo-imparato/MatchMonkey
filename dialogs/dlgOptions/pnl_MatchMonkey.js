@@ -131,7 +131,7 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function (sett, 
 		// ApiMinMatch: single threshold for both Last.fm match and ReccoBeats popularity (0.00-99.99%)
 		if (UI.ApiMinMatch && UI.ApiMinMatch.controlClass) {
 			const apiMatch = typeof cfg.ApiMinMatch === 'number' ? cfg.ApiMinMatch : parseFloat(cfg.ApiMinMatch);
-			const apiMatchVal = Number.isFinite(apiMatch) ? Math.max(0, Math.min(99.99, apiMatch)) : 40.0;
+			const apiMatchVal = Number.isFinite(apiMatch) ? Math.max(0, Math.min(99.99, apiMatch)) : 10.0;
 			// Display with two decimals
 			UI.ApiMinMatch.controlClass.value = apiMatchVal.toFixed(2);
 		}
@@ -355,7 +355,8 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 		// ApiMinMatch: single threshold for both Last.fm match and ReccoBeats popularity (0.00-99.99%)
 		if (UI.ApiMinMatch && UI.ApiMinMatch.controlClass) {
 			let apiMatch = parseFloat(String(UI.ApiMinMatch.controlClass.value).replace(',', '.'));
-			if (!Number.isFinite(apiMatch)) apiMatch = 40.0;
+			if (!Number.isFinite(apiMatch))
+				apiMatch = 10.0;
 			apiMatch = Math.max(0.0, Math.min(99.99, apiMatch));
 			// Store as number with two decimals precision
 			this.config.ApiMinMatch = Math.round(apiMatch * 100) / 100;
