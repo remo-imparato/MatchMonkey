@@ -1344,7 +1344,7 @@ async function fetchRecommendations(seedIds, audioTargets = {}, limit = 100, con
  * This is the main entry point for "Similar Recco" discovery mode.
  * 
  * Workflow:
- * 1. Find track IDs for each seed (via album search)
+ * 1. Find track IDs for each seed (via album search) - tries more seeds until we find matches
  * 2. Fetch audio features for found tracks
  * 3. Calculate average audio features
  * 4. Get recommendations using seed IDs and audio features
@@ -1364,24 +1364,44 @@ async function getReccoRecommendations(seeds, limit = 100) {
 
 	console.log(`getReccoRecommendations: Processing ${seeds.length} seed track(s)`);
 
-	// Limit to 5 seeds per API spec
-	const limitedSeeds = seeds.slice(0, 5);
+	// ReccoBeats API allows max 5 seed track IDs, but we may need to try more
+	// seeds to find 5 that actually exist in their database
+	const maxSeedsToTry = Math.min(seeds.length, 20); // Try up to 20 seeds to find 5 matches
+	const targetFoundCount = 5;
 
-	// Step 1: Find track IDs
-	updateProgress(`Looking up ${limitedSeeds.length} tracks on ReccoBeats...`, 0.1);
-	console.log(`getReccoRecommendations: Step 1 - Looking up track IDs`);
+	// Step 1: Find track IDs - try more seeds until we find enough matches
+	updateProgress(`Looking up tracks on ReccoBeats (trying up to ${maxSeedsToTry} seeds to find ${targetFoundCount} matches)...`, 0.1);
+	console.log(`getReccoRecommendations: Step 1 - Looking up track IDs (trying ${maxSeedsToTry} seeds to find ${targetFoundCount} matches)`);
 
-	const trackResults = await findTrackIdsBatch(limitedSeeds);
+	const allResults = [];
+	const foundTracks = [];
 
-	// Filter to found tracks
-	const foundTracks = trackResults.filter(r => r.trackId);
-	if (foundTracks.length === 0) {
-		console.log('getReccoRecommendations: No tracks found on ReccoBeats');
-		updateProgress('No tracks found on ReccoBeats', 0.5);
-		return { recommendations: [], seedCount: limitedSeeds.length, foundCount: 0 };
+	for (let i = 0; i < maxSeedsToTry && foundTracks.length < targetFoundCount; i++) {
+		const seed = seeds[i];
+		const progress = 0.1 + ((i + 1) / maxSeedsToTry) * 0.2;
+
+		console.log(`getReccoRecommendations: Trying seed ${i + 1}/${maxSeedsToTry}: "${seed.artist} - ${seed.title}" (Album: ${seed.album})`);
+		updateProgress(`ReccoBeats: Looking up "${seed.artist} - ${seed.title}" (${foundTracks.length}/${targetFoundCount} found)...`, progress);
+
+		const trackId = await findTrackId(seed.artist, seed.title, seed.album);
+		allResults.push({ seed, trackId });
+
+		if (trackId) {
+			foundTracks.push({ seed, trackId });
+			console.log(`getReccoRecommendations: FOUND track ID ${trackId} for "${seed.artist} - ${seed.title}" (${foundTracks.length}/${targetFoundCount})`);
+		} else {
+			console.log(`getReccoRecommendations: NOT FOUND: "${seed.artist} - ${seed.title}" (Album: ${seed.album})`);
+		}
 	}
 
-	console.log(`getReccoRecommendations: Found ${foundTracks.length}/${limitedSeeds.length} tracks on ReccoBeats`);
+	if (foundTracks.length === 0) {
+		console.log(`getReccoRecommendations: No tracks found on ReccoBeats after trying ${allResults.length} seeds`);
+		updateProgress(`ReccoBeats: None of ${allResults.length} tracks found - ensure Artist, Album, and Track tags match official release names exactly`, 0.5);
+		return { recommendations: [], seedCount: allResults.length, foundCount: 0, triedCount: allResults.length };
+	}
+
+	console.log(`getReccoRecommendations: Found ${foundTracks.length} track(s) on ReccoBeats after trying ${allResults.length} seeds`);
+	updateProgress(`ReccoBeats: Found ${foundTracks.length}/${allResults.length} tracks on ReccoBeats`, 0.3);
 
 	// Step 2: Fetch audio features
 	updateProgress(`Analyzing audio features of ${foundTracks.length} tracks...`, 0.35);
@@ -1393,7 +1413,7 @@ async function getReccoRecommendations(seeds, limit = 100) {
 	if (audioFeatures.length === 0) {
 		console.log('getReccoRecommendations: No audio features available');
 		updateProgress('No audio features available', 0.5);
-		return { recommendations: [], seedCount: limitedSeeds.length, foundCount: foundTracks.length };
+		return { recommendations: [], seedCount: allResults.length, foundCount: foundTracks.length, triedCount: allResults.length };
 	}
 
 	console.log(`getReccoRecommendations: Retrieved audio features for ${audioFeatures.length} track(s)`);
@@ -1453,15 +1473,16 @@ async function getReccoRecommendations(seeds, limit = 100) {
 	const finalRecommendations = recommendations.slice(0, limit);
 
 	console.log(`getReccoRecommendations: After deduplication: ${recommendations.length} unique tracks (${finalRecommendations.length} after limit)`);
-	updateProgress(`Received ${finalRecommendations.length} unique recommendations from ${audioFeatures.length} seeds`, 0.8);
+	updateProgress(`Received ${finalRecommendations.length} unique recommendations from ${audioFeatures.length} seeds (tried ${allResults.length} tracks)`, 0.8);
 
 	// Calculate average audio targets for backward compatibility
 	const audioTargets = calculateAverageFeatures(audioFeatures);
 
 	return {
 		recommendations: finalRecommendations,
-		seedCount: limitedSeeds.length,
+		seedCount: allResults.length,
 		foundCount: foundTracks.length,
+		triedCount: allResults.length,
 		audioTargets,
 		audioFeatures
 	};

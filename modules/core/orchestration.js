@@ -737,7 +737,7 @@ window.matchMonkeyOrchestration = {
 						const foundMap = await db.findLibraryTracksBatch(
 							candidate.artist,
 							titles,
-							config.tracksPerArtist || 10,
+							config.tracksPerArtist,
 							{
 								best: config.bestEnabled,
 								minRating: config.minRating,
@@ -847,7 +847,7 @@ window.matchMonkeyOrchestration = {
 											tracks = await db.findLibraryTracks(
 												candidate.artist,
 												null,
-												config.tracksPerArtist || 10,
+												config.tracksPerArtist,
 												{
 													best: config.bestEnabled,
 													minRating: config.minRating,
@@ -927,7 +927,7 @@ window.matchMonkeyOrchestration = {
 		// Batch add missed results - they already have normalized popularity
 		if (missedResults.length > 0 && window.matchMonkeyMissedResults?.addBatch) {
 			// Filter missed results by configured API match threshold (applies to both sources)
-			const apiMinMatch = config.apiMinMatch || 0;
+			const apiMinMatch = config.apiMinMatch;
 			const filteredMissedResults = missedResults.filter(r => {
 				try {
 					const src = r.additionalInfo?.source || 'Last.fm';
@@ -994,11 +994,11 @@ window.matchMonkeyOrchestration = {
 		// For mood/activity mode, we search the entire library with rating filters
 		// and then shuffle to get variety
 		try {
-			// Search library for tracks (broad search)
-			const allTracks = await db.findLibraryTracks(
-				null, // No specific artist
-				null, // No specific titles
-				config.totalLimit || 1000, // Get plenty of tracks
+		// Search library for tracks (broad search)
+		const allTracks = await db.findLibraryTracks(
+			null, // No specific artist
+			null, // No specific titles
+			config.totalLimit, // Get plenty of tracks
 				{
 					best: config.bestEnabled,
 					minRating: config.minRating,
