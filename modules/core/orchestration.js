@@ -124,17 +124,6 @@ window.matchMonkeyOrchestration = {
 					autoMode: true,
 					discoveryMode,
 				};
-
-				// Read additional user settings: local collection and API threshold
-				try {
-					config_.localCollection = stringSetting('LocalCollection', '');
-					// ApiMinMatch: single threshold for both Last.fm match and ReccoBeats popularity (0.00-99.99%)
-					const apiMatch = parseFloat(String(getSetting('ApiMinMatch') ?? '40')) || 40.0;
-					config_.apiMinMatch = Math.max(0, Math.min(99.99, Math.round(apiMatch * 100) / 100));
-					console.log(`Match Monkey: Settings - localCollection='${config_.localCollection}', apiMinMatch=${config_.apiMinMatch}%`);
-				} catch (e) {
-					console.warn('Match Monkey: Failed to read additional settings:', e.message);
-				}
 				console.log(`Match Monkey Auto-Mode: Rating filter - minRating=${config_.minRating}, allowUnknown=${config_.allowUnknown}`);
 			} else {
 				const maxTracks = intSetting('MaxPlaylistTracks', 0);
@@ -155,38 +144,27 @@ window.matchMonkeyOrchestration = {
 					autoMode: false,
 					discoveryMode,
 				};
-
-				// Read additional user settings: local collection and API threshold
-				try {
-					config_.localCollection = stringSetting('LocalCollection', '');
-					// ApiMinMatch: single threshold for both Last.fm match and ReccoBeats popularity (0.00-99.99%)
-					const apiMatch = parseFloat(String(getSetting('ApiMinMatch') ?? '40')) || 40.0;
-					config_.apiMinMatch = Math.max(0, Math.min(99.99, Math.round(apiMatch * 100) / 100));
-					console.log(`Match Monkey: Settings - localCollection='${config_.localCollection}', apiMinMatch=${config_.apiMinMatch}%`);
-				} catch (e) {
-					console.warn('Match Monkey: Failed to read additional settings:', e.message);
-				}
 				console.log(`Match Monkey Manual-Mode: Rating filter - minRating=${config_.minRating}, allowUnknown=${config_.allowUnknown}`);
 			}
 
-			// Add mood/activity context if present or from settings
+			// Read additional user settings: local collection and API threshold (common for both modes)
+			try {
+				config_.localCollection = stringSetting('LocalCollection', '');
+				// ApiMinMatch: single threshold for both Last.fm match and ReccoBeats popularity (0.00-99.99%)
+				const apiMatch = parseFloat(String(getSetting('ApiMinMatch') ?? '40')) || 40.0;
+				config_.apiMinMatch = Math.max(0, Math.min(99.99, Math.round(apiMatch * 100) / 100));
+				console.log(`Match Monkey: Settings - localCollection='${config_.localCollection}', apiMinMatch=${config_.apiMinMatch}%`);
+			} catch (e) {
+				console.warn('Match Monkey: Failed to read additional settings:', e.message);
+			}
+
+			// Add mood/activity context if present
 			if (_moodActivityContext) {
 				// Context explicitly provided
 				config_.moodActivityContext = _moodActivityContext.context;
 				config_.moodActivityValue = _moodActivityContext.value;
 				config_.moodSeedBlend = getSetting("MoodActivityBlendRatio", 0.5);
 				console.log(`Match Monkey: Using ${config_.moodActivityContext} "${config_.moodActivityValue}" (blend: ${config_.moodSeedBlend})`);
-			} else if (discoveryMode === 'mood' || discoveryMode === 'activity') {
-				// Context not provided, read from settings
-				if (discoveryMode === 'mood') {
-					config_.moodActivityContext = 'mood';
-					config_.moodActivityValue = stringSetting('DefaultMood', 'energetic');
-				} else {
-					config_.moodActivityContext = 'activity';
-					config_.moodActivityValue = stringSetting('DefaultActivity', 'workout');
-				}
-
-				console.log(`Match Monkey: Using ${config_.moodActivityContext} "${config_.moodActivityValue}" from settings`);
 			}
 
 			// Log configuration summary

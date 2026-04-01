@@ -24,9 +24,6 @@
  * - ApiMinMatch -> ApiMinMatch (0.00-99.99 float lower bound for API match/popularity filtering)
  * - MinRating -> MinRating
  * - IncludeUnrated -> IncludeUnrated
- * - DefaultMood -> DefaultMood
- * - DefaultActivity -> DefaultActivity
- * - HybridMode -> HybridMode
  * - MoodActivityBlendRatio -> MoodActivityBlendRatio (0-100 slider -> 0.0-1.0 ratio)
  * - AutoModeEnabled -> AutoModeEnabled
  * - AutoModeDiscovery -> AutoModeDiscovery
@@ -41,8 +38,6 @@
  * - ClearQueueFirst -> ClearQueueFirst
  * - NavigateAfter -> NavigateAfter
  * - ArtistBlacklist -> ArtistBlacklist
- * - GenreBlacklist -> GenreBlacklist
- * - TitleExclusions -> TitleExclusions
  * 
 
  */
@@ -115,9 +110,7 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function (sett, 
 		this._setRatingControl(UI.MinRating, ratingValue);
 		UI.IncludeUnrated.controlClass.checked = cfg.IncludeUnrated !== false; // Default true
 
-		// === Mood & Activity (ReccoBeats) ===
-		UI.DefaultMood.controlClass.value = cfg.DefaultMood || 'energetic';
-		UI.DefaultActivity.controlClass.value = cfg.DefaultActivity || 'workout';
+		// === Mood & Activity Blend Ratio ===
 		// Blend ratio: stored as 0.0-1.0, displayed as 0-100%
 		const blendRatioPercent = Math.round((cfg.MoodActivityBlendRatio ?? 0.5) * 100);
 		UI.MoodActivityBlendRatio.controlClass.value = blendRatioPercent;
@@ -131,7 +124,7 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function (sett, 
 		// ApiMinMatch: single threshold for both Last.fm match and ReccoBeats popularity (0.00-99.99%)
 		if (UI.ApiMinMatch && UI.ApiMinMatch.controlClass) {
 			const apiMatch = typeof cfg.ApiMinMatch === 'number' ? cfg.ApiMinMatch : parseFloat(cfg.ApiMinMatch);
-			const apiMatchVal = Number.isFinite(apiMatch) ? Math.max(0, Math.min(99.99, apiMatch)) : 10.0;
+			const apiMatchVal = Number.isFinite(apiMatch) ? Math.max(0, Math.min(99.99, apiMatch)) : 40.0;
 			// Display with two decimals
 			UI.ApiMinMatch.controlClass.value = apiMatchVal.toFixed(2);
 		}
@@ -157,10 +150,8 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function (sett, 
 		UI.ClearQueueFirst.controlClass.checked = Boolean(cfg.ClearQueueFirst);
 		UI.NavigateAfter.controlClass.value = cfg.NavigateAfter || 'Navigate to new playlist';
 
-		// === Filters (Advanced) ===
+		// === Filters ===
 		UI.ArtistBlacklist.controlClass.value = cfg.ArtistBlacklist || '';
-		UI.GenreBlacklist.controlClass.value = cfg.GenreBlacklist || '';
-		UI.TitleExclusions.controlClass.value = cfg.TitleExclusions || '';
 
 		// === Missed Results ===
 		this._setupMissedResults(UI);
@@ -311,9 +302,7 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 		this.config.MinRating = rawRating;
 		this.config.IncludeUnrated = UI.IncludeUnrated.controlClass.checked;
 
-		// === Mood & Activity (ReccoBeats) ===
-		this.config.DefaultMood = UI.DefaultMood.controlClass.value || 'energetic';
-		this.config.DefaultActivity = UI.DefaultActivity.controlClass.value || 'workout';
+		// === Mood & Activity Blend Ratio ===
 		// Convert slider percentage (0-100) to ratio (0.0-1.0)
 		const blendRatioPercent = parseInt(UI.MoodActivityBlendRatio.controlClass.value, 10) || 50;
 		this.config.MoodActivityBlendRatio = Math.max(0, Math.min(100, blendRatioPercent)) / 100.0;
@@ -369,8 +358,6 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 
 		// === Filters ===
 		this.config.ArtistBlacklist = UI.ArtistBlacklist.controlClass.value || '';
-		this.config.GenreBlacklist = UI.GenreBlacklist.controlClass.value || '';
-		this.config.TitleExclusions = UI.TitleExclusions.controlClass.value || '';
 
 		// Save all settings
 		try {

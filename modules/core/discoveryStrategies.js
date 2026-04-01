@@ -714,7 +714,7 @@ async function discoverByMood(modules, seeds, config) {
 	console.log(`Discovery [Mood]: Requesting recommendations with mood profile`);
 
 	const seedIds = foundTracks.map(r => r.trackId);
-	const recommendations = await reccobeatsApi.fetchRecommendations(seedIds, audioTargets, 100, `mood:${mood}`);
+	const recommendations = await reccobeatsApi.fetchRecommendations(seedIds, audioTargets, config.similarLimit, `mood:${mood}`);
 
 	console.log(`Discovery [Mood]: Received ${recommendations.length} "${mood}" recommendations`);
 	updateProgress(`ReccoBeats: Found ${recommendations.length} "${mood}" recommendations`, 0.5);
@@ -852,7 +852,7 @@ async function discoverByActivity(modules, seeds, config) {
 	console.log(`Discovery [Activity]: Requesting recommendations with activity profile`);
 
 	const seedIds = foundTracks.map(r => r.trackId);
-	const recommendations = await reccobeatsApi.fetchRecommendations(seedIds, audioTargets, 100, `activity:${activity}`);
+	const recommendations = await reccobeatsApi.fetchRecommendations(seedIds, audioTargets, config.similarLimit, `activity:${activity}`);
 
 	console.log(`Discovery [Activity]: Received ${recommendations.length} "${activity}" recommendations`);
 	updateProgress(`ReccoBeats: Found ${recommendations.length} "${activity}" recommendations`, 0.5);

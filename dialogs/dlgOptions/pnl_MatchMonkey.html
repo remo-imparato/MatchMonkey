@@ -140,6 +140,20 @@
 				</div>
 			</fieldset>
 
+			<!-- Filters -->
+			<fieldset>
+				<legend>Filters</legend>
+				<div class="uiRows">
+					<div class="uiRow">
+						<label class="inline">Exclude artists:</label>
+						<div data-id="ArtistBlacklist"
+							 data-control-class="Edit"
+							 data-tip="Comma-separated list of artist names to exclude from discovery results (case-insensitive)."
+							 data-init-params='{"hint":"e.g., Artist1, Artist2"}'></div>
+					</div>
+				</div>
+			</fieldset>
+
 		</div>
 
 		<!-- RIGHT COLUMN -->
@@ -149,32 +163,6 @@
 			<fieldset>
 				<legend>Mood & Activity defaults</legend>
 				<div class="uiRows">
-
-					<div class="uiRow" style="display:none;">
-						<label class="inline">Default mood:</label>
-						<div data-id="DefaultMood" data-control-class="Dropdown" data-tip="Choose the default mood preset used...">
-							<option value="energetic">Energetic</option>
-							<option value="relaxed">Relaxed</option>
-							<option value="happy">Happy</option>
-							<option value="sad">Sad</option>
-							<option value="focused">Focused</option>
-							<option value="angry">Angry</option>
-							<option value="romantic">Romantic</option>
-						</div>
-					</div>
-
-					<div class="uiRow" style="display:none;">
-						<label class="inline">Default activity:</label>
-						<div data-id="DefaultActivity" data-control-class="Dropdown" data-tip="Choose the default activity preset used...">
-							<option value="workout">Workout</option>
-							<option value="study">Study</option>
-							<option value="party">Party</option>
-							<option value="sleep">Sleep</option>
-							<option value="driving">Driving</option>
-							<option value="meditation">Meditation</option>
-							<option value="cooking">Cooking</option>
-						</div>
-					</div>
 
 					<div class="uiRow">
 						<label class="inline">Acoustic feature balance:</label>
@@ -283,34 +271,6 @@
 								Loading...
 							</span>
 						</div>
-					</div>
-				</div>
-			</fieldset>
-
-			<!-- Filters (Advanced) -->
-			<fieldset style="display:none;">
-				<legend>Filters (advanced) {do not use}</legend>
-				<div class="uiRows">
-					<div class="uiRow">
-						<label class="inline">Exclude artists:</label>
-						<div data-id="ArtistBlacklist"
-							 data-control-class="Edit"
-							 data-tip="Comma-separated list of artist names to exclude from results (case-insensitive)."
-							 data-init-params='{"hint":"e.g., Artist1, Artist2"}'></div>
-					</div>
-					<div class="uiRow">
-						<label class="inline">Exclude genres:</label>
-						<div data-id="GenreBlacklist"
-							 data-control-class="Edit"
-							 data-tip="Comma-separated list of genres to exclude when discovering artists/tracks."
-							 data-init-params='{"hint":"e.g., Christmas, Holiday"}'></div>
-					</div>
-					<div class="uiRow">
-						<label class="inline">Exclude title words:</label>
-						<div data-id="TitleExclusions"
-							 data-control-class="Edit"
-							 data-tip="Comma-separated words - tracks containing these words in the title will be excluded (e.g., Live, Remix)."
-							 data-init-params='{"hint":"e.g., Live, Remix, Demo"}'></div>
 					</div>
 				</div>
 			</fieldset>
