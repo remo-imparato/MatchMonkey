@@ -119,17 +119,17 @@ async function findLibraryTracks(artistName, trackTitles, limit = 100, options =
 
 		const orderClause = best ? 'ORDER BY Songs.Rating DESC, Random()' : 'ORDER BY Random()';
 
-				// Collection filtering - disabled until MM5 schema is confirmed
-				// MediaMonkey 5 may not have CollectionsSongs/Collections tables
-				if (collection) {
-					console.warn('findLibraryTracks: Collection filtering is not yet supported in MM5 - ignoring collection filter');
-				}
+		// Collection filtering - disabled until MM5 schema is confirmed
+		// MediaMonkey 5 may not have CollectionsSongs/Collections tables
+		if (collection) {
+			console.warn('findLibraryTracks: Collection filtering is not yet supported in MM5 - ignoring collection filter');
+		}
 
-				// Different query structure depending on whether we're filtering by artist
-				let query;
-				if (artistClause) {
-					// Query with artist join
-					query = `
+		// Different query structure depending on whether we're filtering by artist
+		let query;
+		if (artistClause) {
+			// Query with artist join
+			query = `
 							SELECT Songs.*
 							FROM Songs
 							INNER JOIN ArtistsSongs ON Songs.ID = ArtistsSongs.IDSong AND ArtistsSongs.PersonType = 1
@@ -307,12 +307,12 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 
 		const orderClause = best ? ' ORDER BY Songs.Rating DESC, Random()' : ' ORDER BY Random()';
 
-				// Collection filtering - disabled until MM5 schema is confirmed
-				if (collection) {
-					console.warn('findLibraryTracksBatch: Collection filtering is not yet supported in MM5 - ignoring collection filter');
-				}
+		// Collection filtering - disabled until MM5 schema is confirmed
+		if (collection) {
+			console.warn('findLibraryTracksBatch: Collection filtering is not yet supported in MM5 - ignoring collection filter');
+		}
 
-				const query = `
+		const query = `
 					WITH Wanted(Idx, Raw, RawUpper, Norm) AS (VALUES ${wantedValuesSql})
 					SELECT Songs.*, Wanted.Raw AS RequestedTitle
 					  FROM Songs

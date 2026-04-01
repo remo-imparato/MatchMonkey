@@ -24,33 +24,33 @@ localRequirejs('matchMonkey');  // -> window.matchMonkey
 
 // Configuration first
 localRequirejs('modules/config');
-	
+
 // Utilities (no dependencies)
 localRequirejs('modules/utils/normalization');
 localRequirejs('modules/utils/helpers');
 localRequirejs('modules/utils/sql');
 localRequirejs('modules/utils/missedResults');  // NEW: Missed results tracker
-	
+
 // Settings (depend on utils)
 localRequirejs('modules/settings/storage');
 localRequirejs('modules/settings/prefixes');
 localRequirejs('modules/settings/lastfm');
-	
+
 // UI (no dependencies)
 localRequirejs('modules/ui/notifications');
-	
+
 // API (depend on utils and settings)
 localRequirejs('modules/api/cache');
 localRequirejs('modules/api/lastfm');
 localRequirejs('modules/api/reccobeats');  // NEW: ReccoBeats API integration
-	
+
 // Database individual modules FIRST
 localRequirejs('modules/db/library');
 localRequirejs('modules/db/playlist');
 localRequirejs('modules/db/queue');
 // THEN load the index which depends on them
 localRequirejs('modules/db/index');
-	
+
 // Core orchestration and integration (depend on everything)
 localRequirejs('modules/core/discoveryStrategies'); // NEW: Discovery strategies
 localRequirejs('modules/core/orchestration');
@@ -204,7 +204,7 @@ function start() {
 			if (needsInit) {
 				// FIRST TIME: Create fresh configuration with defaults
 				console.log('Match Monkey: No configuration found - creating defaults...');
-				
+
 				const initialConfig = Object.assign({}, DEFAULTS);
 				app.setValue(SCRIPT_ID, initialConfig);
 				console.log('Match Monkey: Default configuration created');
@@ -286,31 +286,31 @@ function start() {
 	function initializeAddon() {
 		try {
 			console.log('Match Monkey: MediaMonkey ready, waiting for modules...');
-			
+
 			let checkCount = 0;
 			const maxChecks = 50; // 5 seconds max wait
-			
+
 			const waitForModules = setInterval(() => {
 				checkCount++;
-				
+
 				// Check if modules are loaded
 				if (window.matchMonkey && window.matchMonkey._modulesLoaded) {
 					clearInterval(waitForModules);
-					
+
 					// Validate start function
 					if (typeof window.matchMonkey.start !== 'function') {
 						console.error('Match Monkey: start() function not available');
 						return;
 					}
-					
+
 					// Initialize configuration
 					checkConfig();
-					
+
 					// Start the add-on
 					console.log('Match Monkey: Starting add-on...');
 					window.matchMonkey.start();
 					console.log('Match Monkey: Add-on ready');
-					
+
 				} else if (checkCount >= maxChecks) {
 					clearInterval(waitForModules);
 					console.error('Match Monkey: Timeout waiting for modules');

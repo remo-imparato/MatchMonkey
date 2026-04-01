@@ -719,53 +719,53 @@ window.matchMonkeyOrchestration = {
 							if (foundTracks && foundTracks.length > 0) {
 								tracks.push(...foundTracks);
 
-																// Log matched track with its API popularity/match value
-																const originalTrack = candidate.tracks.find(t => {
-																	const trackTitle = typeof t === 'string' ? t : (t.title || '');
-																	return trackTitle === title;
-																});
-																const matchVal = typeof originalTrack === 'object' ? (originalTrack.match || originalTrack.popularity || 0) : 0;
-																const matchValNorm = matchVal <= 1 ? (matchVal * 100).toFixed(1) : matchVal;
-																console.log(`Match Monkey: MATCHED in library - "${candidate.artist} - ${title}" (API score: ${matchValNorm}%)`);
-															} else {
-																// Find the original track data to get popularity
-																const originalTrack = candidate.tracks.find(t => {
-																	const trackTitle = typeof t === 'string' ? t : (t.title || '');
-																	return trackTitle === title;
-																});
+								// Log matched track with its API popularity/match value
+								const originalTrack = candidate.tracks.find(t => {
+									const trackTitle = typeof t === 'string' ? t : (t.title || '');
+									return trackTitle === title;
+								});
+								const matchVal = typeof originalTrack === 'object' ? (originalTrack.match || originalTrack.popularity || 0) : 0;
+								const matchValNorm = matchVal <= 1 ? (matchVal * 100).toFixed(1) : matchVal;
+								console.log(`Match Monkey: MATCHED in library - "${candidate.artist} - ${title}" (API score: ${matchValNorm}%)`);
+							} else {
+								// Find the original track data to get popularity
+								const originalTrack = candidate.tracks.find(t => {
+									const trackTitle = typeof t === 'string' ? t : (t.title || '');
+									return trackTitle === title;
+								});
 
-																// Extract and normalize popularity from track data
-																const { popularity, rawPlaycount } = this.normalizePopularityFromTrack(originalTrack);
+								// Extract and normalize popularity from track data
+								const { popularity, rawPlaycount } = this.normalizePopularityFromTrack(originalTrack);
 
-																// Determine source for logging
-																const source = config.discoveryMode === 'acoustics' ||
-																	config.discoveryMode === 'mood' ||
-																	config.discoveryMode === 'activity' ? 'ReccoBeats' : 'Last.fm';
+								// Determine source for logging
+								const source = config.discoveryMode === 'acoustics' ||
+									config.discoveryMode === 'mood' ||
+									config.discoveryMode === 'activity' ? 'ReccoBeats' : 'Last.fm';
 
-																// Get match/popularity value for logging
-																const matchVal = typeof originalTrack === 'object' 
-																	? (originalTrack.popularity || originalTrack.match || 0) 
-																	: 0;
-																const matchValDisplay = matchVal <= 1 ? (matchVal * 100).toFixed(1) : matchVal;
+								// Get match/popularity value for logging
+								const matchVal = typeof originalTrack === 'object'
+									? (originalTrack.popularity || originalTrack.match || 0)
+									: 0;
+								const matchValDisplay = matchVal <= 1 ? (matchVal * 100).toFixed(1) : matchVal;
 
-																// Log ALL missed tracks - show source and API value
-																console.log(`Match Monkey: NOT IN LIBRARY - "${candidate.artist} - ${title}" [${source} score: ${matchValDisplay}%, playcount: ${rawPlaycount}]`);
-																notInLibraryCount++;
+								// Log ALL missed tracks - show source and API value
+								console.log(`Match Monkey: NOT IN LIBRARY - "${candidate.artist} - ${title}" [${source} score: ${matchValDisplay}%, playcount: ${rawPlaycount}]`);
+								notInLibraryCount++;
 
-																// Track as missed result with normalized popularity
-																missedResults.push({
-																	artist: candidate.artist,
-																	title: title,
-																	popularity: popularity,
-																	additionalInfo: {
-																		source: source,
-																		discoveryMode: config.discoveryMode,
-																		playcount: typeof originalTrack === 'object' ? (originalTrack.playcount || 0) : 0,
-																		rank: typeof originalTrack === 'object' ? (originalTrack.rank || 0) : 0,
-																		match: typeof originalTrack === 'object' ? (Number(originalTrack.match) || 0) : 0,
-																		reason: 'not_in_library'
-																	}
-																});
+								// Track as missed result with normalized popularity
+								missedResults.push({
+									artist: candidate.artist,
+									title: title,
+									popularity: popularity,
+									additionalInfo: {
+										source: source,
+										discoveryMode: config.discoveryMode,
+										playcount: typeof originalTrack === 'object' ? (originalTrack.playcount || 0) : 0,
+										rank: typeof originalTrack === 'object' ? (originalTrack.rank || 0) : 0,
+										match: typeof originalTrack === 'object' ? (Number(originalTrack.match) || 0) : 0,
+										reason: 'not_in_library'
+									}
+								});
 							}
 						}
 					}

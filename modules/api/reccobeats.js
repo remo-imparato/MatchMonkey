@@ -424,7 +424,7 @@ async function searchArtist(artistName) {
 	const normalizedSearch = normalize(artistName);
 	console.log(`searchArtist: Searching for artist="${artistName}", normalized="${normalizedSearch}"`);
 	updateProgress(`ReccoBeats: Searching for artist "${artistName}"...`, undefined);
-	
+
 	const headers = createHeaders();
 	let page = 0;
 	let maxPages = 1; // Will be updated from API response
@@ -509,7 +509,7 @@ async function searchAlbum(albumName) {
 	const normalizedSearch = normalize(albumName);
 	console.log(`searchAlbum: Searching for album="${albumName}", normalized="${normalizedSearch}"`);
 	updateProgress(`ReccoBeats: Searching for album "${albumName}"...`, undefined);
-	
+
 	const headers = createHeaders();
 	let page = 0;
 	let maxPages = 1; // Will be updated from API response
@@ -649,12 +649,12 @@ async function findAlbumInArtist(artistId, albumName) {
 			// If searching for a specific album, try to match
 			if (normalizedSearch) {
 				const cleanedNormalized = matchMonkeyHelpers.cleanAlbumName(normalizedSearch);
-				
+
 				for (const a of content) {
 					const albumNameRaw = a.name || '';
 					const albumNormalized = normalize(albumNameRaw);
 					const albumCleaned = matchMonkeyHelpers.cleanAlbumName(albumNormalized);
-					
+
 					if (albumCleaned === cleanedNormalized) {
 						const result = { id: a.id, name: a.name };
 						console.log(`findAlbumInArtist: Found match - searched="${albumName}", normalized="${normalizedSearch}", cleaned="${cleanedNormalized}", matched="${a.name}" (ID: ${a.id})`);
@@ -799,13 +799,13 @@ async function getAlbumTracks(albumId) {
  */
 async function findTrackInAlbum(albumId, trackTitle) {
 	const updateProgress = getUpdateProgress();
-	
+
 	const normalizedSearch = normalize(trackTitle);
 	const cleanedSearch = matchMonkeyHelpers.cleanTrackName(normalizedSearch);
-	
+
 	console.log(`findTrackInAlbum: Searching album ${albumId} for track="${trackTitle}", normalized="${normalizedSearch}", cleaned="${cleanedSearch}"`);
 	updateProgress(`ReccoBeats: Searching album for track "${trackTitle}"...`, undefined);
-	
+
 	const tracks = await getAlbumTracks(albumId);
 	if (!tracks.length) {
 		console.log(`findTrackInAlbum: No tracks found in album ${albumId}`);
@@ -816,11 +816,11 @@ async function findTrackInAlbum(albumId, trackTitle) {
 	// Try to match by trackTitle, name, or title fields
 	for (const t of tracks) {
 		if (!t) continue;
-		
+
 		const trackRaw = t.trackTitle || t.name || t.title || '';
 		const trackNormalized = normalize(trackRaw);
 		const trackCleaned = matchMonkeyHelpers.cleanTrackName(trackNormalized);
-		
+
 		if (trackCleaned === cleanedSearch) {
 			console.log(`findTrackInAlbum: Found match - searched="${trackTitle}", normalized="${normalizedSearch}", cleaned="${cleanedSearch}", matched="${trackRaw}" (ID: ${t.id})`);
 			updateProgress(`ReccoBeats: Found track "${trackTitle}"`, undefined);
@@ -928,7 +928,7 @@ async function findTrackIdsBatch(seeds) {
 
 	console.log(`findTrackIdsBatch: Starting batch lookup for ${totalSeeds} seed track(s)`);
 	console.log(`findTrackIdsBatch: Seeds:`, seeds.map((s, i) => `[${i + 1}] artist="${s.artist}", title="${s.title}", album="${s.album}"`).join('\n  '));
-	
+
 	updateProgress(`ReccoBeats: Looking up ${totalSeeds} seed track(s) - requires exact artist, album, and track names...`, 0.1);
 
 	for (let i = 0; i < totalSeeds; i++) {
@@ -941,7 +941,7 @@ async function findTrackIdsBatch(seeds) {
 
 		const trackId = await findTrackId(seed.artist, seed.title, seed.album);
 		results.push({ seed, trackId });
-		
+
 		if (!trackId) {
 			console.log(`findTrackIdsBatch: Track ${i + 1}/${totalSeeds} NOT FOUND - artist="${seed.artist}", title="${seed.title}", album="${seed.album}"`);
 			updateProgress(`ReccoBeats: Track ${i + 1}/${totalSeeds} not found: "${seed.title}" (Album: ${seed.album})`, progress);
@@ -952,13 +952,13 @@ async function findTrackIdsBatch(seeds) {
 
 	const foundCount = results.filter(r => r.trackId).length;
 	const notFoundCount = totalSeeds - foundCount;
-	
+
 	console.log(`findTrackIdsBatch: COMPLETE - Found ${foundCount}/${totalSeeds} track IDs`);
 	if (notFoundCount > 0) {
 		const notFoundTracks = results.filter(r => !r.trackId).map(r => `artist="${r.seed.artist}", title="${r.seed.title}", album="${r.seed.album}"`);
 		console.log(`findTrackIdsBatch: Not found (${notFoundCount}):`, notFoundTracks.join('\n  '));
 	}
-	
+
 	if (notFoundCount > 0) {
 		updateProgress(`ReccoBeats: Found ${foundCount}/${totalSeeds} tracks (${notFoundCount} not found - check tags match official names)`, 0.3);
 	} else {
@@ -1032,7 +1032,7 @@ async function fetchTrackAudioFeatures(trackId) {
 			valence: Number(data.valence) || 0,
 		};
 
-		console.log(`fetchTrackAudioFeatures: Got features for ${trackId}` , features);
+		console.log(`fetchTrackAudioFeatures: Got features for ${trackId}`, features);
 
 		cache?.set(cacheKey, features);
 		return features;
@@ -1653,7 +1653,7 @@ window.matchMonkeyReccoBeatsAPI = {
 	getReccoRecommendations,
 	getMoodRecommendations,
 	getActivityRecommendations,
-	
+
 	// Track/album lookup and audio features
 	searchArtist,
 	searchAlbum,
@@ -1665,7 +1665,7 @@ window.matchMonkeyReccoBeatsAPI = {
 	findTrackIdsBatch,
 	fetchTrackAudioFeatures,
 	getAudioFeatures,
-	
+
 	// Recommendation and utility functions
 	fetchRecommendations,
 	filterTracksByAudioFeatures,
@@ -1673,7 +1673,7 @@ window.matchMonkeyReccoBeatsAPI = {
 	calculateAverageFeatures,
 	blendFeatures,
 	getLogAudioFeatures,
-	
+
 	// Presets and constants
 	MOOD_AUDIO_TARGETS,
 	ACTIVITY_AUDIO_TARGETS,
