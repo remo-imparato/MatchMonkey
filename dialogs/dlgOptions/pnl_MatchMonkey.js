@@ -20,6 +20,9 @@
  * - MaxPlaylistTracks -> MaxPlaylistTracks
  * - UseLastfmRanking -> UseLastfmRanking
  * - PreferHighQuality -> PreferHighQuality
+ * - LocalCollection -> LocalCollection (name of MediaMonkey collection to search locally)
+ * - ReccobeatsMinPopularity -> ReccobeatsMinPopularity (0-100 integer lower bound for reccobeats popularity)
+ * - LastfmMinMatch -> LastfmMinMatch (0.00-99.99 float lower bound for last.fm match percentage)
  * - MinRating -> MinRating
  * - IncludeUnrated -> IncludeUnrated
  * - DefaultMood -> DefaultMood
@@ -120,6 +123,27 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function (sett, 
 		const blendRatioPercent = Math.round((cfg.MoodActivityBlendRatio ?? 0.5) * 100);
 		UI.MoodActivityBlendRatio.controlClass.value = blendRatioPercent;
 
+		// === Local Collection (MediaMonkey collections) ===
+		if (UI.LocalCollection && UI.LocalCollection.controlClass) {
+			UI.LocalCollection.controlClass.value = cfg.LocalCollection || '';
+		}
+
+		// === API Thresholds ===
+		// Reccobeats popularity: 0-100
+		if (UI.ReccobeatsMinPopularity && UI.ReccobeatsMinPopularity.controlClass) {
+			UI.ReccobeatsMinPopularity.controlClass.value = (cfg.ReccobeatsMinPopularity !== undefined)
+				? Math.max(0, Math.min(100, parseInt(cfg.ReccobeatsMinPopularity, 10) || 0))
+				: 0;
+		}
+
+		// Last.fm match: 0.00 - 99.99 (display as percent with 2 decimals)
+		if (UI.LastfmMinMatch && UI.LastfmMinMatch.controlClass) {
+			const lf = typeof cfg.LastfmMinMatch === 'number' ? cfg.LastfmMinMatch : parseFloat(cfg.LastfmMinMatch);
+			const lfVal = Number.isFinite(lf) ? Math.max(0, Math.min(99.99, lf)) : 0.0;
+			// Display with two decimals
+			UI.LastfmMinMatch.controlClass.value = lfVal.toFixed(2);
+		}
+
 		// === Auto-Mode Settings ===
 		this._setupAutoModeCheckbox(UI.AutoModeEnabled);
 		UI.AutoModeEnabled.controlClass.checked = cfg.AutoModeEnabled || false;
@@ -128,12 +152,12 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function (sett, 
 		UI.AutoModeSimilarLimit.controlClass.value = cfg.AutoModeSimilarLimit || 10;
 		UI.AutoModeTracksPerArtist.controlClass.value = cfg.AutoModeTracksPerArtist || 5;
 		UI.AutoModeMaxTracks.controlClass.value = cfg.AutoModeMaxTracks || 30;
-		
+
 		// === Auto-Mode Rating Filter ===
 		const autoRatingValue = parseInt(cfg.AutoModeMinRating, 10) || 0;
 		this._setRatingControl(UI.AutoModeMinRating, autoRatingValue);
 		UI.AutoModeIncludeUnrated.controlClass.checked = cfg.AutoModeIncludeUnrated !== false; // Default true
-		
+
 		UI.SkipDuplicates.controlClass.checked = cfg.SkipDuplicates !== false; // Default true
 
 		// === Queue Behavior ===
@@ -260,7 +284,7 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 			window.removeEventListener('matchmonkey:automodechanged', this._autoModeListener);
 			this._autoModeListener = null;
 		}
-		
+
 		if (this._missedResultsListener) {
 			window.removeEventListener('matchmonkey:missedresultadded', this._missedResultsListener);
 			window.removeEventListener('matchmonkey:missedresultscleared', this._missedResultsListener);
@@ -320,15 +344,38 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 		this.config.AutoModeSimilarLimit = parseInt(UI.AutoModeSimilarLimit.controlClass.value, 10) || 10;
 		this.config.AutoModeTracksPerArtist = parseInt(UI.AutoModeTracksPerArtist.controlClass.value, 10) || 5;
 		this.config.AutoModeMaxTracks = parseInt(UI.AutoModeMaxTracks.controlClass.value, 10) || 30;
-		
+
 		// === Auto-Mode Rating Filter ===
 		const rawAutoRating = Number.isFinite(UI.AutoModeMinRating.controlClass.value)
 			? Math.max(0, Math.min(100, UI.AutoModeMinRating.controlClass.value))
 			: 0;
 		this.config.AutoModeMinRating = rawAutoRating;
 		this.config.AutoModeIncludeUnrated = UI.AutoModeIncludeUnrated.controlClass.checked;
-		
+
 		this.config.SkipDuplicates = UI.SkipDuplicates.controlClass.checked;
+
+		// === Local Collection ===
+		if (UI.LocalCollection && UI.LocalCollection.controlClass) {
+			this.config.LocalCollection = UI.LocalCollection.controlClass.value || '';
+		}
+
+		// === API Thresholds ===
+		// Reccobeats popularity lower bound (integer 0-100)
+		if (UI.ReccobeatsMinPopularity && UI.ReccobeatsMinPopularity.controlClass) {
+			let v = parseInt(UI.ReccobeatsMinPopularity.controlClass.value, 10);
+			if (!Number.isFinite(v)) v = 0;
+			v = Math.max(0, Math.min(100, v));
+			this.config.ReccobeatsMinPopularity = v;
+		}
+
+		// Last.fm match lower bound (float 0.00-99.99)
+		if (UI.LastfmMinMatch && UI.LastfmMinMatch.controlClass) {
+			let lf = parseFloat(String(UI.LastfmMinMatch.controlClass.value).replace(',', '.'));
+			if (!Number.isFinite(lf)) lf = 0.0;
+			lf = Math.max(0.0, Math.min(99.99, lf));
+			// Store as number with two decimals precision
+			this.config.LastfmMinMatch = Math.round(lf * 100) / 100;
+		}
 
 		// === Queue Behavior ===
 		this.config.EnqueueMode = UI.EnqueueMode.controlClass.checked;
@@ -357,26 +404,26 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 /**
  * Setup missed results section
  */
-optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setupMissedResults = function(UI) {
+optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setupMissedResults = function (UI) {
 	try {
 		// Update count
 		this._updateMissedResultsCount(UI);
-		
+
 		// Setup button click handler
 		if (UI.btnViewMissedResults && UI.btnViewMissedResults.controlClass) {
 			app.listen(UI.btnViewMissedResults, 'click', () => {
 				this._openMissedResultsDialog();
 			});
 		}
-		
+
 		// Listen for updates to the missed results
 		this._missedResultsListener = () => {
 			this._updateMissedResultsCount(UI);
 		};
-		
+
 		window.addEventListener('matchmonkey:missedresultadded', this._missedResultsListener);
 		window.addEventListener('matchmonkey:missedresultscleared', this._missedResultsListener);
-		
+
 	} catch (e) {
 		console.error('Match Monkey Options: Error setting up missed results:', e);
 	}
@@ -385,13 +432,13 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setupMissedResults = functio
 /**
  * Update missed results count display
  */
-optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._updateMissedResultsCount = function(UI) {
+optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._updateMissedResultsCount = function (UI) {
 	try {
 		if (!UI.missedResultsCount) return;
-		
+
 		if (window.matchMonkeyMissedResults?.getStats) {
 			const stats = window.matchMonkeyMissedResults.getStats();
-			
+
 			if (stats.total === 0) {
 				UI.missedResultsCount.innerText = 'No missed results';
 			} else {
@@ -413,10 +460,10 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._updateMissedResultsCount = f
 /**
  * Open missed results dialog
  */
-optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._openMissedResultsDialog = function() {
+optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._openMissedResultsDialog = function () {
 	try {
 		console.log('Match Monkey Options: Opening missed results dialog');
-		
+
 		if (typeof uitools !== 'undefined' && uitools.openDialog) {
 			uitools.openDialog('dlgMissedResults', {
 				modal: true

@@ -96,6 +96,17 @@ async function discoverByArtist(modules, seeds, config) {
 			// Add similar artists with match score as popularity indicator
 			for (const artist of similar.slice(0, config.similarLimit || 20)) {
 				if (artist?.name) {
+					// Respect user-defined Last.fm match threshold if provided
+					try {
+						const minMatch = config.lastfmMinMatch || 0;
+						// Last.fm API returns match as 0.0-1.0, convert to percentage 0-100
+						const rawMatch = Number(artist.match) || 0;
+						const artistMatch = rawMatch <= 1 ? rawMatch * 100 : rawMatch;
+						if (minMatch > 0 && artistMatch < minMatch) {
+							// Skip low-match artists
+							continue;
+						}
+					} catch (_) { }
 					// Add or update the artist candidate entry
 					addArtistCandidate(artist.name, seenArtists, blacklist, candidates);
 					// Store match score for popularity tracking
@@ -198,6 +209,15 @@ async function discoverByTrack(modules, seeds, config) {
 				// Group by artist
 				for (const simTrack of similarTracks) {
 					if (!simTrack?.artist || !simTrack?.title) continue;
+
+					// Respect Last.fm match threshold
+					try {
+						const minMatch = config.lastfmMinMatch || 0;
+						// Last.fm API returns match as 0.0-1.0, convert to percentage 0-100
+						const rawMatch = Number(simTrack.match) || 0;
+						const m = rawMatch <= 1 ? rawMatch * 100 : rawMatch;
+						if (minMatch > 0 && m < minMatch) continue;
+					} catch (_) { }
 
 					const artKey = simTrack.artist.toUpperCase();
 					if (blacklist.has(artKey)) continue;
@@ -422,6 +442,16 @@ function buildReccoCandidates(result, blacklist, seenArtists) {
 
 			// First time seeing this artist
 			if (!seenArtists.has(artKey)) {
+				// Apply ReccoBeats popularity threshold if configured
+				try {
+					const minPop = (window.matchMonkeySettings?.reccobeatsMinPopularity ?? null) || null;
+					// Also allow passing threshold via config when calling discoverByRecco (attached to result)
+					if (result?.__reccoFilterMinPopularity != null) {
+						if (popularity < result.__reccoFilterMinPopularity) continue;
+					} else if (typeof minPop === 'number' && minPop > 0 && popularity < minPop) {
+						continue;
+					}
+				} catch (_) { }
 				seenArtists.add(artKey);
 
 				candidates.push({
@@ -490,9 +520,14 @@ async function discoverByRecco(modules, seeds, config) {
 		config.similarLimit || 100
 	);
 
+	// Attach configured minimum popularity to result for downstream filtering
+	try {
+		result.__reccoFilterMinPopularity = config.reccobeatsMinPopularity || 0;
+	} catch (_) { }
+
 	if (!result.recommendations || result.recommendations.length === 0) {
 		console.log('Discovery [ReccoBeats]: No recommendations received');
-		
+
 		// Provide helpful error message based on what failed
 		if (result.foundCount === 0) {
 			updateProgress('ReccoBeats: None of your tracks were found - ensure Artist, Album, and Track tags match official release names exactly', 0.4);

@@ -124,6 +124,18 @@ window.matchMonkeyOrchestration = {
 					autoMode: true,
 					discoveryMode,
 				};
+
+				// Read additional user settings: local collection and API thresholds
+				try {
+					config_.localCollection = stringSetting('LocalCollection', '');
+					config_.reccobeatsMinPopularity = intSetting('ReccobeatsMinPopularity', 0);
+					// Last.fm match stored as 0.00-99.99 (percentage)
+					const lf = parseFloat(String(getSetting('LastfmMinMatch') ?? '0')) || 0.0;
+					config_.lastfmMinMatch = Math.max(0, Math.min(99.99, Math.round(lf * 100) / 100));
+					console.log(`Match Monkey: Settings - localCollection='${config_.localCollection}', reccoMin=${config_.reccobeatsMinPopularity}, lastfmMin=${config_.lastfmMinMatch}`);
+				} catch (e) {
+					console.warn('Match Monkey: Failed to read additional settings:', e.message);
+				}
 				console.log(`Match Monkey Auto-Mode: Rating filter - minRating=${config_.minRating}, allowUnknown=${config_.allowUnknown}`);
 			} else {
 				const maxTracks = intSetting('MaxPlaylistTracks', 0);
@@ -144,6 +156,18 @@ window.matchMonkeyOrchestration = {
 					autoMode: false,
 					discoveryMode,
 				};
+
+				// Read additional user settings: local collection and API thresholds
+				try {
+					config_.localCollection = stringSetting('LocalCollection', '');
+					config_.reccobeatsMinPopularity = intSetting('ReccobeatsMinPopularity', 0);
+					// Last.fm match stored as 0.00-99.99 (percentage)
+					const lf = parseFloat(String(getSetting('LastfmMinMatch') ?? '0')) || 0.0;
+					config_.lastfmMinMatch = Math.max(0, Math.min(99.99, Math.round(lf * 100) / 100));
+					console.log(`Match Monkey: Settings - localCollection='${config_.localCollection}', reccoMin=${config_.reccobeatsMinPopularity}, lastfmMin=${config_.lastfmMinMatch}`);
+				} catch (e) {
+					console.warn('Match Monkey: Failed to read additional settings:', e.message);
+				}
 				console.log(`Match Monkey Manual-Mode: Rating filter - minRating=${config_.minRating}, allowUnknown=${config_.allowUnknown}`);
 			}
 
@@ -342,6 +366,7 @@ window.matchMonkeyOrchestration = {
 								best: config_.bestEnabled,
 								minRating: 0, // Don't filter seed tracks by rating
 								allowUnknown: true,
+								collection: config_.localCollection || ''
 							}
 						);
 
@@ -664,6 +689,7 @@ window.matchMonkeyOrchestration = {
 								best: config.bestEnabled,
 								minRating: config.minRating,
 								allowUnknown: config.allowUnknown,
+								collection: config.localCollection || ''
 							}
 						);
 
@@ -697,7 +723,8 @@ window.matchMonkeyOrchestration = {
 											config.discoveryMode === 'activity' ? 'ReccoBeats' : 'Last.fm',
 										discoveryMode: config.discoveryMode,
 										playcount: typeof originalTrack === 'object' ? (originalTrack.playcount || 0) : 0,
-										rank: typeof originalTrack === 'object' ? (originalTrack.rank || 0) : 0
+										rank: typeof originalTrack === 'object' ? (originalTrack.rank || 0) : 0,
+										match: typeof originalTrack === 'object' ? (Number(originalTrack.match) || 0) : 0
 									}
 								});
 							}
@@ -715,6 +742,7 @@ window.matchMonkeyOrchestration = {
 							best: config.bestEnabled,
 							minRating: config.minRating,
 							allowUnknown: config.allowUnknown,
+							collection: config.localCollection || ''
 						}
 					);
 
@@ -743,7 +771,8 @@ window.matchMonkeyOrchestration = {
 										config.discoveryMode === 'activity' ? 'ReccoBeats' : 'Last.fm',
 									discoveryMode: config.discoveryMode,
 									playcount: typeof t === 'object' ? (t.playcount || 0) : 0,
-									rank: typeof t === 'object' ? (t.rank || 0) : 0
+									rank: typeof t === 'object' ? (t.rank || 0) : 0,
+									match: typeof t === 'object' ? (Number(t.match) || 0) : 0
 								}
 							});
 						});
@@ -774,14 +803,30 @@ window.matchMonkeyOrchestration = {
 		// Batch add missed results - they already have normalized popularity
 		if (missedResults.length > 0 && window.matchMonkeyMissedResults?.addBatch) {
 			// Filter to keep only results above 39% popularity
-			const filteredMissedResults = missedResults.filter(r => (r.popularity || 0) > 39);
+			// Filter missed results by configured thresholds per source
+			const reccoMin = config.reccobeatsMinPopularity || 0;
+			const lastfmMin = config.lastfmMinMatch || 0;
+			const filteredMissedResults = missedResults.filter(r => {
+				try {
+					const src = r.additionalInfo?.source || 'Last.fm';
+					if (src === 'ReccoBeats') {
+						return (r.popularity || 0) >= reccoMin;
+					} else {
+						// Prefer explicit match field when available
+						const m = Number(r.additionalInfo?.match || 0);
+						if (m > 0) return m >= lastfmMin;
+						// Fallback to popularity if no match value
+						return (r.popularity || 0) >= Math.min(100, Math.round(lastfmMin));
+					}
+				} catch (e) { return false; }
+			});
 
 			if (filteredMissedResults.length > 0) {
-				console.log(`Match Monkey: Adding ${filteredMissedResults.length} missed recommendations to tracker (filtered from ${missedResults.length}, threshold: >39%)`);
+				console.log(`Match Monkey: Adding ${filteredMissedResults.length} missed recommendations to tracker (filtered from ${missedResults.length})`);
 				window.matchMonkeyMissedResults.addBatch(filteredMissedResults);
 				console.log(`Match Monkey: Tracked ${filteredMissedResults.length} missed recommendations`);
 			} else {
-				console.log(`Match Monkey: No missed recommendations above 39% popularity threshold (${missedResults.length} filtered out)`);
+				console.log(`Match Monkey: No missed recommendations passed configured thresholds (${missedResults.length} filtered out)`);
 			}
 		}
 

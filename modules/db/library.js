@@ -36,7 +36,7 @@
  */
 async function findLibraryTracks(artistName, trackTitles, limit = 100, options = {}) {
 	try {
-		const { rank = true, best = false, minRating = 0, allowUnknown = true } = options;
+		const { rank = true, best = false, minRating = 0, allowUnknown = true, collection = '' } = options;
 
 		// Validate MM5 environment
 		if (typeof app === 'undefined' || !app.db || !app.db.getTracklist) {
@@ -53,7 +53,7 @@ async function findLibraryTracks(artistName, trackTitles, limit = 100, options =
 		// Build artist matching clause with prefix variations (only if artist specified)
 		const artistClause = (() => {
 			if (!artistName) return ''; // No artist filter
-			
+
 			const normalizedArtist = window.matchMonkeyPrefixes?.fixPrefixes?.(artistName) || artistName;
 			if (!normalizedArtist) return '';
 
@@ -119,28 +119,34 @@ async function findLibraryTracks(artistName, trackTitles, limit = 100, options =
 
 		const orderClause = best ? 'ORDER BY Songs.Rating DESC, Random()' : 'ORDER BY Random()';
 
-		// Different query structure depending on whether we're filtering by artist
-		let query;
-		if (artistClause) {
-			// Query with artist join
-			query = `
-				SELECT Songs.*
-				FROM Songs
-				INNER JOIN ArtistsSongs ON Songs.ID = ArtistsSongs.IDSong AND ArtistsSongs.PersonType = 1
-				INNER JOIN Artists ON ArtistsSongs.IDArtist = Artists.ID
-				${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-				${orderClause}
-				LIMIT ${Math.max(1, Math.min(limit, 10000))}
-			`;
+				// Collection filtering - disabled until MM5 schema is confirmed
+				// MediaMonkey 5 may not have CollectionsSongs/Collections tables
+				if (collection) {
+					console.warn('findLibraryTracks: Collection filtering is not yet supported in MM5 - ignoring collection filter');
+				}
+
+				// Different query structure depending on whether we're filtering by artist
+				let query;
+				if (artistClause) {
+					// Query with artist join
+					query = `
+							SELECT Songs.*
+							FROM Songs
+							INNER JOIN ArtistsSongs ON Songs.ID = ArtistsSongs.IDSong AND ArtistsSongs.PersonType = 1
+							INNER JOIN Artists ON ArtistsSongs.IDArtist = Artists.ID
+							${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+							${orderClause}
+							LIMIT ${Math.max(1, Math.min(limit, 10000))}
+						`;
 		} else {
 			// Query without artist join (search entire library)
 			query = `
-				SELECT Songs.*
-				FROM Songs
-				${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-				${orderClause}
-				LIMIT ${Math.max(1, Math.min(limit, 10000))}
-			`;
+					SELECT Songs.*
+					FROM Songs
+					${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+					${orderClause}
+					LIMIT ${Math.max(1, Math.min(limit, 10000))}
+				`;
 		}
 
 		// Execute query via MM5 API
@@ -165,7 +171,7 @@ async function findLibraryTracks(artistName, trackTitles, limit = 100, options =
 
 		if (results.length > 0) {
 			const searchDesc = artistName ? `"${artistName}"` : 'entire library';
-			const summary = results.slice(0, 3).map(r => 
+			const summary = results.slice(0, 3).map(r =>
 				`"${r.title || r.SongTitle || ''}" by ${r.artist || r.Artist || ''}`
 			).join(', ');
 			console.log(`findLibraryTracks: Found ${results.length} track(s) from ${searchDesc}: ${summary}${results.length > 3 ? '...' : ''}`);
@@ -217,7 +223,7 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 			return resultMap;
 		}
 
-		const { best = false, minRating = 0, allowUnknown = false } = options;
+		const { best = false, minRating = 0, allowUnknown = false, collection = '' } = options;
 		const ratingThreshold = Number(minRating) || 0;
 
 		// SQL escaping helpers
@@ -301,17 +307,22 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 
 		const orderClause = best ? ' ORDER BY Songs.Rating DESC, Random()' : ' ORDER BY Random()';
 
-		const query = `
-			WITH Wanted(Idx, Raw, RawUpper, Norm) AS (VALUES ${wantedValuesSql})
-			SELECT Songs.*, Wanted.Raw AS RequestedTitle
-			FROM Songs
-			INNER JOIN ArtistsSongs ON Songs.ID = ArtistsSongs.IDSong AND ArtistsSongs.PersonType = 1
-			INNER JOIN Artists ON ArtistsSongs.IDArtist = Artists.ID
-			INNER JOIN Wanted ON (UPPER(Songs.SongTitle) = Wanted.RawUpper OR ${songTitleNormExpr} = Wanted.Norm)
-			WHERE ${whereParts.join(' AND ')}
-			${orderClause}
-			LIMIT ${Math.max(1, Math.min(limit * wanted.length, 10000))}
-		`;
+				// Collection filtering - disabled until MM5 schema is confirmed
+				if (collection) {
+					console.warn('findLibraryTracksBatch: Collection filtering is not yet supported in MM5 - ignoring collection filter');
+				}
+
+				const query = `
+					WITH Wanted(Idx, Raw, RawUpper, Norm) AS (VALUES ${wantedValuesSql})
+					SELECT Songs.*, Wanted.Raw AS RequestedTitle
+					  FROM Songs
+					INNER JOIN ArtistsSongs ON Songs.ID = ArtistsSongs.IDSong AND ArtistsSongs.PersonType = 1
+					INNER JOIN Artists ON ArtistsSongs.IDArtist = Artists.ID
+					INNER JOIN Wanted ON (UPPER(Songs.SongTitle) = Wanted.RawUpper OR ${songTitleNormExpr} = Wanted.Norm)
+					WHERE ${whereParts.join(' AND ')}
+					${orderClause}
+					LIMIT ${Math.max(1, Math.min(limit * wanted.length, 10000))}
+				`;
 
 		// Execute query via MM5 API
 		const tl = app.db.getTracklist(query, -1);
@@ -331,16 +342,16 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 
 					// Match track to requested title
 					const trackTitle = track.title || track.SongTitle || '';
-					
+
 					// Try exact match first, then fuzzy match
 					for (const [reqTitle, arr] of resultMap.entries()) {
 						if (arr.length >= limit) continue;
-						
+
 						const reqUpper = reqTitle.toUpperCase();
 						const trackUpper = trackTitle.toUpperCase();
 						const reqNorm = stripName(reqTitle);
 						const trackNorm = stripName(trackTitle);
-						
+
 						if (trackUpper === reqUpper || trackNorm === reqNorm) {
 							arr.push(track);
 							break;
