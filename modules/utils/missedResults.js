@@ -93,16 +93,16 @@ function getAll() {
 function getStats() {
 	try {
 		const results = getAll();
-		
+
 		const stats = {
 			total: results.length,
 			uniqueArtists: new Set(results.map(r => r.artist)).size,
 			totalOccurrences: results.reduce((sum, r) => sum + (r.occurrences || 1), 0),
-			avgPopularity: results.length > 0 
+			avgPopularity: results.length > 0
 				? Math.round(results.reduce((sum, r) => sum + (r.popularity || 0), 0) / results.length)
 				: 0
 		};
-		
+
 		return stats;
 	} catch (e) {
 		console.error('MatchMonkey Missed Results: Error getting stats:', e);
@@ -120,8 +120,26 @@ function getStats() {
  * @param {object} additionalInfo - Optional additional information (source, playcount, etc.)
  */
 function add(artist, title, album = '', popularity = 0, additionalInfo = {}) {
+	// Validate inputs
 	if (!artist || !title) {
 		console.warn('MatchMonkey Missed Results: Cannot add result without artist and title');
+		return;
+	}
+
+	// Sanitize inputs to prevent storage corruption
+	try {
+		artist = String(artist).trim();
+		title = String(title).trim();
+		album = album ? String(album).trim() : '';
+		popularity = isNaN(popularity) ? 0 : Math.max(0, Math.min(100, Number(popularity)));
+		additionalInfo = (typeof additionalInfo === 'object' && additionalInfo !== null) ? additionalInfo : {};
+	} catch (e) {
+		console.error('MatchMonkey Missed Results: Error sanitizing inputs:', e);
+		return;
+	}
+
+	if (!artist || !title) {
+		console.warn('MatchMonkey Missed Results: Cannot add result - artist or title empty after sanitization');
 		return;
 	}
 
@@ -154,18 +172,18 @@ function add(artist, title, album = '', popularity = 0, additionalInfo = {}) {
 		if (existingIndex >= 0) {
 			// Update existing entry - increment occurrences and update popularity if higher
 			results[existingIndex].occurrences = (results[existingIndex].occurrences || 1) + 1;
-			
+
 			// Update popularity if the new value is higher
 			if (popularity > (results[existingIndex].popularity || 0)) {
 				results[existingIndex].popularity = popularity;
 			}
-			
+
 			// Merge additional info
 			results[existingIndex].additionalInfo = {
 				...(results[existingIndex].additionalInfo || {}),
 				...additionalInfo
 			};
-			
+
 			console.log(`MatchMonkey Missed Results: Updated existing - ${artist} - ${title} (occurrences: ${results[existingIndex].occurrences}, popularity: ${popularity}%)`);
 		} else {
 			// Create new result object
@@ -218,15 +236,43 @@ function addBatch(results) {
 
 	console.log(`MatchMonkey Missed Results: Adding batch of ${results.length} results`);
 
-	results.forEach(result => {
-		add(
-			result.artist,
-			result.title,
-			result.album,
-			result.popularity,
-			result.additionalInfo
-		);
+	let successCount = 0;
+	let errorCount = 0;
+
+	results.forEach((result, index) => {
+		try {
+			// Validate result object
+			if (!result || typeof result !== 'object') {
+				console.warn(`MatchMonkey Missed Results: Invalid result at index ${index} - not an object`);
+				errorCount++;
+				return;
+			}
+
+			if (!result.artist || !result.title) {
+				console.warn(`MatchMonkey Missed Results: Invalid result at index ${index} - missing artist or title`);
+				errorCount++;
+				return;
+			}
+
+			add(
+				result.artist,
+				result.title,
+				result.album || '',
+				result.popularity || 0,
+				result.additionalInfo || {}
+			);
+			successCount++;
+		} catch (e) {
+			console.error(`MatchMonkey Missed Results: Error adding result at index ${index}:`, e);
+			errorCount++;
+		}
 	});
+
+	if (errorCount > 0) {
+		console.warn(`MatchMonkey Missed Results: Batch complete - ${successCount} succeeded, ${errorCount} failed`);
+	} else {
+		console.log(`MatchMonkey Missed Results: Batch complete - ${successCount} results added`);
+	}
 }
 
 /**
@@ -252,7 +298,7 @@ function clear() {
 	try {
 		console.log('MatchMonkey Missed Results: Clearing all results');
 		app.setValue(STORAGE_KEY, []);
-		
+
 		// Dispatch event
 		try {
 			const event = new CustomEvent('matchmonkey:missedresultscleared');
