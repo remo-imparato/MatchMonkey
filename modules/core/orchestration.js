@@ -381,9 +381,10 @@ window.matchMonkeyOrchestration = {
 			}
 
 			const dedupedResults = Array.from(duplicateMap.values());
+			const dedupRemovedCount = results.length - dedupedResults.length;
 
-			logger.info('Dedup', `Removed ${results.length - dedupedResults.length} duplicates, ${dedupedResults.length} unique tracks remain`);
-			updateProgress(`Removed ${results.length - dedupedResults.length} duplicates → ${dedupedResults.length} unique tracks`, 0.83);
+			logger.debug('Dedup', `Removed ${dedupRemovedCount} duplicates, ${dedupedResults.length} unique tracks remain`);
+			updateProgress(`Removed ${dedupRemovedCount} duplicates → ${dedupedResults.length} unique tracks`, 0.83);
 
 			// Step 5: Include seed tracks if enabled (before shuffling)
 			// When IncludeSeedArtist is true, we also include the actual seed tracks
@@ -477,6 +478,7 @@ window.matchMonkeyOrchestration = {
 			logger.info('Output', `=== Phase 3: Output (${outputMode}) ===`);
 
 			let output;
+			let outputName = '';
 
 			try {
 				if (config_.autoMode || enqueueEnabled) {
@@ -488,6 +490,7 @@ window.matchMonkeyOrchestration = {
 					config_.genreName = genreName;
 					config_.modeName = modeName;
 					output = await this.buildResultsPlaylist(modules, finalResults, config_);
+					outputName = output?.playlist?.name || config_.seedName || '';
 				}
 			} catch (outputError) {
 				logger.error('Output', 'Output error', outputError);
@@ -501,34 +504,40 @@ window.matchMonkeyOrchestration = {
 			const actualTracksAdded = output?.added ?? output?.trackCount ?? finalResults.length;
 
 			updateProgress(`Complete! Added ${actualTracksAdded} track(s)`, 1.0);
-			logger.info('Workflow', `=== Complete! ${actualTracksAdded} tracks in ${elapsed}s ===`);
 
 			terminateProgressTask(taskId);
 			cache?.clear?.();
 
-			// Build comprehensive stats for user feedback
-			const statsBreakdown = {
-				added: actualTracksAdded,
-				notInLibrary: matchStats?.notInLibrary || 0,
-				filteredByRating: matchStats?.filteredByRating || 0,
-				apiFiltered: discoveryStats?.apiFilteredCount || 0,
-				totalFromApi: discoveryStats?.totalFromApi || 0
-			};
+			// Build comprehensive stats for final summary
+			const notInLibraryCount = matchStats?.notInLibrary || 0;
+			const filteredByRatingCount = matchStats?.filteredByRating || 0;
+			const apiFilteredCount = discoveryStats?.apiFilteredCount || 0;
+			const missedCount = window.matchMonkeyMissedResults?.getCount?.() || 0;
 
-			// Log comprehensive stats using logger.summary
-			logger.summary('Stats', 'Run complete', statsBreakdown);
+			// Log human-readable final summary (always visible)
+			const summaryParts = [`${actualTracksAdded} tracks added in ${elapsed}s`];
+			summaryParts.push(`Mode: ${modeName}`);
+			if (outputName) summaryParts.push(`${outputMode === 'queue' ? 'Queue' : 'Playlist'}: "${outputName}"`);
+			const filterParts = [];
+			if (notInLibraryCount > 0) filterParts.push(`${notInLibraryCount} not in library`);
+			if (apiFilteredCount > 0) filterParts.push(`${apiFilteredCount} below API threshold`);
+			if (filteredByRatingCount > 0) filterParts.push(`${filteredByRatingCount} below rating threshold`);
+			if (dedupRemovedCount > 0) filterParts.push(`${dedupRemovedCount} duplicates removed`);
+			if (missedCount > 0) filterParts.push(`${missedCount} missed results tracked`);
+			if (filterParts.length > 0) summaryParts.push(`Skipped: ${filterParts.join(', ')}`);
+			logger.log('Complete', summaryParts.join(' | '));
 
-			// Build success message with stats breakdown
+			// Build success message for toast
 			let successMsg = `Successfully added ${actualTracksAdded} ${modeName} track(s) in ${elapsed}s`;
 			const detailParts = [];
-			if (statsBreakdown.notInLibrary > 0) {
-				detailParts.push(`${statsBreakdown.notInLibrary} not in library`);
+			if (notInLibraryCount > 0) {
+				detailParts.push(`${notInLibraryCount} not in library`);
 			}
-			if (statsBreakdown.filteredByRating > 0) {
-				detailParts.push(`${statsBreakdown.filteredByRating} below rating threshold`);
+			if (filteredByRatingCount > 0) {
+				detailParts.push(`${filteredByRatingCount} below rating threshold`);
 			}
-			if (statsBreakdown.apiFiltered > 0) {
-				detailParts.push(`${statsBreakdown.apiFiltered} below API threshold`);
+			if (apiFilteredCount > 0) {
+				detailParts.push(`${apiFilteredCount} below API threshold`);
 			}
 			if (detailParts.length > 0) {
 				successMsg += ` (${detailParts.join(', ')})`;

@@ -150,6 +150,10 @@ function add(artist, title, album = '', popularity = 0, additionalInfo = {}) {
 		return;
 	}
 
+	if (popularity < 40) {
+		return;
+	}
+
 	try {
 		const results = getAll(); // Use getAll() which always returns an array
 
@@ -279,7 +283,7 @@ function addBatch(results) {
 	if (errorCount > 0) {
 		logger?.warn('MissedResults', `Batch complete - ${successCount} succeeded, ${errorCount} failed`);
 	} else {
-		logger?.info('MissedResults', `Batch complete - ${successCount} results added`);
+		logger?.debug('MissedResults', `Batch complete - ${successCount} results added`);
 	}
 
 	// Log final storage size after batch
@@ -321,7 +325,7 @@ function getByArtist(artist) {
 function clear() {
 	const logger = _getMissedLogger();
 	try {
-		logger?.info('MissedResults', 'Clearing all results');
+		logger?.debug('MissedResults', 'Clearing all results');
 		app.setValue(STORAGE_KEY, []);
 
 		// Dispatch event
@@ -336,11 +340,25 @@ function clear() {
 	}
 }
 
+/**
+ * Get the total number of missed results
+ * @returns {number} Total count
+ */
+function getCount() {
+	try {
+		const results = getAll();
+		return results.length;
+	} catch (e) {
+		return 0;
+	}
+}
+
 // Export to window namespace
 window.matchMonkeyMissedResults = {
 	init,
 	getAll,
 	getStats,
+	getCount,
 	add,
 	addBatch,
 	getByArtist,

@@ -7,8 +7,10 @@
  * Logging Levels:
  * - error(): Always logged - errors and exceptions
  * - warn(): Always logged - warnings and non-critical issues
- * - info(): Always logged - high-level workflow events and summaries
- * - debug(): Only logged when DEBUG_MODE = true - detailed tracking
+ * - log(): Always logged - key user-facing messages and final summaries
+ * - info(): Only logged in debug mode - workflow events and phase details
+ * - debug(): Only logged in debug mode - detailed tracking
+ * - summary(): Only logged in debug mode - batch operation summaries with optional detail lines
  * 
  * Enable debug mode by setting: window.matchMonkeyDebugMode = true
  * 
@@ -54,7 +56,19 @@ const logger = {
 	},
 
 	/**
-	 * Always logged - use for high-level workflow events and summaries
+	 * Always logged - use for key user-facing messages and final summaries
+	 * Examples: run complete summary, important state changes
+	 */
+	log: function (context, message, ...args) {
+		if (args.length > 0) {
+			console.log(`${LOG_PREFIX} [${context}]: ${message}`, ...args);
+		} else {
+			console.log(`${LOG_PREFIX} [${context}]: ${message}`);
+		}
+	},
+
+	/**
+	 * Only logged in debug mode - use for workflow events and phase details
 	 * Examples: workflow start/end, API responses, phase completions
 	 */
 	info: function (context, message, ...args) {
@@ -82,15 +96,17 @@ const logger = {
 	},
 
 	/**
-	 * Summary logger for batch operations
-	 * Always logs summary, optionally logs individual items in debug mode
+	 * Only logged in debug mode - summary logger for batch operations
+	 * Logs summary line and optionally logs individual detail items
 	 * 
 	 * @param {string} context - Module/function context
 	 * @param {string} operation - What operation completed
 	 * @param {object} stats - Statistics object with counts
-	 * @param {Array} [details] - Optional array of detail strings for debug mode
+	 * @param {Array} [details] - Optional array of detail strings
 	 */
 	summary: function (context, operation, stats, details = null) {
+		if (!isDebugMode()) return;
+
 		// Build stats string
 		const statsParts = Object.entries(stats)
 			.filter(([k, v]) => v !== undefined && v !== null)
@@ -98,9 +114,9 @@ const logger = {
 
 		console.info(`${LOG_PREFIX} [${context}]: ${operation} - ${statsParts.join(', ')}`);
 
-		// In debug mode, log individual details if provided
-		if (isDebugMode() && details && Array.isArray(details) && details.length > 0) {
-			const maxDetails = 20; // Limit to prevent overwhelming output
+		// Log individual details if provided
+		if (details && Array.isArray(details) && details.length > 0) {
+			const maxDetails = 20;
 			const showing = Math.min(details.length, maxDetails);
 			details.slice(0, showing).forEach(d => {
 				console.debug(`${LOG_PREFIX} [${context}] [DEBUG]:   - ${d}`);
