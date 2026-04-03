@@ -126,27 +126,6 @@
 				</div>
 			</fieldset>
 
-			<!-- Queue Behavior -->
-			<fieldset>
-				<legend>Queue behavior (playlist creation override)</legend>
-				<div class="uiRows">
-					<div class="uiRow">
-						<div data-id="EnqueueMode" data-control-class="Checkbox" data-tip="If enabled, add results to Now Playing (queue) instead of creating a playlist.">Enqueue to Now Playing instead of creating playlist?</div>
-					</div>
-					<div class="uiRow">
-						<div data-id="ClearQueueFirst" data-control-class="Checkbox" data-tip="If checked, clear the current Now Playing queue before adding results.">Clear queue before adding?</div>
-					</div>
-					<div class="uiRow">
-						<label class="inline">After completion:</label>
-						<div data-id="NavigateAfter" data-control-class="Dropdown" data-tip="Choose where the app should navigate after playlist/queue creation.">
-							<option>Navigate to new playlist</option>
-							<option>Navigate to now playing</option>
-							<option>Stay in current view</option>
-						</div>
-					</div>
-				</div>
-			</fieldset>
-
 			<!-- Filters -->
 			<fieldset>
 				<legend>Filters</legend>
@@ -165,38 +144,6 @@
 
 		<!-- RIGHT COLUMN -->
 		<div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:1em;">
-
-			<!-- Mood & Activity -->
-			<fieldset>
-				<legend>Mood & Activity defaults</legend>
-				<div class="uiRows">
-
-					<div class="uiRow">
-						<label class="inline">Acoustic feature balance:</label>
-						<div class="sliderContainer" style="width:30em;">
-							<div data-id="MoodActivityBlendRatio"
-								 data-control-class="Slider"
-								 data-tip="Adjust how much the mood/activity preset influences your results. 0% = seeds only, 50% = balanced, 100% = mood/activity only"
-								 data-init-params='{"min":0,"max":100,"step":10,"ticks":[0,50,100]}'></div>
-
-							<div style="display:flex; width:100%; justify-content:space-between; align-items:center;">
-								<span style="white-space:nowrap;">Seeds Only</span>
-								<span style="flex:1; text-align:center; white-space:nowrap;">Balanced Mix</span>
-								<span style="white-space:nowrap;">Preset Only</span>
-							</div>
-						</div>
-					</div>
-
-					<div class="uiRow" style="margin-top:0.3em;padding:0.3em;background:var(--panel-background,#f8f8f8);border-radius:4px;">
-						<span style="font-size:1em;color:var(--text-secondary,#666);">
-							<strong>Tip:</strong> Mood and Activity modes apply predefined audio profiles on top of your seed tracks.
-							The <strong>Acoustic Feature Balance</strong> slider controls how strongly the mood influences the results.
-							Use the <strong>Similar acoustics</strong> menu for acoustic suggestions that use only your selected tracks, without applying a template.
-						</span>
-					</div>
-
-				</div>
-			</fieldset>
 
 			<!-- Auto-Queue -->
 			<fieldset>
@@ -254,6 +201,27 @@
 					</div>
 					<div class="uiRow">
 						<div data-id="SkipDuplicates" data-control-class="Checkbox" data-tip="Prevent adding tracks that already exist in the current Now Playing queue when Auto-queue is active.">Skip duplicates in queue?</div>
+					</div>
+				</div>
+			</fieldset>
+
+			<!-- Queue Behavior -->
+			<fieldset>
+				<legend>Queue behavior (playlist creation override)</legend>
+				<div class="uiRows">
+					<div class="uiRow">
+						<div data-id="EnqueueMode" data-control-class="Checkbox" data-tip="If enabled, add results to Now Playing (queue) instead of creating a playlist.">Enqueue to Now Playing instead of creating playlist?</div>
+					</div>
+					<div class="uiRow">
+						<div data-id="ClearQueueFirst" data-control-class="Checkbox" data-tip="If checked, clear the current Now Playing queue before adding results.">Clear queue before adding?</div>
+					</div>
+					<div class="uiRow">
+						<label class="inline">After completion:</label>
+						<div data-id="NavigateAfter" data-control-class="Dropdown" data-tip="Choose where the app should navigate after playlist/queue creation.">
+							<option>Navigate to new playlist</option>
+							<option>Navigate to now playing</option>
+							<option>Stay in current view</option>
+						</div>
 					</div>
 				</div>
 			</fieldset>

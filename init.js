@@ -54,6 +54,7 @@ localRequirejs('modules/db/index');
 
 // Core orchestration and integration (depend on everything)
 localRequirejs('modules/core/discoveryStrategies'); // NEW: Discovery strategies
+localRequirejs('modules/core/moodActivityDiscovery'); // NEW: Mood/Activity hybrid discovery
 localRequirejs('modules/core/orchestration');
 localRequirejs('modules/core/autoMode');
 localRequirejs('modules/core/mm5Integration');
@@ -145,9 +146,6 @@ function start() {
 		ClearQueueFirst: false,         // Clear queue before adding
 		SkipDuplicates: true,           // Skip tracks already in queue
 		NavigateAfter: 'Navigate to new playlist', // Navigation after completion
-
-		// === Mood/Activity Discovery (ReccoBeats) ===
-		MoodActivityBlendRatio: 0.3,    // Blend ratio: 0.3 = 70% seeds + 30% mood/activity (0=all mood, 1=all seeds)
 
 		// === Underdeveloped / Experimental Features ===
 		HybridMode: false,               // Combine ReccoBeats + Last.fm
@@ -310,6 +308,12 @@ function start() {
 
 					// Initialize configuration
 					checkConfig();
+
+					// Populate in-memory settings cache so getSetting() reads the
+					// validated/migrated config without relying on app.getValue() caching
+					if (window.matchMonkeyStorage?.refreshSettings) {
+						window.matchMonkeyStorage.refreshSettings();
+					}
 
 					// Start the add-on
 					console.log('Match Monkey: Starting add-on...');

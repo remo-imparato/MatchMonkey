@@ -170,8 +170,7 @@ window.matchMonkeyOrchestration = {
 				// Context explicitly provided
 				config_.moodActivityContext = _moodActivityContext.context;
 				config_.moodActivityValue = _moodActivityContext.value;
-				config_.moodSeedBlend = getSetting("MoodActivityBlendRatio", 0.3);
-				logger.info('Config', `Using ${config_.moodActivityContext} "${config_.moodActivityValue}" (blend: ${config_.moodSeedBlend})`);
+				logger.info('Config', `Using ${config_.moodActivityContext} "${config_.moodActivityValue}"`);
 			}
 
 			// Log configuration summary
@@ -215,13 +214,21 @@ window.matchMonkeyOrchestration = {
 
 			const discoveryFn = strategies.getDiscoveryStrategy(discoveryMode);
 			let candidates;
-			let discoveryStats = { apiFilteredCount: 0, totalFromApi: 0 };
+			let discoveryStats = { apiFilteredCount: 0, audioFeatureFilteredCount: 0, totalFromApi: 0 };
 
 			try {
 				const discoveryResult = await discoveryFn(modules, seeds, config_);
 				// Discovery strategies now return {candidates, stats}
+				// Mood/Activity hybrid mode also returns {libraryTracks} for direct use
 				candidates = discoveryResult.candidates || discoveryResult;
 				discoveryStats = discoveryResult.stats || { apiFilteredCount: 0, totalFromApi: 0 };
+
+				// Check if discovery already matched to library (new mood/activity hybrid approach)
+				if (discoveryResult.libraryTracks && discoveryResult.libraryTracks.length > 0) {
+					logger.info('Discovery', `Mood/Activity hybrid mode: ${discoveryResult.libraryTracks.length} library tracks already matched`);
+					// Store for use in library matching step (skip normal matching)
+					config_._preMatchedLibraryTracks = discoveryResult.libraryTracks;
+				}
 			} catch (discoveryError) {
 				logger.error('Discovery', 'Discovery failed', discoveryError);
 				terminateProgressTask(taskId);
@@ -236,9 +243,12 @@ window.matchMonkeyOrchestration = {
 				let errorMsg = `No ${modeName} candidates found.`;
 				let guidance = '';
 
-				if (discoveryMode === 'acoustics' || discoveryMode === 'mood' || discoveryMode === 'activity') {
+				if (discoveryMode === 'acoustics') {
 					errorMsg = `No tracks found on ReccoBeats.`;
 					guidance = ' Acoustic search requires Artist, Album, and Track tags to match official release names exactly. Check your library metadata for accuracy.';
+				} else if (discoveryMode === 'mood' || discoveryMode === 'activity') {
+					errorMsg = `No matching tracks found for ${modeName}.`;
+					guidance = ' Try different seed tracks or verify your tags match official release names.';
 				} else {
 					guidance = ' Try different seeds or adjust settings.';
 				}
@@ -248,7 +258,14 @@ window.matchMonkeyOrchestration = {
 				return { success: false, error: `No ${modeName} found.`, tracksAdded: 0 };
 			}
 
-			logger.info('Discovery', `Found ${candidates.length} candidates (${discoveryStats.apiFilteredCount} filtered by API threshold)`);
+			// Log discovery results with appropriate message based on mode
+			if (discoveryMode === 'mood' || discoveryMode === 'activity') {
+				const audioFiltered = discoveryStats.audioFeatureFilteredCount || 0;
+				logger.info('Discovery', `Found ${candidates.length} candidates (${audioFiltered} filtered by audio features)`);
+			} else {
+				const apiFiltered = discoveryStats.apiFilteredCount || 0;
+				logger.info('Discovery', `Found ${candidates.length} candidates${apiFiltered > 0 ? ` (${apiFiltered} filtered by API threshold)` : ''}`);
+			}
 			updateProgress(`Found ${candidates.length} candidate(s)`, 0.5);
 
 			// Step 3: Match candidates to local library
@@ -261,11 +278,15 @@ window.matchMonkeyOrchestration = {
 
 			updateProgress(`Matching candidates to your library...`, 0.6);
 			try {
-				// Check if this is a mood/activity filter candidate (special handling)
-				const isMoodActivityFilter = candidates.length === 1 &&
-					(candidates[0].artist === '__MOOD_FILTER__' || candidates[0].artist === '__ACTIVITY_FILTER__');
-
-				if (isMoodActivityFilter) {
+				// Check if discovery already provided library tracks (new mood/activity hybrid approach)
+				if (config_._preMatchedLibraryTracks && config_._preMatchedLibraryTracks.length > 0) {
+					// Use pre-matched tracks directly (mood/activity hybrid mode)
+					results = config_._preMatchedLibraryTracks;
+					logger.info('Library', `Using ${results.length} pre-matched library tracks from hybrid discovery`);
+				}
+				// Check if this is a mood/activity filter candidate (legacy special handling)
+				else if (candidates.length === 1 &&
+					(candidates[0].artist === '__MOOD_FILTER__' || candidates[0].artist === '__ACTIVITY_FILTER__')) {
 					// Mood/Activity mode - search library with audio filtering
 					results = await this.matchMoodActivityToLibrary(modules, candidates[0], config_);
 				} else {
@@ -350,19 +371,19 @@ window.matchMonkeyOrchestration = {
 					const existingPriority = getFormatPriority(existing);
 					const newPriority = getFormatPriority(track);
 
-							if (newPriority > existingPriority) {
-								duplicateMap.set(dupKey, track);
-								const existingExt = (existing.fileExtension || existing.FileExtension || 'unknown').toUpperCase();
-								const newExt = (track.fileExtension || track.FileExtension || 'unknown').toUpperCase();
-								logger.debug('Dedup', `Preferring ${newExt} over ${existingExt} for "${makeDupKey(track).replace('||', ' - ')}"`);
-							}
-						}
+					if (newPriority > existingPriority) {
+						duplicateMap.set(dupKey, track);
+						const existingExt = (existing.fileExtension || existing.FileExtension || 'unknown').toUpperCase();
+						const newExt = (track.fileExtension || track.FileExtension || 'unknown').toUpperCase();
+						logger.debug('Dedup', `Preferring ${newExt} over ${existingExt} for "${makeDupKey(track).replace('||', ' - ')}"`);
 					}
+				}
+			}
 
-					const dedupedResults = Array.from(duplicateMap.values());
+			const dedupedResults = Array.from(duplicateMap.values());
 
-					logger.info('Dedup', `Removed ${results.length - dedupedResults.length} duplicates, ${dedupedResults.length} unique tracks remain`);
-					updateProgress(`Removed ${results.length - dedupedResults.length} duplicates → ${dedupedResults.length} unique tracks`, 0.83);
+			logger.info('Dedup', `Removed ${results.length - dedupedResults.length} duplicates, ${dedupedResults.length} unique tracks remain`);
+			updateProgress(`Removed ${results.length - dedupedResults.length} duplicates → ${dedupedResults.length} unique tracks`, 0.83);
 
 			// Step 5: Include seed tracks if enabled (before shuffling)
 			// When IncludeSeedArtist is true, we also include the actual seed tracks
@@ -630,48 +651,48 @@ window.matchMonkeyOrchestration = {
 		const logger = window.matchMonkeyLogger;
 
 		try {
-				if (!app.player) {
-					logger?.warn('AutoMode', 'Player not available');
-					return seeds;
+			if (!app.player) {
+				logger?.warn('AutoMode', 'Player not available');
+				return seeds;
+			}
+
+			// Get Now Playing tracklist
+			const tracklist = (typeof app.player.getTracklist === 'function')
+				? app.player.getTracklist()
+				: null;
+
+			if (!tracklist) {
+				logger?.warn('AutoMode', 'Now Playing tracklist not available');
+				return seeds;
+			}
+
+			// Wait for tracklist to load
+			if (typeof tracklist.whenLoaded === 'function') {
+				await tracklist.whenLoaded();
+			}
+
+			// Get index of the currently playing track
+			let currentIndex = -1;
+			try {
+				if (typeof app.player.getIndexOfPlayingTrack === 'function') {
+					currentIndex = app.player.getIndexOfPlayingTrack(tracklist);
 				}
+			} catch (e) {
+				logger?.warn('AutoMode', 'Could not get playing index: ' + e.message);
+			}
 
-				// Get Now Playing tracklist
-				const tracklist = (typeof app.player.getTracklist === 'function')
-					? app.player.getTracklist()
-					: null;
+			if (currentIndex == null || currentIndex < 0) {
+				logger?.warn('AutoMode', 'Invalid playing index');
+				return seeds;
+			}
 
-				if (!tracklist) {
-					logger?.warn('AutoMode', 'Now Playing tracklist not available');
-					return seeds;
-				}
+			const totalTracks = tracklist.count || 0;
+			const seedCount = threshold;
 
-				// Wait for tracklist to load
-				if (typeof tracklist.whenLoaded === 'function') {
-					await tracklist.whenLoaded();
-				}
+			const startIndex = currentIndex;
+			const endIndex = Math.min(startIndex + seedCount, totalTracks);
 
-				// Get index of the currently playing track
-				let currentIndex = -1;
-				try {
-					if (typeof app.player.getIndexOfPlayingTrack === 'function') {
-						currentIndex = app.player.getIndexOfPlayingTrack(tracklist);
-					}
-				} catch (e) {
-					logger?.warn('AutoMode', 'Could not get playing index: ' + e.message);
-				}
-
-				if (currentIndex == null || currentIndex < 0) {
-					logger?.warn('AutoMode', 'Invalid playing index');
-					return seeds;
-				}
-
-				const totalTracks = tracklist.count || 0;
-				const seedCount = threshold;
-
-				const startIndex = currentIndex;
-				const endIndex = Math.min(startIndex + seedCount, totalTracks);
-
-				logger?.debug('AutoMode', `Collecting seeds from Now Playing (playing=${currentIndex}, total=${totalTracks}, collecting ${endIndex - startIndex} tracks)`);
+			logger?.debug('AutoMode', `Collecting seeds from Now Playing (playing=${currentIndex}, total=${totalTracks}, collecting ${endIndex - startIndex} tracks)`);
 
 			// Extract tracks
 			if (typeof tracklist.locked === 'function') {

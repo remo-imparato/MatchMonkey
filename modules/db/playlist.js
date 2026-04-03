@@ -285,7 +285,7 @@ async function resolveTargetPlaylist(playlistName, parentName, playlistMode, use
 	if (!isOverwriteMode) {
 		let counter = 1;
 		let testName = playlistName;
-		
+
 		// Check for existing playlist with same name
 		const checkExists = async (name) => {
 			if (parentPlaylist) {

@@ -24,7 +24,6 @@
  * - ApiMinMatch -> ApiMinMatch (0.00-99.99 float lower bound for API match/popularity filtering)
  * - MinRating -> MinRating
  * - IncludeUnrated -> IncludeUnrated
- * - MoodActivityBlendRatio -> MoodActivityBlendRatio (0-100 slider -> 0.0-1.0 ratio)
  * - AutoModeEnabled -> AutoModeEnabled
  * - AutoModeDiscovery -> AutoModeDiscovery
  * - AutoModeSeedLimit -> AutoModeSeedLimit
@@ -83,6 +82,9 @@ function setSetting(key, value) {
 optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function (sett, pnl, wndParams) {
 	try {
 
+		// Store panel reference for use in save()
+		this._pnl = pnl;
+
 		// Read configuration from system storage (may be empty)
 		this.config = app.getValue(SCRIPT_ID, {}) || {};
 		const cfg = this.config || {};
@@ -118,17 +120,7 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function (sett, 
 		this._setRatingControl(UI.MinRating, ratingValue);
 		UI.IncludeUnrated.controlClass.checked = cfg.IncludeUnrated !== false; // Default true
 
-		// === Mood & Activity Blend Ratio ===
-		// Blend ratio: stored as 0.0-1.0, displayed as 0-100%
-		// Default is 0.3 (30% preset, 70% seed) to preserve seed character
-		// Note: 0 is valid (100% seed only), so use explicit null/undefined check
-		const blendRatioValue = (cfg.MoodActivityBlendRatio !== null && cfg.MoodActivityBlendRatio !== undefined)
-			? cfg.MoodActivityBlendRatio
-			: 0.3;
-		const blendRatioPercent = Math.round(blendRatioValue * 100);
-		UI.MoodActivityBlendRatio.controlClass.value = blendRatioPercent;
-
-		// === Local Collection (MediaMonkey collections) ===
+		// === Local Collection
 		if (UI.LocalCollection && UI.LocalCollection.controlClass) {
 			UI.LocalCollection.controlClass.value = cfg.LocalCollection || '';
 		}
@@ -288,7 +280,7 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 			this._missedResultsListener = null;
 		}
 
-		const UI = getAllUIElements();
+		const UI = getAllUIElements(this._pnl);
 
 		// Read current config to preserve any keys not in UI
 		this.config = app.getValue(SCRIPT_ID, {});
@@ -317,16 +309,6 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 			: 0;
 		this.config.MinRating = rawRating;
 		this.config.IncludeUnrated = UI.IncludeUnrated.controlClass.checked;
-
-		// === Mood & Activity Blend Ratio ===
-		// Convert slider percentage (0-100) to ratio (0.0-1.0)
-		// Default is 30% (0.3) to preserve seed character when blending with presets
-		// Note: 0 is valid (100% seed only), so check for undefined before parsing
-		const rawBlendValue = UI.MoodActivityBlendRatio.controlClass.value;
-		const blendRatioPercent = (rawBlendValue !== null && rawBlendValue !== undefined)
-			? Math.max(0, Math.min(100, parseInt(rawBlendValue, 10)))
-			: 30;
-		this.config.MoodActivityBlendRatio = blendRatioPercent / 100.0;
 
 		// === Auto-Mode ===
 		// Get auto-mode state from addon if available, otherwise from checkbox
@@ -391,6 +373,9 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 		// Save all settings
 		try {
 			app.setValue(SCRIPT_ID, this.config);
+			// Push the new config directly into the in-memory cache so the
+			// running add-on picks up changes immediately (without a restart)
+			window.matchMonkeyStorage?.updateSettingsCache(this.config);
 			console.log('Match Monkey Options: Settings saved successfully');
 		} catch (e) {
 			console.error('Match Monkey Options: Failed to save:', e.toString());

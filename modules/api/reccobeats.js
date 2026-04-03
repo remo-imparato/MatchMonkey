@@ -72,253 +72,6 @@ const AUDIO_FEATURE_NAMES = [
 	'liveness', 'loudness', 'mode', 'speechiness', 'tempo', 'valence'
 ];
 
-/**
- * Mood-defining features - only these should be blended/overridden for each mood.
- * Other seed features pass through unmodified to preserve the acoustic signature.
- */
-const MOOD_DEFINING_FEATURES = {
-	energetic: ['energy', 'valence', 'danceability', 'tempo'],
-	relaxed: ['energy', 'acousticness', 'tempo'],
-	happy: ['valence', 'energy', 'danceability'],
-	sad: ['valence', 'energy', 'acousticness'],
-	focused: ['instrumentalness', 'speechiness', 'energy'],
-	angry: ['energy', 'valence', 'loudness'],
-	romantic: ['valence', 'acousticness', 'energy'],
-	uplifting: ['valence', 'energy', 'danceability'],
-	dark: ['valence', 'energy', 'instrumentalness']
-};
-
-/**
- * Activity-defining features - only these should be blended/overridden for each activity.
- * Other seed features pass through unmodified to preserve the acoustic signature.
- */
-const ACTIVITY_DEFINING_FEATURES = {
-	workout: ['energy', 'tempo', 'danceability'],
-	study: ['instrumentalness', 'speechiness', 'energy'],
-	party: ['danceability', 'energy', 'valence'],
-	sleep: ['energy', 'acousticness', 'instrumentalness', 'tempo'],
-	driving: ['energy', 'tempo', 'valence'],
-	meditation: ['instrumentalness', 'acousticness', 'energy'],
-	cooking: ['valence', 'energy', 'danceability'],
-	cleaning: ['energy', 'danceability', 'tempo'],
-	walking: ['energy', 'tempo', 'valence'],
-	coding: ['instrumentalness', 'speechiness', 'energy']
-};
-
-/**
- * Audio feature targets for different moods.
- * Used when generating mood-based playlists without seed tracks.
- */
-const MOOD_AUDIO_TARGETS = {
-	// High-energy pop, EDM, pop-rock, upbeat indie.
-	energetic: {
-		'energy': 0.8,
-		'valence': 0.7,
-		'danceability': 0.7,
-		'speechiness': 0.10,
-		'loudness': -6,
-		'liveness': 0.1,
-		'tempo': 130
-	},
-
-	// Chill indie, soft pop, acoustic, mellow electronic.
-	relaxed: {
-		'energy': 0.3,
-		'valence': 0.5,
-		'danceability': 0.3,
-		'acousticness': 0.5,
-		'instrumentalness': 0.2,
-		'speechiness': 0.05,
-		'liveness': 0.1,
-		'tempo': 80
-	},
-
-	// Feel-good pop, upbeat indie, dance-pop.
-	happy: {
-		'energy': 0.6,
-		'valence': 0.9,
-		'danceability': 0.6,
-		'acousticness': 0.2,
-		'speechiness': 0.10,
-		'loudness': -5,
-		'tempo': 115
-	},
-
-	// Emotional ballads, soft acoustic, mellow indie.
-	sad: {
-		'energy': 0.3,
-		'valence': 0.2,
-		'danceability': 0.3,
-		'acousticness': 0.6,
-		'instrumentalness': 0.15,
-		'speechiness': 0.05,
-		'loudness': -10,
-		'tempo': 70
-	},
-
-	// Ambient electronic, downtempo, lo-fi beats.
-	focused: {
-		'energy': 0.4,
-		'valence': 0.4,
-		'danceability': 0.3,
-		'instrumentalness': 0.6,
-		'acousticness': 0.4,
-		'speechiness': 0.05,
-		'loudness': -10,
-		'tempo': 95
-	},
-
-	// Hard rock, metalcore, punk, aggressive alt-rock, rap, EDM.
-	angry: {
-		'energy': 0.9,
-		'valence': 0.2,
-		'danceability': 0.5,
-		'speechiness': 0.15,
-		'acousticness': 0.05,
-		'loudness': -7,
-		'tempo': 120
-	},
-
-	// Soft pop, R&B, acoustic love songs.
-	romantic: {
-		'energy': 0.4,
-		'valence': 0.6,
-		'danceability': 0.4,
-		'acousticness': 0.5,
-		'speechiness': 0.05,
-		'loudness': -8,
-		'tempo': 90
-	},
-
-	// Uplifting pop, indie-pop, cinematic pop, inspirational EDM.
-	uplifting: {
-		'energy': 0.7,
-		'valence': 0.8,
-		'danceability': 0.5,
-		'acousticness': 0.3,
-		'speechiness': 0.05,
-		'loudness': -6,
-		'tempo': 120
-	},
-
-	// Dark pop, alt-electronic, moody indie.
-	dark: {
-		'energy': 0.5,
-		'valence': 0.2,
-		'danceability': 0.4,
-		'acousticness': 0.4,
-		'instrumentalness': 0.3,
-		'speechiness': 0.05,
-		'loudness': -8,
-		'tempo': 100
-	}
-};
-
-/**
- * Audio feature targets for different activities.
- * Used when generating activity-based playlists without seed tracks.
- */
-const ACTIVITY_AUDIO_TARGETS = {
-	// High-energy EDM, hip-hop, pop, rock.
-	workout: {
-		'energy': 0.9,
-		'danceability': 0.8,
-		'loudness': -5,
-		'speechiness': 0.10,
-		'tempo': 140
-	},
-
-	// Lo-fi beats, ambient, soft electronic.
-	study: {
-		'energy': 0.3,
-		'instrumentalness': 0.7,
-		'acousticness': 0.6,
-		'speechiness': 0.05,
-		'liveness': 0.1,
-		'tempo': 85
-	},
-
-	// Dance-pop, EDM, club tracks.
-	party: {
-		'energy': 0.8,
-		'valence': 0.8,
-		'danceability': 0.9,
-		'loudness': -4,
-		'speechiness': 0.10,
-		'tempo': 125
-	},
-
-	// Ambient, soft acoustic, sleep playlists.
-	sleep: {
-		'energy': 0.1,
-		'acousticness': 0.75,
-		'instrumentalness': 0.6,
-		'speechiness': 0.0,
-		'liveness': 0.05,
-		'tempo': 60
-	},
-
-	// Driving pop, alt-rock, synth-pop.
-	driving: {
-		'energy': 0.6,
-		'valence': 0.6,
-		'danceability': 0.5,
-		'loudness': -6,
-		'speechiness': 0.10,
-		'tempo': 110
-	},
-
-	// Meditation/ambient soundscapes.
-	meditation: {
-		'energy': 0.2,
-		'acousticness': 0.85,
-		'instrumentalness': 0.85,
-		'speechiness': 0.0,
-		'liveness': 0.05,
-		'tempo': 60
-	},
-
-	// Chill pop, upbeat indie, soft electronic.
-	cooking: {
-		'energy': 0.5,
-		'valence': 0.7,
-		'danceability': 0.5,
-		'acousticness': 0.35,
-		'speechiness': 0.10,
-		'tempo': 100
-	},
-
-	// Upbeat pop, dance-pop, rhythmic indie.
-	cleaning: {
-		'energy': 0.75,
-		'valence': 0.7,
-		'danceability': 0.7,
-		'loudness': -5,
-		'speechiness': 0.10,
-		'tempo': 125
-	},
-
-	// Indie-pop, soft electronic, light rock.
-	walking: {
-		'energy': 0.55,
-		'valence': 0.6,
-		'danceability': 0.6,
-		'acousticness': 0.3,
-		'speechiness': 0.05,
-		'tempo': 115
-	},
-
-	// Minimal electronic, downtempo, ambient techno.
-	coding: {
-		'energy': 0.35,
-		'valence': 0.35,
-		'danceability': 0.3,
-		'instrumentalness': 0.7,
-		'acousticness': 0.3,
-		'speechiness': 0.05,
-		'tempo': 90
-	}
-};
 
 // =============================================================================
 // HELPER FUNCTIONS - Rate Limiting & HTTP
@@ -330,7 +83,7 @@ const ACTIVITY_AUDIO_TARGETS = {
  * @returns {string} Normalized string
  */
 function normalize(s) {
-	return String(s || '').toLowerCase().replace(/[\s\-\_\(\)\[\]\.\'\"]+/g, '').trim();
+	return String(s || '').normalize('NFC').toLowerCase().replace(/[\s\-\_\(\)\[\]\.\'\"]+/g, '').trim();
 }
 
 /**
@@ -911,8 +664,8 @@ async function findTrackInAlbum(albumId, trackTitle) {
 
 		// Check if either contains the other (handles "T.N.T." matching "TNT" or "Live: T.N.T.")
 		if (trackCleaned.includes(cleanedSearch) || cleanedSearch.includes(trackCleaned)) {
-			// Only accept if the cleaned search is substantial (at least 3 chars)
-			if (cleanedSearch.length >= 3) {
+			// Only accept if both strings are substantial (at least 3 chars)
+			if (cleanedSearch.length >= 3 && trackCleaned.length >= 3) {
 				logger?.debug('ReccoBeats', `findTrackInAlbum: Found substring match "${trackTitle}" -> "${trackRaw}" (ID: ${t.id})`);
 				updateProgress(`ReccoBeats: Found track "${trackTitle}"`, undefined);
 				return t;
@@ -938,15 +691,16 @@ async function findTrackInAlbum(albumId, trackTitle) {
  */
 function normalizeForMatch(s) {
 	return String(s || '')
+		.normalize('NFC')						// consistent Unicode representation
 		.toLowerCase()
-		.replace(/\(.*?\)/g, '')           // remove parentheses and contents
-		.replace(/\[.*?\]/g, '')           // remove brackets and contents
-		.replace(/feat\.?|ft\.?/gi, '')    // remove feat/ft
-		.replace(/remaster(ed)?/gi, '')    // remove remaster tags
-		.replace(/\s*-\s*live\s+at\b.*/gi, '') // remove "- Live at..." suffixes
-		.replace(/\s*\(live\)/gi, '')      // remove (Live)
-		.replace(/[^a-z0-9\s]/g, '')       // remove punctuation
-		.replace(/\s+/g, ' ')              // collapse whitespace
+		.replace(/\(.*?\)/g, '')				// remove parentheses and contents
+		.replace(/\[.*?\]/g, '')				// remove brackets and contents
+		.replace(/feat\.?|ft\.?/gi, '')			// remove feat/ft
+		.replace(/remaster(ed)?/gi, '')			// remove remaster tags
+		.replace(/\s*-\s*live\s+at\b.*/gi, '')	// remove "- Live at..." suffixes
+		.replace(/\s*\(live\)/gi, '')			// remove (Live)
+		.replace(/[^\p{L}\p{N}\s]/gu, '')		// remove punctuation, keep all Unicode letters & digits
+		.replace(/\s+/g, ' ')					// collapse whitespace
 		.trim();
 }
 
@@ -1056,7 +810,7 @@ async function findTrackId(artist, title, album) {
 					return trackId;
 				}
 
-				if (nTitle.length >= 3 && (nTrack.includes(nTitle) || nTitle.includes(nTrack))) {
+				if (nTitle.length >= 3 && nTrack.length >= 3 && (nTrack.includes(nTitle) || nTitle.includes(nTrack))) {
 					const score = Math.min(nTrack.length, nTitle.length) / Math.max(nTrack.length, nTitle.length) * 80;
 					containsMatches.push({ track: { ...t, _albumName: albumEntry.name, _albumId: albumEntry.id }, matchType: 'contains', score });
 				}
@@ -1245,138 +999,6 @@ async function getAudioFeatures(foundTracks) {
 	return audioFeatures;
 }
 
-/**
- * Selectively blends seed features with mood/activity preset.
- * 
- * ONLY outputs the defining features for each mood/activity - does NOT pass
- * through other seed features. This prevents over-constraining the API.
- * 
- * Adaptive Blending Logic:
- * - If seed differs from preset by >0.4 for a feature, reduce blendRatio to preserve seed character
- * - Directional blending: Some features should only blend in one direction to avoid ruining the vibe
- *   * valence (happiness): Don't force happy music on dark seeds (only blend down, not up)
- *   * energy: Can blend both ways (chill music can be energized, energetic can be calmed)
- *   * danceability: Can blend both ways
- * 
- * Example: For "energetic" mood, only outputs energy, valence, danceability, tempo.
- * The API will use the seed track ID for similarity, plus these blended features to steer.
- *
- * @param {Object} seedAvg - Raw averaged audio features from seed tracks
- * @param {Object} preset - Audio feature targets for the selected mood/activity
- * @param {number} blendRatio - 0 = all seed, 1 = all preset, 0.5 = equal blend (will be adjusted adaptively)
- * @param {string[]} definingFeatures - Which features to blend and output (others ignored)
- * @param {string} contextName - Mood/activity name for directional blending rules
- * @returns {Object} Blended feature object with ONLY the defining features
- */
-function blendFeaturesSelective(seedAvg, preset, blendRatio, definingFeatures = null, contextName = '') {
-	const logger = _getReccoLogger();
-	const result = {};
-
-	// If no defining features specified, fall back to all preset keys (legacy behavior)
-	const featuresToBlend = definingFeatures
-		? new Set(definingFeatures)
-		: new Set(Object.keys(preset));
-
-	const debug = {
-		seedAvg,
-		preset,
-		blendRatio,
-		definingFeatures: Array.from(featuresToBlend),
-		keys: {},
-		final: null
-	};
-
-	// Adaptive blending threshold - if seed and preset differ by more than this, reduce blend
-	const ADAPTIVE_THRESHOLD = 0.4;
-	// When adaptive mode triggers, reduce blend ratio by this much
-	const ADAPTIVE_REDUCTION = 0.5; // Multiply blend ratio by 0.5 (e.g., 0.3 -> 0.15)
-
-	// ONLY output the defining features - do NOT copy all seed features
-	// This prevents over-constraining the API with features that don't define the mood/activity
-	for (const key of featuresToBlend) {
-		const seedVal = seedAvg[key];
-		const presetVal = preset[key];
-
-		if (presetVal !== undefined && presetVal !== null) {
-			if (seedVal !== undefined && seedVal !== null && !Number.isNaN(seedVal)) {
-				// Calculate difference between seed and preset
-				const diff = Math.abs(seedVal - presetVal);
-
-				// Adaptive blending: if seed differs significantly from preset, reduce blend ratio
-				// This preserves the seed's character when it's very different from the mood/activity
-				let effectiveBlendRatio = blendRatio;
-				if (diff > ADAPTIVE_THRESHOLD) {
-					effectiveBlendRatio = blendRatio * ADAPTIVE_REDUCTION;
-					logger?.debug('ReccoBeats', `Adaptive blend for ${key}: diff=${diff.toFixed(2)} > ${ADAPTIVE_THRESHOLD}, reducing blend ${blendRatio.toFixed(2)} -> ${effectiveBlendRatio.toFixed(2)}`);
-				}
-
-				// Directional blending: Some features should only blend in certain directions
-				// This prevents ruining the vibe (e.g., forcing happiness on dark music)
-				let blendedValue;
-
-				// Valence (happiness): Only blend DOWN, never force happiness on dark seeds
-				if (key === 'valence') {
-					if (presetVal > seedVal) {
-						// Preset is happier than seed - don't force it, use seed value
-						blendedValue = seedVal;
-						logger?.debug('ReccoBeats', `Directional blend for valence: preset=${presetVal.toFixed(2)} > seed=${seedVal.toFixed(2)}, using seed (preserving dark character)`);
-					} else {
-						// Preset is darker than seed - can blend down
-						blendedValue = seedVal * (1 - effectiveBlendRatio) + presetVal * effectiveBlendRatio;
-					}
-				}
-				// Energy: Can blend both ways (chill music can be energized, energetic can be calmed)
-				// Danceability: Can blend both ways
-				// Other features: Normal blending
-				else {
-					blendedValue = seedVal * (1 - effectiveBlendRatio) + presetVal * effectiveBlendRatio;
-				}
-
-				result[key] = blendedValue;
-				debug.keys[key] = {
-					type: 'blended',
-					seedValue: seedVal,
-					presetValue: presetVal,
-					diff: diff,
-					originalBlendRatio: blendRatio,
-					effectiveBlendRatio: effectiveBlendRatio,
-					finalValue: blendedValue
-				};
-			} else {
-				// No seed value available, use preset directly
-				result[key] = presetVal;
-				debug.keys[key] = {
-					type: 'preset-only',
-					presetValue: presetVal,
-					finalValue: presetVal
-				};
-			}
-		}
-	}
-
-	debug.final = result;
-	logger?.debug('ReccoBeats', 'blendFeaturesSelective DEBUG:', debug);
-
-	return result;
-}
-
-/**
- * Get the defining features for a mood.
- * @param {string} mood - Mood name (e.g., 'energetic', 'relaxed')
- * @returns {string[]} Array of feature names that define this mood
- */
-function getMoodDefiningFeatures(mood) {
-	return MOOD_DEFINING_FEATURES[mood?.toLowerCase()] || ['energy', 'valence'];
-}
-
-/**
- * Get the defining features for an activity.
- * @param {string} activity - Activity name (e.g., 'workout', 'study')
- * @returns {string[]} Array of feature names that define this activity
- */
-function getActivityDefiningFeatures(activity) {
-	return ACTIVITY_DEFINING_FEATURES[activity?.toLowerCase()] || ['energy', 'danceability'];
-}
 
 function getLogAudioFeatures(audioFeatures) {
 	const fmt = (v, digits = 2) => {
@@ -1626,65 +1248,6 @@ async function getReccoRecommendations(seeds, limit = 100) {
 	};
 }
 
-/**
- * Get recommendations for a specific mood using predefined audio targets.
- * No seed tracks needed - uses MOOD_AUDIO_TARGETS.
- * 
- * Note: ReccoBeats recommendation API requires seed track IDs, so we cannot
- * directly query by audio features alone. This function is a placeholder
- * that returns the audio targets for local library filtering.
- * 
- * @param {string} mood - Mood name (e.g., 'energetic', 'relaxed')
- * @param {number} limit - Maximum tracks
- * @returns {Promise<object>} Result with audio targets for filtering
- */
-async function getMoodRecommendations(mood, limit = 100) {
-	const logger = _getReccoLogger();
-	const moodLower = (mood || '').toLowerCase();
-	const targets = MOOD_AUDIO_TARGETS[moodLower];
-
-	if (!targets) {
-		logger?.warn('ReccoBeats', `getMoodRecommendations: Unknown mood "${mood}"`);
-		return { audioTargets: {}, recommendations: [] };
-	}
-
-	logger?.debug('ReccoBeats', `getMoodRecommendations: Using "${mood}" audio targets:`, targets);
-
-	// Note: Without seed tracks, we can only provide audio targets for filtering
-	// The discovery strategy should handle finding tracks in the library
-	return {
-		audioTargets: { ...targets },
-		recommendations: [],
-		mood
-	};
-}
-
-/**
- * Get recommendations for a specific activity using predefined audio targets.
- * No seed tracks needed - uses ACTIVITY_AUDIO_TARGETS.
- * 
- * @param {string} activity - Activity name (e.g., 'workout', 'study')
- * @param {number} limit - Maximum tracks
- * @returns {Promise<object>} Result with audio targets for filtering
- */
-async function getActivityRecommendations(activity, limit = 100) {
-	const logger = _getReccoLogger();
-	const activityLower = (activity || '').toLowerCase();
-	const targets = ACTIVITY_AUDIO_TARGETS[activityLower];
-
-	if (!targets) {
-		logger?.warn('ReccoBeats', `getActivityRecommendations: Unknown activity "${activity}"`);
-		return { audioTargets: {}, recommendations: [] };
-	}
-
-	logger?.debug('ReccoBeats', `getActivityRecommendations: Using "${activity}" audio targets:`, targets);
-
-	return {
-		audioTargets: { ...targets },
-		recommendations: [],
-		activity
-	};
-}
 
 // =============================================================================
 // UTILITY FUNCTIONS
@@ -1812,8 +1375,6 @@ function calculateAudioFeatureMatch(track, target, weights = null) {
 window.matchMonkeyReccoBeatsAPI = {
 	// High-level discovery functions
 	getReccoRecommendations,
-	getMoodRecommendations,
-	getActivityRecommendations,
 
 	// Track/album lookup and audio features
 	searchArtist,
@@ -1832,16 +1393,9 @@ window.matchMonkeyReccoBeatsAPI = {
 	fetchRecommendations,
 	filterTracksByAudioFeatures,
 	calculateAudioFeatureMatch,
-	blendFeaturesSelective,
-	getMoodDefiningFeatures,
-	getActivityDefiningFeatures,
 	getLogAudioFeatures,
 
-	// Presets and constants
-	MOOD_AUDIO_TARGETS,
-	ACTIVITY_AUDIO_TARGETS,
-	MOOD_DEFINING_FEATURES,
-	ACTIVITY_DEFINING_FEATURES,
+	// Constants
 	AUDIO_FEATURE_NAMES,
 	RECCOBEATS_API_BASE,
 	API_TIMEOUT_MS,

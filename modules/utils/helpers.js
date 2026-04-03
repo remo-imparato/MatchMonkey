@@ -21,8 +21,8 @@ function canonicalizeString(str) {
 
 	let s = str;
 
-	// Normalize Unicode (remove accents, weird spacing)
-	s = s.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+	// Normalize Unicode to composed form (preserves all Unicode characters)
+	s = s.normalize("NFC");
 
 	// Remove zero-width, non-breaking, control chars
 	s = s.replace(/[\u200B-\u200D\uFEFF\u00A0]/g, "");

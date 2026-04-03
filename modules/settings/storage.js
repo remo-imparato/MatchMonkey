@@ -16,6 +16,35 @@
 const SCRIPT_ID = 'MatchMonkey';
 
 /**
+ * In-memory settings cache.
+ * Populated at startup via refreshSettings() and updated directly by the
+ * options panel save(), so changes take effect immediately without a restart.
+ * Falls back to app.getValue() if not yet initialised.
+ */
+let _settingsCache = null;
+
+/**
+ * Populate (or re-populate) the in-memory cache from the persistent store.
+ * Call once at startup (after checkConfig) and whenever settings are reset.
+ */
+function refreshSettings() {
+	if (typeof app === 'undefined' || !app.getValue) return;
+	_settingsCache = Object.assign({}, app.getValue(SCRIPT_ID, {}));
+}
+
+/**
+ * Push a complete settings object directly into the cache.
+ * Used by the options panel save() so changes are visible immediately
+ * without relying on app.getValue() re-reading the updated value.
+ * @param {object} config The full settings object just written via app.setValue.
+ */
+function updateSettingsCache(config) {
+	if (config && typeof config === 'object') {
+		_settingsCache = Object.assign({}, config);
+	}
+}
+
+/**
  * Read a setting stored under this script's namespace.
  * @param {string} key Setting name.
  * @param {*} fallback Value returned when setting is missing.
@@ -26,9 +55,9 @@ function getSetting(key, fallback) {
 		return fallback;
 	}
 
-	const allSettings = app.getValue(SCRIPT_ID, {});
+	const allSettings = _settingsCache || app.getValue(SCRIPT_ID, {});
 	const val = allSettings[key];
-	
+
 	if (val === undefined || val === null) {
 		return fallback;
 	}
@@ -49,8 +78,9 @@ function setSetting(key, value) {
 	// 1. Get the current config object
 	// 2. Update the specific key
 	// 3. Save the entire object back
-	const config = app.getValue(SCRIPT_ID, {});
+	const config = _settingsCache || app.getValue(SCRIPT_ID, {});
 	config[key] = value;
+	if (_settingsCache) _settingsCache[key] = value;
 	app.setValue(SCRIPT_ID, config);
 }
 
@@ -137,4 +167,6 @@ window.matchMonkeyStorage = {
 	stringSetting,
 	boolSetting,
 	listSetting,
+	refreshSettings,
+	updateSettingsCache,
 };

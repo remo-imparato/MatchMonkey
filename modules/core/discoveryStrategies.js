@@ -655,335 +655,54 @@ async function discoverByRecco(modules, seeds, config) {
 /**
  * Mood-based discovery strategy.
  * 
- * Uses predefined audio feature profiles for different moods.
- * Does NOT require seed tracks - just searches library for tracks matching the mood profile.
+ * Delegates to the moodActivityDiscovery module which implements a hybrid
+ * Last.fm + ReccoBeats approach:
+ * 1. Find similar tracks via Last.fm
+ * 2. Match to local library
+ * 3. Filter by audio features from ReccoBeats
  * 
- * Available moods: energetic, relaxed, happy, sad, focused, angry, romantic
+ * Available moods: energetic, relaxed, happy, sad, focused, angry, romantic, uplifting, dark
  * 
  * @param {object} modules - Module dependencies
- * @param {Array} seeds - Seed objects (not used for mood discovery)
+ * @param {Array} seeds - Seed objects [{artist, title, album, genre}, ...]
  * @param {object} config - Configuration with moodActivityValue
- * @returns {Promise<Array>} Array of {artist, tracks[], audioTargets} candidates
+ * @returns {Promise<object>} { candidates, stats, libraryTracks }
  */
 async function discoverByMood(modules, seeds, config) {
-	const { ui: { notifications } } = modules;
-	const { updateProgress } = notifications;
-	const reccobeatsApi = window.matchMonkeyReccoBeatsAPI;
+	const moodActivityModule = window.matchMonkeyMoodActivityDiscovery;
 	const logger = _getLogger();
 
-	const emptyResult = { candidates: [], stats: { apiFilteredCount: 0, totalFromApi: 0 } };
-
-	if (!seeds || seeds.length === 0) {
-		logger.warn('Mood', 'No seed tracks provided');
-		return emptyResult;
+	if (!moodActivityModule) {
+		logger.error('Mood', 'MoodActivityDiscovery module not loaded');
+		return { candidates: [], stats: { apiFilteredCount: 0, totalFromApi: 0 } };
 	}
 
-	const mood = config.moodActivityValue || 'energetic';
-	logger.info('Mood', `Processing "${mood}" mood with ${seeds.length} seed track(s)`);
-	updateProgress(`Mood "${mood}": Preparing ${seeds.length} seed track(s) - requires exact metadata...`, 0.15);
-
-	// Expand seeds by splitting artists
-	seeds = expandSeedsByArtist(seeds);
-	//seeds = matchMonkeyHelpers.shuffle(seeds);
-
-	logger.debug('Mood', `After artist expansion: ${seeds.length} seed track(s)`);
-
-	const limitedSeeds = seeds.slice(0, config.seedLimit);
-
-	// Step 1: Find track IDs
-	updateProgress(`ReccoBeats: Looking up ${limitedSeeds.length} tracks (artist/album/track must match official names)...`, 0.2);
-	logger.debug('Mood', `Looking up track IDs for ${limitedSeeds.length} seeds`);
-
-	const trackResults = await reccobeatsApi.findTrackIdsBatch(limitedSeeds);
-
-	// Filter to found tracks
-	const foundTracks = trackResults.filter(r => r.trackId);
-	if (foundTracks.length === 0) {
-		logger.debug('Mood', 'No tracks found on ReccoBeats');
-		updateProgress('ReccoBeats: None of your tracks found - verify Artist, Album, and Track tags match official release names exactly', 0.3);
-		return emptyResult;
-	} else {
-		const notFound = limitedSeeds.length - foundTracks.length;
-		if (notFound > 0) {
-			updateProgress(`ReccoBeats: Found ${foundTracks.length}/${limitedSeeds.length} tracks (${notFound} missing - check tag accuracy)`, 0.25);
-		} else {
-			updateProgress(`ReccoBeats: Successfully found all ${foundTracks.length} tracks`, 0.25);
-		}
-	}
-
-	logger.debug('Mood', `Found ${foundTracks.length}/${limitedSeeds.length} tracks on ReccoBeats`);
-
-	let moodPreset = reccobeatsApi?.MOOD_AUDIO_TARGETS?.[mood.toLowerCase()];
-	let audioTargets = null;
-
-	if (!moodPreset) {
-		logger.error('Mood', `Unknown mood "${mood}"`);
-		return emptyResult;
-	}
-
-	logger.debug('Mood', `Using "${mood}" preset with blend ratio ${config.moodSeedBlend}`);
-	updateProgress(`Mood "${mood}": Analyzing audio features...`, 0.3);
-
-	const audioFeatures = await reccobeatsApi.getAudioFeatures(foundTracks);
-
-	if (!audioFeatures || audioFeatures.length === 0) {
-		updateProgress(`ReccoBeats: No audio features available for found tracks`, 0.35);
-		return emptyResult;
-	}
-
-	// Get blend ratio and defining features for this mood
-	const BLEND_RATIO = config.moodSeedBlend;
-	const ratio = Math.min(1, Math.max(0, BLEND_RATIO));
-	const definingFeatures = reccobeatsApi.getMoodDefiningFeatures(mood);
-	logger.debug('Mood', `Defining features for "${mood}": ${definingFeatures.join(', ')}`);
-
-	// Process EACH SEED INDEPENDENTLY (don't average - preserves individual acoustic signatures)
-	updateProgress(`ReccoBeats: Getting "${mood}" recommendations for ${audioFeatures.length} seeds...`, 0.4);
-	logger.debug('Mood', `Processing ${audioFeatures.length} seeds individually (no averaging)`);
-
-	const allRecommendations = [];
-
-	// Make separate recommendation calls per seed (like Acoustics mode does)
-	for (let i = 0; i < audioFeatures.length; i++) {
-		const seedFeatures = audioFeatures[i];
-		const seedTrack = foundTracks[i];
-
-		// Blend THIS seed's features with mood preset (not averaged features)
-		const audioTargets = reccobeatsApi.blendFeaturesSelective(
-			seedFeatures,
-			moodPreset,
-			ratio,
-			definingFeatures,
-			mood
-		);
-
-		const progressPercent = 0.4 + (0.15 * (i / audioFeatures.length));
-		updateProgress(`ReccoBeats: "${mood}" recommendations for seed ${i + 1}/${audioFeatures.length}...`, progressPercent);
-		logger.debug('Mood', `Seed ${i + 1}/${audioFeatures.length}: ${seedTrack.seed.artist} - ${seedTrack.seed.title}`);
-
-		const seedRecs = await reccobeatsApi.fetchRecommendations(
-			[seedTrack.trackId],
-			audioTargets,
-			config.similarLimit,
-			`mood:${mood}:seed${i}`
-		);
-
-		logger.debug('Mood', `Seed ${i + 1} returned ${seedRecs.length} recommendations`);
-		allRecommendations.push(...seedRecs);
-	}
-
-	// Deduplicate recommendations
-	const uniqueMap = new Map();
-	for (const rec of allRecommendations) {
-		const key = rec.id != null
-			? String(rec.id).toLowerCase()
-			: `${rec.artists?.[0]?.name || ''}|||${rec.trackTitle || ''}`.toLowerCase();
-		if (!uniqueMap.has(key)) {
-			uniqueMap.set(key, rec);
-		}
-	}
-
-	const recommendations = Array.from(uniqueMap.values()).slice(0, config.similarLimit);
-	logger.debug('Mood', `After dedup: ${recommendations.length} unique "${mood}" recommendations`);
-	updateProgress(`ReccoBeats: Found ${recommendations.length} unique "${mood}" recommendations`, 0.55);
-
-	let candidates = [];
-	const seenArtists = new Set();
-	const blacklist = buildBlacklist(modules);
-
-	// Pass API match threshold via __apiMinMatch
-	const seedIdRecs = {
-		"recommendations": recommendations,
-		"__apiMinMatch": config.apiMinMatch
-	};
-	const buildResult = buildReccoCandidates(seedIdRecs, blacklist, seenArtists);
-	candidates = buildResult.candidates;
-	const apiFilteredCount = buildResult.apiFilteredCount;
-
-	const totalTracks = candidates.reduce((sum, c) => sum + (c.tracks?.length || 0), 0);
-	logger.summary('Mood', `"${mood}" discovery complete`, {
-		candidates: candidates.length,
-		tracks: totalTracks,
-		filtered: apiFilteredCount
-	});
-	updateProgress(`Mood "${mood}": ${candidates.length} artists with ${totalTracks} tracks`, 0.6);
-
-	return {
-		candidates,
-		stats: {
-			apiFilteredCount,
-			totalFromApi: recommendations.length
-		}
-	};
+	return moodActivityModule.discoverByMood(modules, seeds, config);
 }
 
 /**
  * Activity-based discovery strategy.
  * 
- * Uses predefined audio feature profiles for different activities.
- * Does NOT require seed tracks - just searches library for tracks matching the activity profile.
+ * Delegates to the moodActivityDiscovery module which implements a hybrid
+ * Last.fm + ReccoBeats approach.
  * 
- * Available activities: workout, study, party, sleep, driving, meditation, cooking
+ * Available activities: workout, study, party, sleep, driving, meditation, cooking, cleaning, walking, coding
  * 
  * @param {object} modules - Module dependencies
- * @param {Array} seeds - Seed objects (not used for activity discovery)
+ * @param {Array} seeds - Seed objects [{artist, title, album, genre}, ...]
  * @param {object} config - Configuration with moodActivityValue
- * @returns {Promise<Array>} Array of {artist, tracks[], audioTargets} candidates
+ * @returns {Promise<object>} { candidates, stats, libraryTracks }
  */
 async function discoverByActivity(modules, seeds, config) {
-	const { ui: { notifications } } = modules;
-	const { updateProgress } = notifications;
-	const reccobeatsApi = window.matchMonkeyReccoBeatsAPI;
+	const moodActivityModule = window.matchMonkeyMoodActivityDiscovery;
 	const logger = _getLogger();
 
-	const emptyResult = { candidates: [], stats: { apiFilteredCount: 0, totalFromApi: 0 } };
-
-	if (!reccobeatsApi) {
-		logger.error('Activity', 'ReccoBeats API not available');
-		return emptyResult;
+	if (!moodActivityModule) {
+		logger.error('Activity', 'MoodActivityDiscovery module not loaded');
+		return { candidates: [], stats: { apiFilteredCount: 0, totalFromApi: 0 } };
 	}
 
-	if (!seeds || seeds.length === 0) {
-		logger.warn('Activity', 'No seed tracks provided');
-		return emptyResult;
-	}
-
-	const activity = config.moodActivityValue || 'workout';
-	logger.info('Activity', `Processing "${activity}" activity with ${seeds.length} seed track(s)`);
-	updateProgress(`Activity "${activity}": Preparing ${seeds.length} seed track(s) - requires exact metadata...`, 0.15);
-
-	// Expand seeds by splitting artists
-	seeds = expandSeedsByArtist(seeds);
-	//seeds = matchMonkeyHelpers.shuffle(seeds);
-
-	logger.debug('Activity', `After artist expansion: ${seeds.length} seed track(s)`);
-
-	const limitedSeeds = seeds.slice(0, config.seedLimit);
-
-	// Step 1: Find track IDs
-	updateProgress(`ReccoBeats: Looking up ${limitedSeeds.length} tracks (artist/album/track must match official names)...`, 0.2);
-	logger.debug('Activity', `Looking up track IDs for ${limitedSeeds.length} seeds`);
-
-	const trackResults = await reccobeatsApi.findTrackIdsBatch(limitedSeeds);
-
-	// Filter to found tracks
-	const foundTracks = trackResults.filter(r => r.trackId);
-	if (foundTracks.length === 0) {
-		logger.debug('Activity', 'No tracks found on ReccoBeats');
-		updateProgress('ReccoBeats: None of your tracks found - verify Artist, Album, and Track tags match official release names exactly', 0.3);
-		return emptyResult;
-	}
-
-	logger.debug('Activity', `Found ${foundTracks.length}/${limitedSeeds.length} tracks on ReccoBeats`);
-	const notFound = limitedSeeds.length - foundTracks.length;
-	if (notFound > 0) {
-		updateProgress(`ReccoBeats: Found ${foundTracks.length}/${limitedSeeds.length} tracks (${notFound} missing - check tag accuracy)`, 0.25);
-	} else {
-		updateProgress(`ReccoBeats: Successfully found all ${foundTracks.length} tracks`, 0.25);
-	}
-
-	let activityPreset = reccobeatsApi?.ACTIVITY_AUDIO_TARGETS?.[activity.toLowerCase()];
-	let audioTargets = null;
-
-	if (!activityPreset) {
-		logger.error('Activity', `Unknown activity "${activity}"`);
-		return emptyResult;
-	}
-
-	logger.debug('Activity', `Using "${activity}" preset with blend ratio ${config.moodSeedBlend}`);
-	updateProgress(`Activity "${activity}": Analyzing audio features...`, 0.3);
-
-	const audioFeatures = await reccobeatsApi.getAudioFeatures(foundTracks);
-
-	if (!audioFeatures || audioFeatures.length === 0) {
-		updateProgress(`ReccoBeats: No audio features available for found tracks`, 0.35);
-		return emptyResult;
-	}
-
-	// Get blend ratio and defining features for this activity
-	const BLEND_RATIO = config.moodSeedBlend;
-	const ratio = Math.min(1, Math.max(0, BLEND_RATIO));
-	const definingFeatures = reccobeatsApi.getActivityDefiningFeatures(activity);
-	logger.debug('Activity', `Defining features for "${activity}": ${definingFeatures.join(', ')}`);
-
-	// Process EACH SEED INDEPENDENTLY (don't average - preserves individual acoustic signatures)
-	updateProgress(`ReccoBeats: Getting "${activity}" recommendations for ${audioFeatures.length} seeds...`, 0.4);
-	logger.debug('Activity', `Processing ${audioFeatures.length} seeds individually (no averaging)`);
-
-	const allRecommendations = [];
-
-	// Make separate recommendation calls per seed (like Acoustics mode does)
-	for (let i = 0; i < audioFeatures.length; i++) {
-		const seedFeatures = audioFeatures[i];
-		const seedTrack = foundTracks[i];
-
-		// Blend THIS seed's features with activity preset (not averaged features)
-		const audioTargets = reccobeatsApi.blendFeaturesSelective(
-			seedFeatures,
-			activityPreset,
-			ratio,
-			definingFeatures,
-			activity
-		);
-
-		const progressPercent = 0.4 + (0.15 * (i / audioFeatures.length));
-		updateProgress(`ReccoBeats: "${activity}" recommendations for seed ${i + 1}/${audioFeatures.length}...`, progressPercent);
-		logger.debug('Activity', `Seed ${i + 1}/${audioFeatures.length}: ${seedTrack.seed.artist} - ${seedTrack.seed.title}`);
-
-		const seedRecs = await reccobeatsApi.fetchRecommendations(
-			[seedTrack.trackId],
-			audioTargets,
-			config.similarLimit,
-			`activity:${activity}:seed${i}`
-		);
-
-		logger.debug('Activity', `Seed ${i + 1} returned ${seedRecs.length} recommendations`);
-		allRecommendations.push(...seedRecs);
-	}
-
-	// Deduplicate recommendations
-	const uniqueMap = new Map();
-	for (const rec of allRecommendations) {
-		const key = rec.id != null
-			? String(rec.id).toLowerCase()
-			: `${rec.artists?.[0]?.name || ''}|||${rec.trackTitle || ''}`.toLowerCase();
-		if (!uniqueMap.has(key)) {
-			uniqueMap.set(key, rec);
-		}
-	}
-
-	const recommendations = Array.from(uniqueMap.values()).slice(0, config.similarLimit);
-	logger.debug('Activity', `After dedup: ${recommendations.length} unique "${activity}" recommendations`);
-	updateProgress(`ReccoBeats: Found ${recommendations.length} unique "${activity}" recommendations`, 0.55);
-
-	let candidates = [];
-	const seenArtists = new Set();
-	const blacklist = buildBlacklist(modules);
-
-	// Pass API match threshold via __apiMinMatch
-	const seedIdRecs = {
-		"recommendations": recommendations,
-		"__apiMinMatch": config.apiMinMatch
-	};
-	const buildResult = buildReccoCandidates(seedIdRecs, blacklist, seenArtists);
-	candidates = buildResult.candidates;
-	const apiFilteredCount = buildResult.apiFilteredCount;
-
-	const totalTracks = candidates.reduce((sum, c) => sum + (c.tracks?.length || 0), 0);
-	logger.summary('Activity', `"${activity}" discovery complete`, {
-		candidates: candidates.length,
-		tracks: totalTracks,
-		filtered: apiFilteredCount
-	});
-	updateProgress(`Activity "${activity}": ${candidates.length} artists with ${totalTracks} tracks`, 0.6);
-
-	return {
-		candidates,
-		stats: {
-			apiFilteredCount,
-			totalFromApi: recommendations.length
-		}
-	};
+	return moodActivityModule.discoverByActivity(modules, seeds, config);
 }
 
 // ============================================================================

@@ -135,7 +135,7 @@ async function findLibraryTracks(artistName, trackTitles, limit = 100, options =
 			const titles = Array.isArray(trackTitles) ? trackTitles : [trackTitles];
 			const nonEmpty = titles.map(t => String(t || '').trim()).filter(Boolean);
 			if (!nonEmpty.length) return '';
-			const conds = nonEmpty.map(t => `UPPER(Songs.SongTitle) LIKE '%${escapeSql(t.toUpperCase())}%'`);
+			const conds = nonEmpty.map(t => `(UPPER(Songs.SongTitle) LIKE '%${escapeSql(t.toUpperCase())}%' OR Songs.SongTitle LIKE '%${escapeSql(t)}%')`);
 			return `(${conds.join(' OR ')})`;
 		})();
 
@@ -193,9 +193,13 @@ async function findLibraryTracks(artistName, trackTitles, limit = 100, options =
 				`;
 		}
 
+		// Log SQL query in debug mode
+		logger?.debug('Library', `findLibraryTracks SQL: ${query.replace(/\s+/g, ' ').trim()}`);
+
 		// Execute query via MM5 API
 		const tracklist = app.db.getTracklist(query, -1);
-		if (!tracklist) return [];
+		if (!tracklist)
+			return [];
 
 		await tracklist.whenLoaded();
 
@@ -287,7 +291,7 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 		const quote = (s) => `'${escapeSql(s)}'`;
 
 		// Prepare requested titles with normalized variants for fuzzy matching
-		const stripName = window.stripName || ((s) => s.toUpperCase().replace(/\W/g, ''));
+		const stripName = window.stripName || ((s) => s.toUpperCase().replace(/[^\p{L}\p{N}]/gu, ''));
 		const wanted = trackTitles
 			.map((t, idx) => {
 				const raw = String(t || '').trim();
@@ -349,7 +353,7 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 		// Build WHERE clause
 		const whereParts = [];
 		if (artistClause) whereParts.push(artistClause);
-		whereParts.push(`(UPPER(Songs.SongTitle) = Wanted.RawUpper OR ${songTitleNormExpr} = Wanted.Norm)`);
+		whereParts.push(`(UPPER(Songs.SongTitle) = Wanted.RawUpper OR ${songTitleNormExpr} = Wanted.Norm OR Songs.SongTitle = Wanted.Raw)`);
 
 		if (ratingThreshold > 0) {
 			if (allowUnknown) {
@@ -377,7 +381,7 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 					  FROM Songs
 					INNER JOIN ArtistsSongs ON Songs.ID = ArtistsSongs.IDSong AND ArtistsSongs.PersonType = 1
 					INNER JOIN Artists ON ArtistsSongs.IDArtist = Artists.ID
-					INNER JOIN Wanted ON (UPPER(Songs.SongTitle) = Wanted.RawUpper OR ${songTitleNormExpr} = Wanted.Norm)
+					INNER JOIN Wanted ON (UPPER(Songs.SongTitle) = Wanted.RawUpper OR ${songTitleNormExpr} = Wanted.Norm OR Songs.SongTitle = Wanted.Raw)
 					WHERE ${whereParts.join(' AND ')}
 					${orderClause}
 					LIMIT ${Math.max(1, Math.min(limit * wanted.length, 10000))}
