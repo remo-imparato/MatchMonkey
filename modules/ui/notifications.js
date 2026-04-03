@@ -7,6 +7,9 @@
 
 'use strict';
 
+/** Helper to get logger instance safely */
+const _getNotifyLogger = () => window.matchMonkeyLogger;
+
 /**
  * Global progress task reference for use across functions.
  * Set during long-running operations, cleared on completion.
@@ -20,20 +23,21 @@ let globalProgressTask = null;
  * @param {string|object} [options] Toast options ('info', 'success', 'error', 'warning') or options object.
  */
 function showToast(text, options = {}) {
+	const logger = _getNotifyLogger();
 	try {
 		// Normalize options - if string, treat as type
 		const opts = typeof options === 'string' ? { type: options } : options;
-		
+
 		// Use MM5's toastMessage API
 		if (typeof uitools !== 'undefined' && uitools?.toastMessage?.show) {
 			uitools.toastMessage.show(text, opts);
 			return;
 		}
-		
-		// Fallback to console log
-		console.log('Match Monkey: ' + text);
+
+		// Fallback to logger
+		logger?.info('Notifications', text);
 	} catch (e) {
-		console.error('Match Monkey: showToast error: ' + e.toString());
+		logger?.error('Notifications', 'showToast error: ' + e.toString());
 	}
 }
 
@@ -51,7 +55,8 @@ function updateProgress(message, value) {
 				globalProgressTask.value = Math.max(0, Math.min(1, value));
 			}
 		} catch (e) {
-			console.error('Match Monkey: updateProgress error: ' + e.toString());
+			const logger = _getNotifyLogger();
+			logger?.error('Notifications', 'updateProgress error: ' + e.toString());
 		}
 	}
 }
@@ -63,6 +68,7 @@ function updateProgress(message, value) {
  * @returns {string|null} Task ID for reference, or null if not available.
  */
 function createProgressTask(leadingText) {
+	const logger = _getNotifyLogger();
 	try {
 		if (typeof app !== 'undefined' && app.backgroundTasks?.createNew) {
 			const progressTask = app.backgroundTasks.createNew();
@@ -70,11 +76,11 @@ function createProgressTask(leadingText) {
 			progressTask.text = 'Starting...';
 			progressTask.value = 0;
 			globalProgressTask = progressTask;
-			console.log('Match Monkey: Progress task created');
+			logger?.debug('Notifications', 'Progress task created');
 			return progressTask.id || 'active';
 		}
 	} catch (e) {
-		console.error('Match Monkey: createProgressTask error: ' + e.toString());
+		logger?.error('Notifications', 'createProgressTask error: ' + e.toString());
 	}
 	return null;
 }
@@ -88,7 +94,8 @@ function terminateProgressTask(taskId) {
 		try {
 			globalProgressTask.terminate();
 		} catch (e) {
-			console.error('Match Monkey: Error terminating progress task: ' + e.toString());
+			const logger = _getNotifyLogger();
+			logger?.error('Notifications', 'Error terminating progress task: ' + e.toString());
 		}
 		globalProgressTask = null;
 	}
@@ -107,7 +114,8 @@ function terminateProgressTaskAfterDelay(delay = 2000) {
 					terminateProgressTask();
 				}
 			} catch (e) {
-				console.error('Match Monkey: Error in delayed termination: ' + e.toString());
+				const logger = _getNotifyLogger();
+				logger?.error('Notifications', 'Error in delayed termination: ' + e.toString());
 			}
 		}, delay);
 	}

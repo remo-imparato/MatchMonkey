@@ -77,10 +77,11 @@ window.matchMonkeyOrchestration = {
 		const { showToast, updateProgress, createProgressTask, terminateProgressTask } = notifications;
 		const { formatError, shuffle: shuffleUtil, shuffleWithDispersion } = helpers;
 
-		// Get discovery strategies
+		// Get logger and discovery strategies
+		const logger = window.matchMonkeyLogger;
 		const strategies = window.matchMonkeyDiscoveryStrategies;
 		if (!strategies) {
-			console.error('Match Monkey: Discovery strategies module not loaded');
+			logger.error('Init', 'Discovery strategies module not loaded');
 			showToast('Add-on error: Discovery strategies not loaded', { type: 'error', duration: 5000 });
 			return { success: false, error: 'Discovery strategies not loaded', tracksAdded: 0 };
 		}
@@ -97,7 +98,7 @@ window.matchMonkeyOrchestration = {
 			const modeName = strategies.getDiscoveryModeName(discoveryMode);
 			taskId = createProgressTask(`MatchMonkey - ${modeName}`);
 			updateProgress(`Preparing ${modeName} discovery...`, 0);
-			console.log(`Match Monkey: === Starting ${modeName} Discovery (auto=${autoMode}) ===`);
+			logger.info('Workflow', `=== Starting ${modeName} Discovery (auto=${autoMode}) ===`);
 
 			// Validate environment
 			if (typeof app === 'undefined' || !app.player) {
@@ -116,7 +117,7 @@ window.matchMonkeyOrchestration = {
 					totalLimit: intSetting('AutoModeMaxTracks', 30),
 					includeSeedArtist: boolSetting('IncludeSeedArtist', true),
 					rankEnabled: boolSetting('UseLastfmRanking', true),
-					bestEnabled: boolSetting('PreferHighQuality', true),
+					formatPreference: stringSetting('AudioFormatPreference', 'Mixed (all formats)'),
 					randomize: true,
 					showConfirm: false,
 					minRating: intSetting('AutoModeMinRating', 0),
@@ -124,7 +125,7 @@ window.matchMonkeyOrchestration = {
 					autoMode: true,
 					discoveryMode,
 				};
-				console.log(`Match Monkey Auto-Mode: Rating filter - minRating=${config_.minRating}, allowUnknown=${config_.allowUnknown}`);
+				logger.debug('Config', `Auto-Mode: minRating=${config_.minRating}, allowUnknown=${config_.allowUnknown}`);
 			} else {
 				const maxTracks = intSetting('MaxPlaylistTracks', 0);
 
@@ -132,11 +133,11 @@ window.matchMonkeyOrchestration = {
 					seedLimit: intSetting('SimilarArtistsLimit', 20),
 					similarLimit: intSetting('SimilarArtistsLimit', 20),
 					trackSimilarLimit: intSetting('TrackSimilarLimit', 100),
-					tracksPerArtist: intSetting('TracksPerArtist', 30),
+					tracksPerArtist: intSetting('TracksPerArtist', 10000), // High limit for manual mode (capped at 10k by database)
 					totalLimit: maxTracks > 0 ? maxTracks : 100000,
 					includeSeedArtist: boolSetting('IncludeSeedArtist', true),
 					rankEnabled: boolSetting('UseLastfmRanking', true),
-					bestEnabled: boolSetting('PreferHighQuality', true),
+					formatPreference: stringSetting('AudioFormatPreference', 'Mixed (all formats)'),
 					randomize: boolSetting('ShuffleResults', true),
 					showConfirm: boolSetting('ShowConfirmDialog', false),
 					minRating: intSetting('MinRating', 0),
@@ -144,18 +145,24 @@ window.matchMonkeyOrchestration = {
 					autoMode: false,
 					discoveryMode,
 				};
-				console.log(`Match Monkey Manual-Mode: Rating filter - minRating=${config_.minRating}, allowUnknown=${config_.allowUnknown}`);
+				logger.debug('Config', `Manual-Mode: minRating=${config_.minRating}, allowUnknown=${config_.allowUnknown}`);
 			}
 
-			// Read additional user settings: local collection and API threshold (common for both modes)
+			// Read additional user settings
 			try {
 				config_.localCollection = stringSetting('LocalCollection', '');
 				// ApiMinMatch: single threshold for both Last.fm match and ReccoBeats popularity (0.00-99.99%)
-				const apiMatch = parseFloat(String(getSetting('ApiMinMatch') ?? '40')) || 40.0;
+				// Treat blank, null, undefined, or 0 as "no filtering" (disabled)
+				const rawApiMatch = getSetting('ApiMinMatch');
+				let apiMatch = 0;
+				if (rawApiMatch !== null && rawApiMatch !== undefined && rawApiMatch !== '') {
+					apiMatch = parseFloat(String(rawApiMatch));
+					if (isNaN(apiMatch)) apiMatch = 0;
+				}
 				config_.apiMinMatch = Math.max(0, Math.min(99.99, Math.round(apiMatch * 100) / 100));
-				console.log(`Match Monkey: Settings - localCollection='${config_.localCollection}', apiMinMatch=${config_.apiMinMatch}%`);
+				logger.debug('Config', `localCollection='${config_.localCollection}', apiMinMatch=${config_.apiMinMatch === 0 ? 'disabled' : config_.apiMinMatch + '%'}`);
 			} catch (e) {
-				console.warn('Match Monkey: Failed to read additional settings:', e.message);
+				logger.warn('Config', `Failed to read additional settings: ${e.message}`);
 			}
 
 			// Add mood/activity context if present
@@ -163,12 +170,12 @@ window.matchMonkeyOrchestration = {
 				// Context explicitly provided
 				config_.moodActivityContext = _moodActivityContext.context;
 				config_.moodActivityValue = _moodActivityContext.value;
-				config_.moodSeedBlend = getSetting("MoodActivityBlendRatio", 0.5);
-				console.log(`Match Monkey: Using ${config_.moodActivityContext} "${config_.moodActivityValue}" (blend: ${config_.moodSeedBlend})`);
+				config_.moodSeedBlend = getSetting("MoodActivityBlendRatio", 0.3);
+				logger.info('Config', `Using ${config_.moodActivityContext} "${config_.moodActivityValue}" (blend: ${config_.moodSeedBlend})`);
 			}
 
 			// Log configuration summary
-			console.log(`Match Monkey: Config - seedLimit=${config_.seedLimit}, similarLimit=${config_.similarLimit}, tracksPerArtist=${config_.tracksPerArtist}`);
+			logger.info('Config', `seedLimit=${config_.seedLimit}, similarLimit=${config_.similarLimit}, tracksPerArtist=${config_.tracksPerArtist}`);
 
 			// Step 1: Collect seed tracks
 			let seeds = [];
@@ -179,7 +186,7 @@ window.matchMonkeyOrchestration = {
 
 				// In auto-mode, collect seeds from Now Playing queue
 				if (autoMode) {
-					console.log(`Match Monkey Auto-Mode: Using Now Playing queue for seeds (threshold=${autoModeThreshold})`);
+					logger.debug('Seeds', `Using Now Playing queue (threshold=${autoModeThreshold})`);
 					seeds = await this.collectAutoModeSeedsFromQueue(modules, autoModeThreshold);
 				} else {
 					// Manual mode: use selection or current track
@@ -190,21 +197,21 @@ window.matchMonkeyOrchestration = {
 					terminateProgressTask(taskId);
 					const modeMsg = autoMode ? 'No tracks in Now Playing queue.' : 'Select tracks or play something first.';
 					showToast(`No seed tracks found. ${modeMsg}`, { type: 'warning', duration: 5000 });
-					console.log('Match Monkey: No seed tracks found, exiting');
+					logger.info('Seeds', 'No seed tracks found, exiting');
 					return { success: false, error: 'No seed tracks found.', tracksAdded: 0 };
 				}
 
-				console.log(`Match Monkey: Collected ${seeds.length} seed track(s)`);
+				logger.info('Seeds', `Collected ${seeds.length} seed track(s)`);
 				updateProgress(`Found ${seeds.length} seed track(s)`, 0.1);
 			} else {
 				// Mood/Activity modes don't need seeds
-				console.log(`Match Monkey: ${discoveryMode} mode - no seeds required`);
+				logger.info('Seeds', `${discoveryMode} mode - no seeds required`);
 				updateProgress(`Starting ${modeName} discovery...`, 0.1);
 			}
 
 			// Step 2: Run discovery strategy
 			updateProgress(`Contacting ${modeName} service...`, 0.15);
-			console.log(`Match Monkey: === Phase 1: Discovery via ${modeName} ===`);
+			logger.info('Discovery', `=== Phase 1: ${modeName} ===`);
 
 			const discoveryFn = strategies.getDiscoveryStrategy(discoveryMode);
 			let candidates;
@@ -216,7 +223,7 @@ window.matchMonkeyOrchestration = {
 				candidates = discoveryResult.candidates || discoveryResult;
 				discoveryStats = discoveryResult.stats || { apiFilteredCount: 0, totalFromApi: 0 };
 			} catch (discoveryError) {
-				console.error(`Match Monkey: Discovery error:`, discoveryError);
+				logger.error('Discovery', 'Discovery failed', discoveryError);
 				terminateProgressTask(taskId);
 				showToast(`Discovery failed: ${formatError(discoveryError)}`, { type: 'error', duration: 5000 });
 				return { success: false, error: formatError(discoveryError), tracksAdded: 0 };
@@ -237,16 +244,16 @@ window.matchMonkeyOrchestration = {
 				}
 
 				showToast(`${errorMsg}${guidance}`, { type: 'info', duration: 7000 });
-				console.log(`Match Monkey: Discovery returned no candidates`);
+				logger.info('Discovery', 'Discovery returned no candidates');
 				return { success: false, error: `No ${modeName} found.`, tracksAdded: 0 };
 			}
 
-			console.log(`Match Monkey: Discovery found ${candidates.length} candidate(s) (${discoveryStats.apiFilteredCount} filtered by API threshold)`);
+			logger.info('Discovery', `Found ${candidates.length} candidates (${discoveryStats.apiFilteredCount} filtered by API threshold)`);
 			updateProgress(`Found ${candidates.length} candidate(s)`, 0.5);
 
 			// Step 3: Match candidates to local library
 			updateProgress(`Searching your music library...`, 0.55);
-			console.log(`Match Monkey: === Phase 2: Library Matching ===`);
+			logger.info('Library', `=== Phase 2: Library Matching ===`);
 
 			// Step 3: Match candidates to local library
 			let results;
@@ -268,7 +275,7 @@ window.matchMonkeyOrchestration = {
 					matchStats = matchResult.stats;
 				}
 			} catch (matchError) {
-				console.error(`Match Monkey: Library matching error:`, matchError);
+				logger.error('Library', 'Library matching error', matchError);
 				terminateProgressTask(taskId);
 				showToast(`Library search failed: ${formatError(matchError)}`, { type: 'error', duration: 5000 });
 				return { success: false, error: formatError(matchError), tracksAdded: 0 };
@@ -277,14 +284,15 @@ window.matchMonkeyOrchestration = {
 			if (!results || results.length === 0) {
 				terminateProgressTask(taskId);
 				showToast(`No matching tracks found in your library. Try different seeds or adjust filters.`, { type: 'info', duration: 5000 });
-				console.log(`Match Monkey: No tracks matched in library`);
+				logger.info('Library', 'No tracks matched in library');
 				return { success: false, error: 'No matching tracks found.', tracksAdded: 0 };
 			}
 
-			console.log(`Match Monkey: Library matching found ${results.length} track(s)`);
+			logger.info('Library', `Found ${results.length} matching track(s)`);
 			updateProgress(`Found ${results.length} matching track(s)`, 0.8);
 
 			// Step 4: Remove duplicates based on artist + title
+			// When duplicates exist (e.g., MP3 and FLAC versions), prefer higher quality formats
 			updateProgress(`Removing duplicates...`, 0.82);
 			const makeDupKey = (t) => {
 				if (!t) return '';
@@ -299,24 +307,68 @@ window.matchMonkeyOrchestration = {
 				return `${artist.toUpperCase()}||${title.toUpperCase()}`;
 			};
 
-			const seenDuplicates = new Set();
-			const dedupedResults = [];
+			// Helper to determine audio quality priority (higher number = better quality)
+			const getFormatPriority = (track) => {
+				if (!track) return 0;
+				const ext = (track.fileExtension || track.FileExtension || '').toLowerCase().replace('.', '');
+				const type = (track.fileType || track.FileType || '').toLowerCase();
+
+				// Lossless formats get highest priority
+				if (ext === 'flac' || type === 'flac') return 100;
+				if (ext === 'ape' || type === 'ape') return 95;
+				if (ext === 'wav' || type === 'wav') return 90;
+				if (ext === 'alac' || ext === 'm4a' || type === 'alac') return 85;
+				if (ext === 'wv' || type === 'wavpack') return 80;
+
+				// High bitrate lossy formats
+				if (ext === 'mp3' || type === 'mp3') {
+					const bitrate = track.bitrate || track.Bitrate || 0;
+					if (bitrate >= 320) return 70;
+					if (bitrate >= 256) return 65;
+					if (bitrate >= 192) return 60;
+					return 50;
+				}
+
+				// Other lossy formats
+				if (ext === 'ogg' || type === 'ogg') return 55;
+				if (ext === 'wma' || type === 'wma') return 45;
+				if (ext === 'aac' || type === 'aac') return 52;
+
+				return 0;
+			};
+
+			const duplicateMap = new Map();
 			for (const track of results) {
 				const dupKey = makeDupKey(track);
-				if (dupKey && !seenDuplicates.has(dupKey)) {
-					seenDuplicates.add(dupKey);
-					dedupedResults.push(track);
-				}
-			}
+				if (!dupKey) continue;
 
-			console.log(`Match Monkey: Removed ${results.length - dedupedResults.length} duplicates, ${dedupedResults.length} unique tracks remain`);
-			updateProgress(`Removed ${results.length - dedupedResults.length} duplicates → ${dedupedResults.length} unique tracks`, 0.83);
+				const existing = duplicateMap.get(dupKey);
+				if (!existing) {
+					duplicateMap.set(dupKey, track);
+				} else {
+					// Compare quality - keep the higher quality version
+					const existingPriority = getFormatPriority(existing);
+					const newPriority = getFormatPriority(track);
+
+							if (newPriority > existingPriority) {
+								duplicateMap.set(dupKey, track);
+								const existingExt = (existing.fileExtension || existing.FileExtension || 'unknown').toUpperCase();
+								const newExt = (track.fileExtension || track.FileExtension || 'unknown').toUpperCase();
+								logger.debug('Dedup', `Preferring ${newExt} over ${existingExt} for "${makeDupKey(track).replace('||', ' - ')}"`);
+							}
+						}
+					}
+
+					const dedupedResults = Array.from(duplicateMap.values());
+
+					logger.info('Dedup', `Removed ${results.length - dedupedResults.length} duplicates, ${dedupedResults.length} unique tracks remain`);
+					updateProgress(`Removed ${results.length - dedupedResults.length} duplicates → ${dedupedResults.length} unique tracks`, 0.83);
 
 			// Step 5: Include seed tracks if enabled (before shuffling)
 			// When IncludeSeedArtist is true, we also include the actual seed tracks
 			if (config_.includeSeedArtist && seeds.length > 0) {
 				updateProgress(`Including seed tracks...`, 0.84);
-				console.log(`Match Monkey: Including ${seeds.length} seed track(s) in results`);
+				logger.debug('Seeds', `Including ${seeds.length} seed track(s) in results`);
 
 				const seedTracksToAdd = [];
 				const existingKeys = new Set();
@@ -338,7 +390,7 @@ window.matchMonkeyOrchestration = {
 							seed.title,
 							1, // Only need one match
 							{
-								best: config_.bestEnabled,
+								formatPreference: config_.formatPreference,
 								minRating: 0, // Don't filter seed tracks by rating
 								allowUnknown: true,
 								collection: config_.localCollection || ''
@@ -353,17 +405,17 @@ window.matchMonkeyOrchestration = {
 							if (key && !existingKeys.has(key)) {
 								existingKeys.add(key);
 								seedTracksToAdd.push(foundTrack);
-								console.log(`Match Monkey: Added seed track "${seed.artist} - ${seed.title}"`);
+								logger.debug('Seeds', `Added seed track "${seed.artist} - ${seed.title}"`);
 							}
 						}
 					} catch (e) {
-						console.warn(`Match Monkey: Could not find seed track "${seed.artist} - ${seed.title}":`, e.message);
+						logger.warn('Seeds', `Could not find seed track "${seed.artist} - ${seed.title}": ${e.message}`);
 					}
 				}
 
 				// Add seed tracks to results (will be shuffled together with other tracks if shuffle is enabled)
 				if (seedTracksToAdd.length > 0) {
-					console.log(`Match Monkey: Adding ${seedTracksToAdd.length} seed track(s) to results pool`);
+					logger.debug('Seeds', `Adding ${seedTracksToAdd.length} seed track(s) to results pool`);
 					dedupedResults.push(...seedTracksToAdd);
 					updateProgress(`Added ${seedTracksToAdd.length} seed track(s) to results`, 0.85);
 				}
@@ -371,7 +423,7 @@ window.matchMonkeyOrchestration = {
 
 			// Step 6: Apply randomization if enabled (after adding seed tracks)
 			if (config_.randomize) {
-				console.log(`Match Monkey: Dispersing and randomizing ${dedupedResults.length} results to avoid artist clustering`);
+				logger.debug('Shuffle', `Dispersing and randomizing ${dedupedResults.length} results to avoid artist clustering`);
 				updateProgress(`Shuffling ${dedupedResults.length} tracks...`, 0.86);
 
 				// Use enhanced shuffle that disperses tracks from the same artist/album
@@ -380,7 +432,7 @@ window.matchMonkeyOrchestration = {
 				dedupedResults.length = 0;
 				dedupedResults.push(...shuffled);
 
-				console.log(`Match Monkey: Shuffle complete - tracks dispersed across artists`);
+				logger.debug('Shuffle', 'Shuffle complete - tracks dispersed across artists');
 				updateProgress(`Shuffled ${dedupedResults.length} tracks`, 0.87);
 			}
 
@@ -390,18 +442,18 @@ window.matchMonkeyOrchestration = {
 				: dedupedResults;
 
 			if (finalResults.length < dedupedResults.length) {
-				console.log(`Match Monkey: Applied limit: ${dedupedResults.length} → ${finalResults.length} tracks`);
+				logger.info('Output', `Applied limit: ${dedupedResults.length} → ${finalResults.length} tracks`);
 				updateProgress(`Applied limit: ${finalResults.length} of ${dedupedResults.length} tracks`, 0.88);
 			}
 
-			console.log(`Match Monkey: Final track count: ${finalResults.length}`);
+			logger.info('Output', `Final track count: ${finalResults.length}`);
 
 			// Step 6: Output results
 			const enqueueEnabled = boolSetting('EnqueueMode', false);
 			const outputMode = config_.autoMode || enqueueEnabled ? 'queue' : 'playlist';
 
 			updateProgress(`Adding ${finalResults.length} track(s) to ${outputMode}...`, 0.9);
-			console.log(`Match Monkey: === Phase 3: Output (${outputMode}) ===`);
+			logger.info('Output', `=== Phase 3: Output (${outputMode}) ===`);
 
 			let output;
 
@@ -417,7 +469,7 @@ window.matchMonkeyOrchestration = {
 					output = await this.buildResultsPlaylist(modules, finalResults, config_);
 				}
 			} catch (outputError) {
-				console.error(`Match Monkey: Output error:`, outputError);
+				logger.error('Output', 'Output error', outputError);
 				terminateProgressTask(taskId);
 				showToast(`Failed to create ${outputMode}: ${formatError(outputError)}`, { type: 'error', duration: 5000 });
 				return { success: false, error: formatError(outputError), tracksAdded: 0 };
@@ -428,7 +480,7 @@ window.matchMonkeyOrchestration = {
 			const actualTracksAdded = output?.added ?? output?.trackCount ?? finalResults.length;
 
 			updateProgress(`Complete! Added ${actualTracksAdded} track(s)`, 1.0);
-			console.log(`Match Monkey: === Complete! ${actualTracksAdded} tracks in ${elapsed}s ===`);
+			logger.info('Workflow', `=== Complete! ${actualTracksAdded} tracks in ${elapsed}s ===`);
 
 			terminateProgressTask(taskId);
 			cache?.clear?.();
@@ -442,17 +494,8 @@ window.matchMonkeyOrchestration = {
 				totalFromApi: discoveryStats?.totalFromApi || 0
 			};
 
-			// Log comprehensive stats to console
-			console.log(`Match Monkey: User feedback - ${statsBreakdown.added} tracks added`);
-			if (statsBreakdown.notInLibrary > 0) {
-				console.log(`Match Monkey: User feedback - ${statsBreakdown.notInLibrary} recommendations were not found in library`);
-			}
-			if (statsBreakdown.filteredByRating > 0) {
-				console.log(`Match Monkey: User feedback - ${statsBreakdown.filteredByRating} recommendations were skipped (below minRating ${config_.minRating})`);
-			}
-			if (statsBreakdown.apiFiltered > 0) {
-				console.log(`Match Monkey: User feedback - ${statsBreakdown.apiFiltered} recommendations were skipped (below ${config_.apiMinMatch}% API threshold)`);
-			}
+			// Log comprehensive stats using logger.summary
+			logger.summary('Stats', 'Run complete', statsBreakdown);
 
 			// Build success message with stats breakdown
 			let successMsg = `Successfully added ${actualTracksAdded} ${modeName} track(s) in ${elapsed}s`;
@@ -481,7 +524,7 @@ window.matchMonkeyOrchestration = {
 			};
 
 		} catch (e) {
-			console.error('Match Monkey: Unexpected error:', e);
+			logger.error('Workflow', 'Unexpected error', e);
 			terminateProgressTask(taskId);
 			cache?.clear?.();
 			showToast(`Error: ${formatError(e)}`, { type: 'error', duration: 5000 });
@@ -509,7 +552,7 @@ window.matchMonkeyOrchestration = {
 					selectedList = uitools.getSelectedTracklist();
 				}
 			} catch (e) {
-				console.log('collectSeedTracks: Could not get selected tracklist: ' + e.toString());
+				window.matchMonkeyLogger?.debug('Seeds', 'Could not get selected tracklist: ' + e.toString());
 			}
 
 			if (selectedList) {
@@ -533,7 +576,7 @@ window.matchMonkeyOrchestration = {
 						});
 					}
 				} catch (e) {
-					console.error('collectSeedTracks: Error iterating selection: ' + e.toString());
+					window.matchMonkeyLogger?.error('Seeds', 'Error iterating selection: ' + e.toString());
 				}
 			}
 
@@ -561,12 +604,12 @@ window.matchMonkeyOrchestration = {
 						});
 					}
 				} catch (e) {
-					console.warn('Match Monkey: Failed to get current track:', e);
+					window.matchMonkeyLogger?.warn('Seeds', 'Failed to get current track: ' + e.message);
 				}
 			}
 
 		} catch (e) {
-			console.error('Match Monkey: Error collecting seeds:', e);
+			window.matchMonkeyLogger?.error('Seeds', 'Error collecting seeds', e);
 		}
 
 		// Final cleanup
@@ -584,51 +627,51 @@ window.matchMonkeyOrchestration = {
 	async collectAutoModeSeedsFromQueue(modules, threshold) {
 		const seeds = [];
 
+		const logger = window.matchMonkeyLogger;
+
 		try {
-			if (!app.player) {
-				console.warn('collectAutoModeSeedsFromQueue: Player not available');
-				return seeds;
-			}
-
-			// Get Now Playing tracklist
-			const tracklist = (typeof app.player.getTracklist === 'function')
-				? app.player.getTracklist()
-				: null;
-
-			if (!tracklist) {
-				console.warn('collectAutoModeSeedsFromQueue: Now Playing tracklist not available');
-				return seeds;
-			}
-
-			// Wait for tracklist to load
-			if (typeof tracklist.whenLoaded === 'function') {
-				await tracklist.whenLoaded();
-			}
-
-			// Get index of the currently playing track
-			let currentIndex = -1;
-			try {
-				if (typeof app.player.getIndexOfPlayingTrack === 'function') {
-					currentIndex = app.player.getIndexOfPlayingTrack(tracklist);
+				if (!app.player) {
+					logger?.warn('AutoMode', 'Player not available');
+					return seeds;
 				}
-			} catch (e) {
-				console.warn('collectAutoModeSeedsFromQueue: Could not get playing index:', e);
-			}
 
-			if (currentIndex == null || currentIndex < 0) {
-				console.warn('collectAutoModeSeedsFromQueue: Invalid playing index');
-				return seeds;
-			}
+				// Get Now Playing tracklist
+				const tracklist = (typeof app.player.getTracklist === 'function')
+					? app.player.getTracklist()
+					: null;
 
-			const totalTracks = tracklist.count || 0;
-			const seedCount = threshold;
+				if (!tracklist) {
+					logger?.warn('AutoMode', 'Now Playing tracklist not available');
+					return seeds;
+				}
 
-			const startIndex = currentIndex;
-			const endIndex = Math.min(startIndex + seedCount, totalTracks);
+				// Wait for tracklist to load
+				if (typeof tracklist.whenLoaded === 'function') {
+					await tracklist.whenLoaded();
+				}
 
-			console.log(
-				`Match Monkey Auto-Mode: Collecting seeds from Now Playing (playing=${currentIndex}, total=${totalTracks}, collecting ${endIndex - startIndex} tracks)`
-			);
+				// Get index of the currently playing track
+				let currentIndex = -1;
+				try {
+					if (typeof app.player.getIndexOfPlayingTrack === 'function') {
+						currentIndex = app.player.getIndexOfPlayingTrack(tracklist);
+					}
+				} catch (e) {
+					logger?.warn('AutoMode', 'Could not get playing index: ' + e.message);
+				}
+
+				if (currentIndex == null || currentIndex < 0) {
+					logger?.warn('AutoMode', 'Invalid playing index');
+					return seeds;
+				}
+
+				const totalTracks = tracklist.count || 0;
+				const seedCount = threshold;
+
+				const startIndex = currentIndex;
+				const endIndex = Math.min(startIndex + seedCount, totalTracks);
+
+				logger?.debug('AutoMode', `Collecting seeds from Now Playing (playing=${currentIndex}, total=${totalTracks}, collecting ${endIndex - startIndex} tracks)`);
 
 			// Extract tracks
 			if (typeof tracklist.locked === 'function') {
@@ -649,10 +692,10 @@ window.matchMonkeyOrchestration = {
 				});
 			}
 
-			console.log(`Match Monkey Auto-Mode: Collected ${seeds.length} seeds from Now Playing queue`);
+			logger?.info('AutoMode', `Collected ${seeds.length} seeds from Now Playing queue`);
 
 		} catch (e) {
-			console.error('Match Monkey Auto-Mode: Error collecting seeds from queue:', e);
+			logger?.error('AutoMode', 'Error collecting seeds from queue', e);
 		}
 
 		return seeds.filter(s => s.artist && s.artist.trim().length > 0);
@@ -669,19 +712,20 @@ window.matchMonkeyOrchestration = {
 	async matchCandidatesToLibrary(modules, candidates, config) {
 		const { db, ui: { notifications } } = modules;
 		const { updateProgress } = notifications;
+		const logger = window.matchMonkeyLogger;
 		const results = [];
 		const seenTrackIds = new Set();
 
 		const totalCandidates = candidates.length;
-		console.log(`Match Monkey: Matching ${totalCandidates} candidates to library`);
-		console.log(`Match Monkey: Rating filter - minRating=${config.minRating}, allowUnknown=${config.allowUnknown}`);
+		logger.info('Library', `Matching ${totalCandidates} candidates to library`);
+		logger.debug('Library', `Rating filter - minRating=${config.minRating}, allowUnknown=${config.allowUnknown}`);
 
 		// Log active API threshold settings for developer visibility
 		if (config.apiMinMatch > 0) {
-			console.log(`Match Monkey: API threshold - min match: ${config.apiMinMatch}% (applies to both Last.fm and ReccoBeats)`);
+			logger.debug('Library', `API threshold - min match: ${config.apiMinMatch}% (applies to both Last.fm and ReccoBeats)`);
 		}
 		if (config.localCollection) {
-			console.log(`Match Monkey: Collection filter: "${config.localCollection}" (NOTE: not yet implemented in MM5)`);
+			logger.warn('Library', `Collection filter: "${config.localCollection}" (NOTE: not yet implemented in MM5)`);
 		}
 
 		updateProgress(`Searching local library for ${totalCandidates} artists...`, 0.55);
@@ -719,174 +763,187 @@ window.matchMonkeyOrchestration = {
 
 					if (titles.length > 0) {
 						searchedSpecificTracks = true; // Mark that we searched for specific tracks
-						const foundMap = await db.findLibraryTracksBatch(
+
+						// OPTIMIZATION: Do a single query without rating filter to get ALL tracks
+						// Then filter by rating in-memory. This avoids duplicate SQL queries.
+						const allTracksMap = await db.findLibraryTracksBatch(
 							candidate.artist,
 							titles,
 							config.tracksPerArtist,
 							{
-								best: config.bestEnabled,
-								minRating: config.minRating,
-								allowUnknown: config.allowUnknown,
+								formatPreference: config.formatPreference,
+								minRating: 0, // Get all tracks regardless of rating
+								allowUnknown: true,
 								collection: config.localCollection || ''
 							}
 						);
 
-						// Collect all found tracks and track missed ones with popularity
-						for (const [title, foundTracks] of foundMap.entries()) {
-							if (foundTracks && foundTracks.length > 0) {
-								tracks.push(...foundTracks);
+						// Helper to check if track passes rating filter
+						const passesRatingFilter = (track) => {
+							if (!track || config.minRating <= 0) return true;
+							const rating = track.rating || track.Rating || -1;
+							// If allowUnknown is true, include unrated tracks (-1)
+							if (config.allowUnknown && rating < 0) return true;
+							// Otherwise check if rating meets threshold
+							return rating >= config.minRating && rating <= 100;
+						};
+
+						// Process each title and separate into matched vs filtered
+						for (const [title, allTracks] of allTracksMap.entries()) {
+							// Apply rating filter in-memory
+							const matchedTracks = allTracks.filter(passesRatingFilter);
+
+							if (matchedTracks.length > 0) {
+								// Found tracks that pass the rating filter
+								tracks.push(...matchedTracks);
 
 								// Log matched track with its API popularity/match value
-								// For artist-based discovery, matchScore is on candidate level
-								// For track-based/ReccoBeats, match/popularity is on track level
 								const originalTrack = candidate.tracks.find(t => {
 									const trackTitle = typeof t === 'string' ? t : (t.title || '');
 									return trackTitle === title;
 								});
-								// Try track-level match/popularity first, then fall back to candidate-level matchScore
 								let matchVal = 0;
 								if (typeof originalTrack === 'object') {
 									matchVal = originalTrack.match || originalTrack.popularity || 0;
 								}
-								// If no track-level score, use candidate's artist similarity score
 								if (matchVal === 0 && candidate.matchScore) {
 									matchVal = candidate.matchScore;
 								}
 								const matchValNorm = matchVal <= 1 ? (matchVal * 100).toFixed(1) : Number(matchVal).toFixed(1);
-								console.log(`Match Monkey: MATCHED in library - "${candidate.artist} - ${title}" (API score: ${matchValNorm}%)`);
+								//console.log(`Match Monkey: MATCHED in library - "${candidate.artist} - ${title}" (API score: ${matchValNorm}%)`);
 							} else {
-								// Track not found with rating filter - check if it exists without rating filter
-								let filteredByRating = false;
-								if (config.minRating > 0) {
-									try {
-										const unratedCheck = await db.findLibraryTracksBatch(
-											candidate.artist,
-											[title],
-											1,
-											{ best: false, minRating: 0, allowUnknown: true, collection: config.localCollection || '' }
-										);
-										const unratedTracks = unratedCheck.get(title);
-										if (unratedTracks && unratedTracks.length > 0) {
-											filteredByRating = true;
-											filteredByRatingCount++;
-											console.log(`Match Monkey: FILTERED BY RATING - "${candidate.artist} - ${title}" exists but below minRating ${config.minRating}`);
-										}
-									} catch (_) { /* ignore check errors */ }
-								}
+								// No tracks passed rating filter - check if any exist at all
+								const filteredByRating = allTracks.length > 0;
 
-								if (!filteredByRating) {
+								if (filteredByRating) {
+									filteredByRatingCount++;
+									//console.log(`Match Monkey: FILTERED BY RATING - "${candidate.artist} - ${title}" exists but below minRating ${config.minRating}`);
+								} else {
 									// Find the original track data to get popularity
 									const originalTrack = candidate.tracks.find(t => {
-																const trackTitle = typeof t === 'string' ? t : (t.title || '');
-																return trackTitle === title;
-															});
+										const trackTitle = typeof t === 'string' ? t : (t.title || '');
+										return trackTitle === title;
+									});
 
-															// Extract and normalize popularity from track data
-															const { popularity, rawPlaycount } = this.normalizePopularityFromTrack(originalTrack);
+									// Extract and normalize popularity from track data
+									const { popularity, rawPlaycount } = this.normalizePopularityFromTrack(originalTrack);
 
-															// Determine source for logging
-															const source = config.discoveryMode === 'acoustics' ||
-																config.discoveryMode === 'mood' ||
-																config.discoveryMode === 'activity' ? 'ReccoBeats' : 'Last.fm';
+									// Determine source for logging
+									const source = config.discoveryMode === 'acoustics' ||
+										config.discoveryMode === 'mood' ||
+										config.discoveryMode === 'activity' ? 'ReccoBeats' : 'Last.fm';
 
-															// Get match/popularity value for logging
-															// Try track-level match/popularity first, then fall back to candidate-level matchScore
-															let matchVal = 0;
-															if (typeof originalTrack === 'object') {
-																matchVal = originalTrack.popularity || originalTrack.match || 0;
-															}
-															// If no track-level score, use candidate's artist similarity score
-															if (matchVal === 0 && candidate.matchScore) {
-																matchVal = candidate.matchScore;
-															}
-															const matchValDisplay = matchVal <= 1 ? (matchVal * 100).toFixed(1) : Number(matchVal).toFixed(1);
-
-															// Log ALL missed tracks - show source and API value
-															console.log(`Match Monkey: NOT IN LIBRARY - "${candidate.artist} - ${title}" [${source} score: ${matchValDisplay}%, playcount: ${rawPlaycount}]`);
-															notInLibraryCount++;
-
-															// Track as missed result with normalized popularity
-															// Use matchVal (which may come from candidate.matchScore) for missed tracking
-															const normalizedMatchForStorage = matchVal <= 1 ? matchVal * 100 : matchVal;
-															missedResults.push({
-																artist: candidate.artist,
-																title: title,
-																popularity: popularity || normalizedMatchForStorage,
-																additionalInfo: {
-																	source: source,
-																	discoveryMode: config.discoveryMode,
-																	playcount: typeof originalTrack === 'object' ? (originalTrack.playcount || 0) : 0,
-																	rank: typeof originalTrack === 'object' ? (originalTrack.rank || 0) : 0,
-																	match: normalizedMatchForStorage,
-																	reason: 'not_in_library'
-																}
-															});
-														}
-													}
-												}
-											}
-										}
-
-										// Fallback: search by artist only
-										if (tracks.length === 0) {
-											tracks = await db.findLibraryTracks(
-												candidate.artist,
-												null,
-												config.tracksPerArtist,
-												{
-													best: config.bestEnabled,
-													minRating: config.minRating,
-													allowUnknown: config.allowUnknown,
-													collection: config.localCollection || ''
-												}
-											);
-
-					// If no tracks found for artist at all, track the artist's top tracks as missed
-						// BUT only if we didn't already search for specific tracks (to avoid double-tracking)
-						if (tracks.length === 0 && !searchedSpecificTracks && candidate.tracks && candidate.tracks.length > 0) {
-							// Determine source for logging
-							const source = config.discoveryMode === 'acoustics' ||
-								config.discoveryMode === 'mood' ||
-								config.discoveryMode === 'activity' ? 'ReccoBeats' : 'Last.fm';
-
-							candidate.tracks.slice(0, 3).forEach(t => {
-								const trackTitle = typeof t === 'string' ? t : (t.title || '');
-								if (!trackTitle) return;
-
-								// Extract and normalize popularity
-								const { popularity, rawPlaycount } = this.normalizePopularityFromTrack(t);
-
-								// Get match/popularity value for logging
-								// Try track-level match/popularity first, then fall back to candidate-level matchScore
-								let matchVal = typeof t === 'object' ? (t.popularity || t.match || 0) : 0;
-								// If no track-level score, use candidate's artist similarity score
-								if (matchVal === 0 && candidate.matchScore) {
-									matchVal = candidate.matchScore;
-								}
-								const matchValDisplay = matchVal <= 1 ? (matchVal * 100).toFixed(1) : Number(matchVal).toFixed(1);
-
-								// Log ALL missed artists - show source and API value
-								console.log(`Match Monkey: ARTIST NOT IN LIBRARY - "${candidate.artist} - ${trackTitle}" [${source} score: ${matchValDisplay}%, playcount: ${rawPlaycount}]`);
-								notInLibraryCount++;
-
-								// Use matchVal (which may come from candidate.matchScore) for missed tracking
-								const normalizedMatchForStorage = matchVal <= 1 ? matchVal * 100 : matchVal;
-								missedResults.push({
-									artist: candidate.artist,
-									title: trackTitle,
-									popularity: popularity || normalizedMatchForStorage,
-									additionalInfo: {
-										source: source,
-										discoveryMode: config.discoveryMode,
-										playcount: typeof t === 'object' ? (t.playcount || 0) : 0,
-										rank: typeof t === 'object' ? (t.rank || 0) : 0,
-										match: normalizedMatchForStorage,
-										reason: 'not_in_library'
+									// Get match/popularity value for logging
+									// Try track-level match/popularity first, then fall back to candidate-level matchScore
+									let matchVal = 0;
+									if (typeof originalTrack === 'object') {
+										matchVal = originalTrack.popularity || originalTrack.match || 0;
 									}
-								});
-							});
+									// If no track-level score, use candidate's artist similarity score
+									if (matchVal === 0 && candidate.matchScore) {
+										matchVal = candidate.matchScore;
+									}
+									const matchValDisplay = matchVal <= 1 ? (matchVal * 100).toFixed(1) : Number(matchVal).toFixed(1);
+
+									// Log ALL missed tracks - show source and API value
+									//console.log(`Match Monkey: NOT IN LIBRARY - "${candidate.artist} - ${title}" [${source} score: ${matchValDisplay}%, playcount: ${rawPlaycount}]`);
+									notInLibraryCount++;
+
+									// Track as missed result with normalized popularity
+									// Use matchVal (which may come from candidate.matchScore) for missed tracking
+									const normalizedMatchForStorage = matchVal <= 1 ? matchVal * 100 : matchVal;
+
+									// Sanitize all numeric values for JSON serialization
+									const safeNumber = (val) => {
+										const num = Number(val);
+										return (Number.isFinite(num) ? num : 0);
+									};
+
+									missedResults.push({
+										artist: String(candidate.artist || ''),
+										title: String(title || ''),
+										popularity: safeNumber(popularity || normalizedMatchForStorage),
+										additionalInfo: {
+											source: String(source || 'Last.fm'),
+											discoveryMode: String(config.discoveryMode || ''),
+											playcount: safeNumber(typeof originalTrack === 'object' ? (originalTrack.playcount || 0) : 0),
+											rank: safeNumber(typeof originalTrack === 'object' ? (originalTrack.rank || 0) : 0),
+											match: safeNumber(normalizedMatchForStorage),
+											reason: 'not_in_library'
+										}
+									});
+								}
+							}
 						}
 					}
+				}
+
+				// Fallback: search by artist only
+				if (tracks.length === 0) {
+					tracks = await db.findLibraryTracks(
+						candidate.artist,
+						null,
+						config.tracksPerArtist,
+						{
+							formatPreference: config.formatPreference,
+							minRating: config.minRating,
+							allowUnknown: config.allowUnknown,
+							collection: config.localCollection || ''
+						}
+					);
+
+					// If no tracks found for artist at all, track the artist's top tracks as missed
+					// BUT only if we didn't already search for specific tracks (to avoid double-tracking)
+					if (tracks.length === 0 && !searchedSpecificTracks && candidate.tracks && candidate.tracks.length > 0) {
+						// Determine source for logging
+						const source = config.discoveryMode === 'acoustics' ||
+							config.discoveryMode === 'mood' ||
+							config.discoveryMode === 'activity' ? 'ReccoBeats' : 'Last.fm';
+
+						// Track up to 3 tracks from this artist as missed (without individual logging)
+						candidate.tracks.slice(0, 3).forEach(t => {
+							const trackTitle = typeof t === 'string' ? t : (t.title || '');
+							if (!trackTitle) return;
+
+							// Extract and normalize popularity
+							const { popularity, rawPlaycount } = this.normalizePopularityFromTrack(t);
+
+							// Get match/popularity value
+							// Try track-level match/popularity first, then fall back to candidate-level matchScore
+							let matchVal = typeof t === 'object' ? (t.popularity || t.match || 0) : 0;
+							// If no track-level score, use candidate's artist similarity score
+							if (matchVal === 0 && candidate.matchScore) {
+								matchVal = candidate.matchScore;
+							}
+
+							// Track missed count
+							notInLibraryCount++;
+
+							// Use matchVal (which may come from candidate.matchScore) for missed tracking
+							const normalizedMatchForStorage = matchVal <= 1 ? matchVal * 100 : matchVal;
+
+							// Sanitize all numeric values for JSON serialization
+							const safeNumber = (val) => {
+								const num = Number(val);
+								return (Number.isFinite(num) ? num : 0);
+							};
+
+							missedResults.push({
+								artist: String(candidate.artist || ''),
+								title: String(trackTitle || ''),
+								popularity: safeNumber(popularity || normalizedMatchForStorage),
+								additionalInfo: {
+									source: String(source || 'Last.fm'),
+									discoveryMode: String(config.discoveryMode || ''),
+									playcount: safeNumber(typeof t === 'object' ? (t.playcount || 0) : 0),
+									rank: safeNumber(typeof t === 'object' ? (t.rank || 0) : 0),
+									match: safeNumber(normalizedMatchForStorage),
+									reason: 'not_in_library'
+								}
+							});
+						});
+					}
+				}
 
 				// Add unique tracks to results
 				let matchedForArtist = 0;
@@ -905,7 +962,7 @@ window.matchMonkeyOrchestration = {
 				}
 
 			} catch (e) {
-				console.warn(`Match Monkey: Error matching "${candidate.artist}":`, e.message);
+				logger.warn('Library', `Error matching "${candidate.artist}": ${e.message}`);
 			}
 		}
 
@@ -932,16 +989,20 @@ window.matchMonkeyOrchestration = {
 			});
 
 			if (filteredMissedResults.length > 0) {
-				console.log(`Match Monkey: Adding ${filteredMissedResults.length} missed recommendations to tracker (filtered from ${missedResults.length})`);
+				logger.debug('Library', `Adding ${filteredMissedResults.length} missed recommendations to tracker (filtered from ${missedResults.length})`);
 				window.matchMonkeyMissedResults.addBatch(filteredMissedResults);
-				console.log(`Match Monkey: Tracked ${filteredMissedResults.length} missed recommendations`);
 			} else {
-				console.log(`Match Monkey: No missed recommendations passed configured thresholds (${missedResults.length} filtered out)`);
+				logger.debug('Library', `No missed recommendations passed configured thresholds (${missedResults.length} filtered out)`);
 			}
 		}
 
-		console.log(`Match Monkey: Library matching found ${results.length} unique tracks`);
-		console.log(`Match Monkey: Stats - matched: ${totalTracksMatched}, notInLibrary: ${notInLibraryCount}, filteredByRating: ${filteredByRatingCount}, candidates: ${totalCandidates}`);
+		// Log summary stats
+		logger.summary('Library', 'Matching complete', {
+			matched: totalTracksMatched,
+			notInLibrary: notInLibraryCount,
+			filteredByRating: filteredByRatingCount,
+			artists: `${artistsMatched}/${totalCandidates}`
+		});
 		updateProgress(`Library: Found ${totalTracksMatched} tracks from ${artistsMatched}/${totalCandidates} artists`, 0.8);
 
 		// Return tracks and stats for user feedback
@@ -979,26 +1040,26 @@ window.matchMonkeyOrchestration = {
 		// For mood/activity mode, we search the entire library with rating filters
 		// and then shuffle to get variety
 		try {
-		// Search library for tracks (broad search)
-		const allTracks = await db.findLibraryTracks(
-			null, // No specific artist
-			null, // No specific titles
-			config.totalLimit, // Get plenty of tracks
+			// Search library for tracks (broad search)
+			const allTracks = await db.findLibraryTracks(
+				null, // No specific artist
+				null, // No specific titles
+				config.totalLimit, // Get plenty of tracks
 				{
-					best: config.bestEnabled,
+					formatPreference: config.formatPreference,
 					minRating: config.minRating,
 					allowUnknown: config.allowUnknown,
 				}
 			);
 
-			console.log(`Match Monkey: Found ${allTracks.length} tracks in library for ${moodOrActivity} filtering`);
+			window.matchMonkeyLogger?.info('Library', `Found ${allTracks.length} tracks in library for ${moodOrActivity} filtering`);
 
 			// For now, return all tracks - in future we could filter by audio characteristics
 			// if the user has audio features stored in their library
 			return allTracks;
 
 		} catch (e) {
-			console.error(`Match Monkey: Error searching library for ${moodOrActivity}:`, e);
+			window.matchMonkeyLogger?.error('Library', `Error searching library for ${moodOrActivity}`, e);
 			return [];
 		}
 	},
@@ -1093,21 +1154,21 @@ window.matchMonkeyOrchestration = {
 					added++;
 					if (dupKey) existing.add(dupKey);
 				} catch (e) {
-					console.warn(`Match Monkey: Failed to queue track:`, e?.message || e);
+					window.matchMonkeyLogger?.warn('Queue', `Failed to queue track: ${e?.message || e}`);
 				}
 			}
 
 			if (skippedDuplicates > 0) {
-				console.log(`Match Monkey: Skipped ${skippedDuplicates} duplicates already in queue`);
+				window.matchMonkeyLogger?.info('Queue', `Skipped ${skippedDuplicates} duplicates already in queue`);
 				updateProgress(`Queued ${added} tracks (skipped ${skippedDuplicates} duplicates)`, 0.98);
 			} else {
 				updateProgress(`Queued ${added} tracks to Now Playing`, 0.98);
 			}
 
-			console.log(`Match Monkey: Queued ${added} tracks to Now Playing`);
+			window.matchMonkeyLogger?.info('Queue', `Queued ${added} tracks to Now Playing`);
 
 		} catch (e) {
-			console.error('Match Monkey: Error queuing results:', e);
+			window.matchMonkeyLogger?.error('Queue', 'Error queuing results', e);
 		}
 
 		return { added };
@@ -1245,180 +1306,13 @@ window.matchMonkeyOrchestration = {
 			}
 		}
 
-		// Truncate if too long
-		if (playlistName.length > 100) {
-			playlistName = playlistName.substring(0, 97) + '...';
-		}
-
-		console.log(`Match Monkey: Building playlist "${playlistName}" (mode: ${playlistMode})`);
-		updateProgress(`Creating playlist "${playlistName}"...`, 0.92);
-
-		// Handle "Do not create playlist" mode
-		if (playlistMode === 'Do not create playlist') {
-			showToast(`Found ${tracks.length} tracks (playlist creation disabled)`, 'info');
-			return { added: 0, playlist: null };
-		}
-
-		let userSelectedPlaylist = null;
-
-		// Show confirmation dialog if enabled
-		if (config.showConfirm) {
-			console.log('Match Monkey: Showing playlist selection dialog');
-			updateProgress('Waiting for playlist selection...', 0.93);
-			try {
-				const dialogResult = await this.showPlaylistDialog();
-
-				if (dialogResult === null) {
-					console.log('Match Monkey: UserCancelled playlist dialog');
-					return { added: 0, playlist: null, cancelled: true };
-				}
-
-				if (dialogResult && !dialogResult.autoCreate) {
-					userSelectedPlaylist = dialogResult;
-				}
-			} catch (dialogError) {
-				console.error('Match Monkey: Dialog error:', dialogError);
+		// Append audio format preference indicator (only for non-mixed modes)
+		if (config.formatPreference && config.formatPreference !== 'Mixed (all formats)') {
+			if (config.formatPreference === 'Lossless only') {
+				playlistName = `${playlistName} [Lossless]`;
+			} else if (config.formatPreference === 'Lossy only') {
+				playlistName = `${playlistName} [Lossy]`;
 			}
-		}
-
-		try {
-			// Resolve target playlist
-			updateProgress(`Resolving playlist "${playlistName}"...`, 0.94);
-			const resolution = await db.resolveTargetPlaylist(
-				playlistName,
-				parentName,
-				playlistMode,
-				userSelectedPlaylist
-			);
-
-			const targetPlaylist = resolution.playlist;
-			const shouldClear = resolution.shouldClear;
-
-			if (!targetPlaylist) {
-				throw new Error('Failed to create or find target playlist');
-			}
-
-			console.log(`Match Monkey: Using playlist "${targetPlaylist.name}" (clear: ${shouldClear})`);
-
-			// Clear existing tracks if needed
-			if (shouldClear) {
-				console.log('Match Monkey: Clearing existing tracks');
-				updateProgress(`Clearing existing tracks from "${targetPlaylist.name}"...`, 0.95);
-				await db.clearPlaylistTracks(targetPlaylist);
-			}
-
-			// Add tracks to playlist
-			updateProgress(`Adding ${tracks.length} tracks to "${targetPlaylist.name}"...`, 0.96);
-			const addedCount = await db.addTracksToPlaylist(targetPlaylist, tracks);
-
-			if (addedCount === 0) {
-				console.warn('Match Monkey: No tracks were added to playlist');
-				showToast(`Warning: No tracks could be added to playlist`, 'warning');
-			} else {
-				updateProgress(`Added ${addedCount} tracks to "${targetPlaylist.name}"`, 0.98);
-			}
-
-			// Navigate based on user settings
-			this.navigateAfterCreation(navigateAfter, targetPlaylist);
-
-			console.log(`Match Monkey: Playlist "${targetPlaylist.name}" complete with ${addedCount} tracks`);
-
-			return { added: addedCount, playlist: targetPlaylist };
-
-		} catch (e) {
-			console.error('Match Monkey: Error creating playlist:', e);
-			showToast(`Failed to create playlist: ${e.message}`, 'error');
-			return { added: 0, playlist: null };
-		}
-	},
-	/*/
-		async buildResultsPlaylist(modules, tracks, config) {
-		const { db, settings: { storage }, ui: { notifications } } = modules;
-		const { stringSetting } = storage;
-		const { showToast, updateProgress } = notifications;
-
-		const playlistTemplate = stringSetting('PlaylistName', '- Similar to % (#)');
-		const parentName = stringSetting('ParentPlaylist', '');
-		const playlistMode = stringSetting('PlaylistMode', 'Create new playlist');
-		const navigateAfter = stringSetting('NavigateAfter', 'Navigate to new playlist');
-
-		const modeName = config.modeName || 'Similar Artists';
-		const seedName = config.seedName || 'Selection';
-
-		// Helper: produce playlist name from a template supporting multiple replacement tokens.
-		// Supported placeholders (case-insensitive):
-		// - %SEED% or % : seed/artist display name (backwards compatible with single '%')
-		// - %MODE% : friendly mode name (e.g. "Similar Artists")
-		// - %TYPE% : discovery mode key (e.g. "artist", "track", "mood")
-		// - %MOOD% or %CONTEXT% : mood/activity value if present
-		// - (#) or %COUNT% or %N% or %TRACKS% : number of tracks added
-		const buildNameFromTemplate = (template) => {
-			if (!template || typeof template !== 'string') return '';
-
-			let name = template;
-
-			// Replace explicit track-count token "(#)"
-			name = name.replace(/\(\#\)/g, String(tracks.length));
-
-			// Replace common count tokens (%COUNT%, %N%, %TRACKS%)
-			name = name.replace(/%COUNT%/ig, String(tracks.length));
-			name = name.replace(/%N%/ig, String(tracks.length));
-			name = name.replace(/%TRACKS%/ig, String(tracks.length));
-			name = name.replace(/%#%/ig, String(tracks.length));
-
-			// Replacement map for other tokens
-			const replacements = {
-				'SEED': seedName,
-				'MODE': modeName,
-				'TYPE': config.discoveryMode || '',
-				'MOOD': config.moodActivityValue || '',
-				'CONTEXT': config.moodActivityValue || '',
-				'ARTIST': seedName, // alias for backwards/explicit artist token
-			};
-
-			// Replace %TOKEN% style placeholders (case-insensitive)
-			name = name.replace(/%([A-Z0-9_]+)%/ig, (m, token) => {
-				const key = String(token).toUpperCase();
-				return (replacements.hasOwnProperty(key) ? String(replacements[key]) : m);
-			});
-
-			// Backwards compatibility: single '%' -> first occurrence becomes seedName
-			// Only replace if a %SEED% style token wasn't used.
-			if (name.indexOf('%') >= 0 && !/%[A-Z0-9_]+%/i.test(template)) {
-				name = name.replace('%', seedName);
-			}
-
-			// Final cleanup: collapse multiple spaces, trim
-			name = name.replace(/\s+/g, ' ').trim();
-
-			return name;
-		};
-
-		// Build playlist name from template
-		let playlistName = buildNameFromTemplate(playlistTemplate || '');
-
-		// If template produced an empty name, fall back to previous behaviour
-		if (!playlistName) {
-			if (playlistTemplate.indexOf('%') >= 0) {
-				playlistName = playlistTemplate.replace('%', seedName);
-			} else {
-				playlistName = `${playlistTemplate} ${seedName}`;
-			}
-		}
-
-		// Append discovery mode indicator when relevant
-		if (config.moodActivityValue && (config.discoveryMode === 'mood' || config.discoveryMode === 'activity')) {
-			const capitalizedValue = config.moodActivityValue.charAt(0).toUpperCase() + config.moodActivityValue.slice(1);
-			const contextLabel = config.moodActivityContext === 'mood' ? 'Mood' : 'Activity';
-			playlistName = `${playlistName} (${contextLabel}: ${capitalizedValue})`;
-		} else if (config.discoveryMode === 'acoustics') {
-			playlistName = `${playlistName} (Similar Acoustics)`;
-		} else if (config.discoveryMode === 'track') {
-			playlistName = `${playlistName} (Similar Tracks)`;
-		} else if (config.discoveryMode === 'genre') {
-			playlistName = `${playlistName} (Similar Genre)`;
-		} else {
-			playlistName = `${playlistName} (${modeName})`;
 		}
 
 		// Truncate if too long

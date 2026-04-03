@@ -12,6 +12,9 @@
 
 'use strict';
 
+/** Helper to get logger instance safely */
+const _getPlaylistLogger = () => window.matchMonkeyLogger;
+
 /**
  * Find a playlist by name anywhere in the playlist tree.
  * Uses MM5's getByTitleAsync() method.
@@ -21,30 +24,31 @@
  * @returns {Promise<object|null>} Playlist object if found, null otherwise
  */
 async function findPlaylist(playlistName) {
+	const logger = _getPlaylistLogger();
 	if (!playlistName || String(playlistName).trim().length === 0) {
 		return null;
 	}
 
 	if (typeof app === 'undefined' || !app.playlists) {
-		console.warn('findPlaylist: app.playlists not available');
+		logger?.warn('Playlist', 'findPlaylist: app.playlists not available');
 		return null;
 	}
 
 	try {
 		const name = String(playlistName).trim();
-		
+
 		// Use MM5's documented getByTitleAsync method
 		const result = await app.playlists.getByTitleAsync(name);
-		
+
 		if (result) {
-			console.log(`findPlaylist: Found "${name}"`);
+			logger?.debug('Playlist', `findPlaylist: Found "${name}"`);
 			return result;
 		}
-		
-		console.log(`findPlaylist: "${name}" not found`);
+
+		logger?.debug('Playlist', `findPlaylist: "${name}" not found`);
 		return null;
 	} catch (e) {
-		console.error('findPlaylist error:', e);
+		logger?.error('Playlist', 'findPlaylist error: ' + e.toString());
 		return null;
 	}
 }
@@ -59,6 +63,7 @@ async function findPlaylist(playlistName) {
  * @returns {Promise<object|null>} Playlist object if found and is a child of parent, null otherwise
  */
 async function findPlaylistUnderParent(playlistName, parentPlaylist) {
+	const logger = _getPlaylistLogger();
 	if (!playlistName || !parentPlaylist) {
 		return null;
 	}
@@ -66,22 +71,22 @@ async function findPlaylistUnderParent(playlistName, parentPlaylist) {
 	try {
 		// Use app.playlists.getByTitleAsync to find the playlist
 		const playlist = await findPlaylist(playlistName);
-		
+
 		if (!playlist) {
-			console.log(`findPlaylistUnderParent: "${playlistName}" not found`);
+			logger?.debug('Playlist', `findPlaylistUnderParent: "${playlistName}" not found`);
 			return null;
 		}
 
 		// Verify it's a child of the parent by checking parentID
 		if (playlist.parentID === parentPlaylist.id) {
-			console.log(`findPlaylistUnderParent: Found "${playlistName}" under parent`);
+			logger?.debug('Playlist', `findPlaylistUnderParent: Found "${playlistName}" under parent`);
 			return playlist;
 		}
 
-		console.log(`findPlaylistUnderParent: "${playlistName}" exists but not under specified parent`);
+		logger?.debug('Playlist', `findPlaylistUnderParent: "${playlistName}" exists but not under specified parent`);
 		return null;
 	} catch (e) {
-		console.error('findPlaylistUnderParent error:', e);
+		logger?.error('Playlist', 'findPlaylistUnderParent error: ' + e.toString());
 		return null;
 	}
 }
@@ -96,13 +101,14 @@ async function findPlaylistUnderParent(playlistName, parentPlaylist) {
  * @returns {Promise<object|null>} Created playlist object or null on failure
  */
 async function createPlaylist(playlistName, parentPlaylist = null) {
+	const logger = _getPlaylistLogger();
 	if (!playlistName || String(playlistName).trim().length === 0) {
-		console.error('createPlaylist: Invalid playlist name');
+		logger?.error('Playlist', 'createPlaylist: Invalid playlist name');
 		return null;
 	}
 
 	if (typeof app === 'undefined' || !app.playlists?.root) {
-		console.error('createPlaylist: app.playlists.root not available');
+		logger?.error('Playlist', 'createPlaylist: app.playlists.root not available');
 		return null;
 	}
 
@@ -113,7 +119,7 @@ async function createPlaylist(playlistName, parentPlaylist = null) {
 		// Create new playlist using MM5's newPlaylist() method
 		const playlist = targetNode.newPlaylist();
 		if (!playlist) {
-			console.error('createPlaylist: newPlaylist() returned null');
+			logger?.error('Playlist', 'createPlaylist: newPlaylist() returned null');
 			return null;
 		}
 
@@ -123,11 +129,11 @@ async function createPlaylist(playlistName, parentPlaylist = null) {
 		// Commit to database using commitAsync()
 		await playlist.commitAsync();
 
-		console.log(`createPlaylist: Created "${name}"${parentPlaylist ? ' under parent' : ' at root'}`);
+		logger?.debug('Playlist', `createPlaylist: Created "${name}"${parentPlaylist ? ' under parent' : ' at root'}`);
 		return playlist;
 
 	} catch (e) {
-		console.error('createPlaylist error:', e);
+		logger?.error('Playlist', 'createPlaylist error: ' + e.toString());
 		return null;
 	}
 }
@@ -140,6 +146,7 @@ async function createPlaylist(playlistName, parentPlaylist = null) {
  * @returns {Promise<boolean>} True if cleared successfully
  */
 async function clearPlaylistTracks(playlist) {
+	const logger = _getPlaylistLogger();
 	if (!playlist) {
 		return false;
 	}
@@ -147,10 +154,10 @@ async function clearPlaylistTracks(playlist) {
 	try {
 		// Use MM5's clearTracksAsync method
 		await playlist.clearTracksAsync();
-		console.log(`clearPlaylistTracks: Cleared "${playlist.name}"`);
+		logger?.debug('Playlist', `clearPlaylistTracks: Cleared "${playlist.name}"`);
 		return true;
 	} catch (e) {
-		console.error('clearPlaylistTracks error:', e);
+		logger?.error('Playlist', 'clearPlaylistTracks error: ' + e.toString());
 		return false;
 	}
 }
@@ -164,6 +171,7 @@ async function clearPlaylistTracks(playlist) {
  * @returns {Promise<number>} Number of tracks added
  */
 async function addTracksToPlaylist(playlist, tracks) {
+	const logger = _getPlaylistLogger();
 	if (!playlist || !Array.isArray(tracks) || tracks.length === 0) {
 		return 0;
 	}
@@ -189,11 +197,11 @@ async function addTracksToPlaylist(playlist, tracks) {
 		// Use MM5's addTracksAsync method
 		await playlist.addTracksAsync(tracklist);
 
-		console.log(`addTracksToPlaylist: Added ${validCount} tracks to "${playlist.name}"`);
+		logger?.debug('Playlist', `addTracksToPlaylist: Added ${validCount} tracks to "${playlist.name}"`);
 		return validCount;
 
 	} catch (e) {
-		console.error('addTracksToPlaylist error:', e);
+		logger?.error('Playlist', 'addTracksToPlaylist error: ' + e.toString());
 		return 0;
 	}
 }
@@ -206,16 +214,17 @@ async function addTracksToPlaylist(playlist, tracks) {
  * @returns {Promise<boolean>} True if deleted successfully
  */
 async function deletePlaylist(playlist) {
+	const logger = _getPlaylistLogger();
 	if (!playlist) {
 		return false;
 	}
 
 	try {
 		await playlist.deleteAsync();
-		console.log(`deletePlaylist: Deleted "${playlist.name}"`);
+		logger?.debug('Playlist', `deletePlaylist: Deleted "${playlist.name}"`);
 		return true;
 	} catch (e) {
-		console.error('deletePlaylist error:', e);
+		logger?.error('Playlist', 'deletePlaylist error: ' + e.toString());
 		return false;
 	}
 }
@@ -236,9 +245,10 @@ async function deletePlaylist(playlist) {
  * @returns {Promise<{playlist: object|null, shouldClear: boolean}>}
  */
 async function resolveTargetPlaylist(playlistName, parentName, playlistMode, userSelectedPlaylist = null) {
+	const logger = _getPlaylistLogger();
 	// If user selected a playlist via dialog, use that
 	if (userSelectedPlaylist && !userSelectedPlaylist.autoCreate) {
-		console.log(`resolveTargetPlaylist: Using user-selected playlist`);
+		logger?.debug('Playlist', `resolveTargetPlaylist: Using user-selected playlist`);
 		return {
 			playlist: userSelectedPlaylist,
 			shouldClear: playlistMode.toLowerCase().includes('overwrite'),
@@ -251,7 +261,7 @@ async function resolveTargetPlaylist(playlistName, parentName, playlistMode, use
 		parentPlaylist = await findPlaylist(parentName.trim());
 		if (!parentPlaylist) {
 			// Create the parent playlist at root
-			console.log(`resolveTargetPlaylist: Creating parent playlist "${parentName}"`);
+			logger?.debug('Playlist', `resolveTargetPlaylist: Creating parent playlist "${parentName}"`);
 			parentPlaylist = await createPlaylist(parentName.trim(), null);
 		}
 	}
@@ -265,7 +275,7 @@ async function resolveTargetPlaylist(playlistName, parentName, playlistMode, use
 			: await findPlaylist(playlistName);
 
 		if (existing) {
-			console.log(`resolveTargetPlaylist: Found existing playlist to overwrite`);
+			logger?.debug('Playlist', `resolveTargetPlaylist: Found existing playlist to overwrite`);
 			return { playlist: existing, shouldClear: true };
 		}
 	}
@@ -306,13 +316,14 @@ async function resolveTargetPlaylist(playlistName, parentName, playlistMode, use
  * @returns {Promise<object|null>} Playlist object or null on failure
  */
 async function getOrCreatePlaylist(playlistName) {
+	const logger = _getPlaylistLogger();
 	const existing = await findPlaylist(playlistName);
 	if (existing) {
-		console.log(`getOrCreatePlaylist: Using existing "${playlistName}"`);
+		logger?.debug('Playlist', `getOrCreatePlaylist: Using existing "${playlistName}"`);
 		return existing;
 	}
 
-	console.log(`getOrCreatePlaylist: Creating new "${playlistName}"`);
+	logger?.debug('Playlist', `getOrCreatePlaylist: Creating new "${playlistName}"`);
 	return await createPlaylist(playlistName, null);
 }
 

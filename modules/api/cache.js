@@ -9,13 +9,16 @@
 
 'use strict';
 
+// Get logger reference
+const _getCacheLogger = () => window.matchMonkeyLogger;
+
 /**
  * Per-run cache structure containing:
  * - similarArtists: Map<string, object[]>
  * - topTracks: Map<string, (string|object)[]>
- * - _similarTracks: Map<string, object[]> (for track.getSimilar)
- * - _artistInfo: Map<string, object> (for artist.getInfo)
- * - _reccobeats: Map<string, object[]> (for ReccoBeats API)
+ * - similarTracks: Map<string, object[]> (for track.getSimilar)
+ * - artistInfo: Map<string, object> (for artist.getInfo)
+ * - reccobeats: Map<string, object[]> (for ReccoBeats API)
  */
 let lastfmRunCache = null;
 
@@ -47,9 +50,9 @@ function initLastfmRunCache() {
 	lastfmRunCache = {
 		similarArtists: new Map(),
 		topTracks: new Map(),
-		_similarTracks: new Map(),
-		_artistInfo: new Map(),
-		_reccobeats: new Map(),
+		similarTracks: new Map(),
+		artistInfo: new Map(),
+		reccobeats: new Map(),
 	};
 }
 
@@ -62,9 +65,9 @@ function clearLastfmRunCache() {
 	if (lastfmRunCache) {
 		lastfmRunCache.similarArtists?.clear();
 		lastfmRunCache.topTracks?.clear();
-		lastfmRunCache._similarTracks?.clear();
-		lastfmRunCache._artistInfo?.clear();
-		lastfmRunCache._reccobeats?.clear();
+		lastfmRunCache.similarTracks?.clear();
+		lastfmRunCache.artistInfo?.clear();
+		lastfmRunCache.reccobeats?.clear();
 	}
 	lastfmRunCache = null;
 }
@@ -80,11 +83,12 @@ function getCachedSimilarArtists(artistName) {
 	const cached = lastfmRunCache.similarArtists.has(key) 
 		? lastfmRunCache.similarArtists.get(key) 
 		: null;
-	
+
 	if (cached !== null) {
-		console.log(`Cache HIT: Similar artists for "${artistName}" (${cached.length} artists)`);
+		const logger = _getCacheLogger();
+		logger?.debug('Cache', `HIT: Similar artists for "${artistName}" (${cached.length} artists)`);
 	}
-	
+
 	return cached;
 }
 
@@ -97,7 +101,8 @@ function cacheSimilarArtists(artistName, artists) {
 	if (!lastfmRunCache?.similarArtists) return;
 	const key = cacheKeyArtist(artistName);
 	lastfmRunCache.similarArtists.set(key, artists || []);
-	console.log(`Cache STORE: Similar artists for "${artistName}" (${(artists || []).length} artists)`);
+	const logger = _getCacheLogger();
+	logger?.debug('Cache', `STORE: Similar artists for "${artistName}" (${(artists || []).length} artists)`);
 }
 
 /**
@@ -113,11 +118,12 @@ function getCachedTopTracks(artistName, limit, withPlaycount = false) {
 	const cached = lastfmRunCache.topTracks.has(key) 
 		? lastfmRunCache.topTracks.get(key) 
 		: null;
-	
+
 	if (cached !== null) {
-		console.log(`Cache HIT: Top tracks for "${artistName}" limit=${limit} withPlaycount=${withPlaycount} (${cached.length} tracks)`);
+		const logger = _getCacheLogger();
+		logger?.debug('Cache', `HIT: Top tracks for "${artistName}" limit=${limit} withPlaycount=${withPlaycount} (${cached.length} tracks)`);
 	}
-	
+
 	return cached;
 }
 
@@ -132,7 +138,8 @@ function cacheTopTracks(artistName, limit, withPlaycount, tracks) {
 	if (!lastfmRunCache?.topTracks) return;
 	const key = cacheKeyTopTracks(artistName, limit, withPlaycount);
 	lastfmRunCache.topTracks.set(key, tracks || []);
-	console.log(`Cache STORE: Top tracks for "${artistName}" limit=${limit} withPlaycount=${withPlaycount} (${(tracks || []).length} tracks)`);
+	const logger = _getCacheLogger();
+	logger?.debug('Cache', `STORE: Top tracks for "${artistName}" limit=${limit} withPlaycount=${withPlaycount} (${(tracks || []).length} tracks)`);
 }
 
 /**
@@ -153,9 +160,9 @@ function getCacheStats() {
 		active: true,
 		similarArtists: lastfmRunCache.similarArtists?.size || 0,
 		topTracks: lastfmRunCache.topTracks?.size || 0,
-		similarTracks: lastfmRunCache._similarTracks?.size || 0,
-		artistInfo: lastfmRunCache._artistInfo?.size || 0,
-		reccobeats: lastfmRunCache._reccobeats?.size || 0,
+		similarTracks: lastfmRunCache.similarTracks?.size || 0,
+		artistInfo: lastfmRunCache.artistInfo?.size || 0,
+		reccobeats: lastfmRunCache.reccobeats?.size || 0,
 	};
 }
 

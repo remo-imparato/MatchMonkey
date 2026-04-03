@@ -103,7 +103,15 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function (sett, 
 		UI.TracksPerArtist.controlClass.value = cfg.TracksPerArtist || 30;
 		UI.MaxPlaylistTracks.controlClass.value = cfg.MaxPlaylistTracks || 0; // 0 = unlimited
 		UI.UseLastfmRanking.controlClass.checked = cfg.UseLastfmRanking !== false; // Default true
-		UI.PreferHighQuality.controlClass.checked = cfg.PreferHighQuality !== false; // Default true
+
+		// Audio format preference: 'Mixed (all formats)' | 'Lossless only' | 'Lossy only'
+		// Map from stored value (if using legacy PreferHighQuality boolean, migrate to Mixed)
+		let audioFormatPref = cfg.AudioFormatPreference || 'Mixed (all formats)';
+		if (audioFormatPref === true || audioFormatPref === false) {
+			// Migrate legacy PreferHighQuality boolean to new AudioFormatPreference
+			audioFormatPref = 'Mixed (all formats)';
+		}
+		UI.AudioFormatPreference.controlClass.value = audioFormatPref;
 
 		// === Rating Filter ===
 		const ratingValue = parseInt(cfg.MinRating, 10) || 0;
@@ -112,7 +120,12 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function (sett, 
 
 		// === Mood & Activity Blend Ratio ===
 		// Blend ratio: stored as 0.0-1.0, displayed as 0-100%
-		const blendRatioPercent = Math.round((cfg.MoodActivityBlendRatio ?? 0.5) * 100);
+		// Default is 0.3 (30% preset, 70% seed) to preserve seed character
+		// Note: 0 is valid (100% seed only), so use explicit null/undefined check
+		const blendRatioValue = (cfg.MoodActivityBlendRatio !== null && cfg.MoodActivityBlendRatio !== undefined)
+			? cfg.MoodActivityBlendRatio
+			: 0.3;
+		const blendRatioPercent = Math.round(blendRatioValue * 100);
 		UI.MoodActivityBlendRatio.controlClass.value = blendRatioPercent;
 
 		// === Local Collection (MediaMonkey collections) ===
@@ -122,11 +135,12 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function (sett, 
 
 		// === API Thresholds ===
 		// ApiMinMatch: single threshold for both Last.fm match and ReccoBeats popularity (0.00-99.99%)
+		// Treat blank, null, undefined, or 0 as "no filtering" (disabled)
 		if (UI.ApiMinMatch && UI.ApiMinMatch.controlClass) {
 			const apiMatch = typeof cfg.ApiMinMatch === 'number' ? cfg.ApiMinMatch : parseFloat(cfg.ApiMinMatch);
-			const apiMatchVal = Number.isFinite(apiMatch) ? Math.max(0, Math.min(99.99, apiMatch)) : 40.0;
-			// Display with two decimals
-			UI.ApiMinMatch.controlClass.value = apiMatchVal.toFixed(2);
+			const apiMatchVal = Number.isFinite(apiMatch) && apiMatch > 0 ? Math.max(0, Math.min(99.99, apiMatch)) : '';
+			// Display with two decimals or blank for no filtering
+			UI.ApiMinMatch.controlClass.value = apiMatchVal === '' ? '' : apiMatchVal.toFixed(2);
 		}
 
 		// === Auto-Mode Settings ===
@@ -293,7 +307,9 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 		this.config.TracksPerArtist = parseInt(UI.TracksPerArtist.controlClass.value, 10) || 30;
 		this.config.MaxPlaylistTracks = parseInt(UI.MaxPlaylistTracks.controlClass.value, 10) || 0;
 		this.config.UseLastfmRanking = UI.UseLastfmRanking.controlClass.checked;
-		this.config.PreferHighQuality = UI.PreferHighQuality.controlClass.checked;
+
+		// Audio format preference: 'Mixed (all formats)' | 'Lossless only' | 'Lossy only'
+		this.config.AudioFormatPreference = UI.AudioFormatPreference.controlClass.value || 'Mixed (all formats)';
 
 		// === Rating Filter ===
 		const rawRating = Number.isFinite(UI.MinRating.controlClass.value)
@@ -304,8 +320,13 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 
 		// === Mood & Activity Blend Ratio ===
 		// Convert slider percentage (0-100) to ratio (0.0-1.0)
-		const blendRatioPercent = parseInt(UI.MoodActivityBlendRatio.controlClass.value, 10) || 50;
-		this.config.MoodActivityBlendRatio = Math.max(0, Math.min(100, blendRatioPercent)) / 100.0;
+		// Default is 30% (0.3) to preserve seed character when blending with presets
+		// Note: 0 is valid (100% seed only), so check for undefined before parsing
+		const rawBlendValue = UI.MoodActivityBlendRatio.controlClass.value;
+		const blendRatioPercent = (rawBlendValue !== null && rawBlendValue !== undefined)
+			? Math.max(0, Math.min(100, parseInt(rawBlendValue, 10)))
+			: 30;
+		this.config.MoodActivityBlendRatio = blendRatioPercent / 100.0;
 
 		// === Auto-Mode ===
 		// Get auto-mode state from addon if available, otherwise from checkbox
@@ -342,13 +363,21 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 
 		// === API Thresholds ===
 		// ApiMinMatch: single threshold for both Last.fm match and ReccoBeats popularity (0.00-99.99%)
+		// Treat blank or 0 as "no filtering" (disabled)
 		if (UI.ApiMinMatch && UI.ApiMinMatch.controlClass) {
-			let apiMatch = parseFloat(String(UI.ApiMinMatch.controlClass.value).replace(',', '.'));
-			if (!Number.isFinite(apiMatch))
-				apiMatch = 10.0;
-			apiMatch = Math.max(0.0, Math.min(99.99, apiMatch));
-			// Store as number with two decimals precision
-			this.config.ApiMinMatch = Math.round(apiMatch * 100) / 100;
+			const rawValue = String(UI.ApiMinMatch.controlClass.value || '').trim();
+			if (rawValue === '') {
+				// Blank = no filtering, store as null or undefined
+				this.config.ApiMinMatch = undefined;
+			} else {
+				let apiMatch = parseFloat(rawValue.replace(',', '.'));
+				if (!Number.isFinite(apiMatch) || apiMatch < 0) {
+					apiMatch = 0;
+				}
+				apiMatch = Math.min(99.99, apiMatch);
+				// Store as number with two decimals precision, or 0 for disabled
+				this.config.ApiMinMatch = Math.round(apiMatch * 100) / 100;
+			}
 		}
 
 		// === Queue Behavior ===

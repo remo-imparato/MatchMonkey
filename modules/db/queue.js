@@ -8,6 +8,9 @@
 
 'use strict';
 
+/** Helper to get logger instance safely */
+const _getQueueLogger = () => window.matchMonkeyLogger;
+
 /**
  * Add a single track to the Now Playing queue.
  *
@@ -17,13 +20,14 @@
  * @returns {Promise<boolean>} True if successfully queued
  */
 async function queueTrack(track, playNow = false) {
+	const logger = _getQueueLogger();
 	if (!track || typeof track !== 'object') {
-		console.error('queueTrack: Invalid track object');
+		logger?.error('Queue', 'queueTrack: Invalid track object');
 		return false;
 	}
 
 	if (typeof app === 'undefined' || !app.player) {
-		console.error('queueTrack: app.player not available');
+		logger?.error('Queue', 'queueTrack: app.player not available');
 		return false;
 	}
 
@@ -40,7 +44,7 @@ async function queueTrack(track, playNow = false) {
 
 		return true;
 	} catch (e) {
-		console.error('queueTrack error:', e);
+		logger?.error('Queue', 'queueTrack error: ' + e.toString());
 		return false;
 	}
 }
@@ -55,12 +59,13 @@ async function queueTrack(track, playNow = false) {
  * @returns {Promise<number>} Number of tracks successfully queued
  */
 async function queueTracks(tracks, playNow = false, clearFirst = false) {
+	const logger = _getQueueLogger();
 	if (!Array.isArray(tracks) || tracks.length === 0) {
 		return 0;
 	}
 
 	if (typeof app === 'undefined' || !app.player) {
-		console.error('queueTracks: app.player not available');
+		logger?.error('Queue', 'queueTracks: app.player not available');
 		return 0;
 	}
 
@@ -87,10 +92,10 @@ async function queueTracks(tracks, playNow = false, clearFirst = false) {
 			startPlayback: playNow,
 		});
 
-		console.log(`queueTracks: Queued ${validCount} tracks`);
+		logger?.debug('Queue', `queueTracks: Queued ${validCount} tracks`);
 		return validCount;
 	} catch (e) {
-		console.error('queueTracks error:', e);
+		logger?.error('Queue', 'queueTracks error: ' + e.toString());
 		return 0;
 	}
 }

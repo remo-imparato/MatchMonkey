@@ -286,9 +286,9 @@
 		 * cache structure with separate Maps for each type:
 		 * - similarArtists: Last.fm similar artists
 		 * - topTracks: Last.fm top tracks
-		 * - _similarTracks: Last.fm similar tracks
-		 * - _artistInfo: Last.fm artist info
-		 * - _reccobeats: ReccoBeats API responses
+		 * - similarTracks: Last.fm similar tracks
+		 * - artistInfo: Last.fm artist info
+		 * - reccobeats: ReccoBeats API responses
 		 * 
 		 * @returns {object} Result object with success status and stats
 		 */

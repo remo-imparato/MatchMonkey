@@ -15,6 +15,46 @@
 
 'use strict';
 
+// Get logger reference
+const _getLibraryLogger = () => window.matchMonkeyLogger;
+
+/**
+ * Helper function to determine if a track matches the format preference.
+ * Since Songs.FileType and Songs.FileExtension don't exist as database columns,
+ * format filtering must be done post-query using track object properties.
+ *
+ * @param {object} track - Track object with fileType/fileExtension properties
+ * @param {string} formatPreference - Format filter: 'Mixed (all formats)', 'Lossless only', or 'Lossy only'
+ * @returns {boolean} True if track matches the format preference
+ */
+function matchesFormatPreference(track, formatPreference) {
+	if (!formatPreference || formatPreference === 'Mixed (all formats)') {
+		return true; // No filtering
+	}
+
+	if (!track) return false;
+
+	// Get file extension and type (with fallbacks for different property names)
+	const ext = (track.fileExtension || track.FileExtension || '').toLowerCase().replace('.', '');
+	const type = (track.fileType || track.FileType || '').toLowerCase();
+
+	if (formatPreference === 'Lossless only') {
+		// Lossless formats: FLAC, APE, WAV, ALAC/M4A, WavPack
+		const losslessExts = ['flac', 'ape', 'wav', 'm4a', 'wv'];
+		const losslessTypes = ['flac', 'ape', 'wav', 'alac', 'wavpack'];
+		return losslessExts.includes(ext) || losslessTypes.includes(type);
+	}
+
+	if (formatPreference === 'Lossy only') {
+		// Lossy formats: MP3, OGG, AAC, WMA
+		const lossyExts = ['mp3', 'ogg', 'aac', 'wma', 'm4p'];
+		const lossyTypes = ['mp3', 'ogg', 'aac', 'wma'];
+		return lossyExts.includes(ext) || lossyTypes.includes(type);
+	}
+
+	return true; // Unknown preference - include track
+}
+
 /**
  * Find tracks in the library matching optional artist name and/or track titles.
  *
@@ -36,11 +76,13 @@
  */
 async function findLibraryTracks(artistName, trackTitles, limit = 100, options = {}) {
 	try {
-		const { rank = true, best = false, minRating = 0, allowUnknown = true, collection = '' } = options;
+		const { rank = true, formatPreference = 'Mixed (all formats)', minRating = 0, allowUnknown = true, collection = '' } = options;
+
+		const logger = _getLibraryLogger();
 
 		// Validate MM5 environment
 		if (typeof app === 'undefined' || !app.db || !app.db.getTracklist) {
-			console.warn('findLibraryTracks: MM5 app.db.getTracklist not available');
+			logger?.warn('Library', 'findLibraryTracks: MM5 app.db.getTracklist not available');
 			return [];
 		}
 
@@ -112,17 +154,19 @@ async function findLibraryTracks(artistName, trackTitles, limit = 100, options =
 		})();
 
 		// Build WHERE clause
+		// Note: Format filtering is applied post-query in JavaScript (Songs.FileType/FileExtension are not SQL columns)
 		const where = [];
 		if (artistClause) where.push(artistClause);
 		if (titleClause) where.push(titleClause);
 		if (ratingClause) where.push(ratingClause);
 
-		const orderClause = best ? 'ORDER BY Songs.Rating DESC, Random()' : 'ORDER BY Random()';
+		// Always order by bitrate descending for quality, then random for variety
+		const orderClause = 'ORDER BY Songs.Bitrate DESC, Random()';
 
 		// Collection filtering - disabled until MM5 schema is confirmed
 		// MediaMonkey 5 may not have CollectionsSongs/Collections tables
 		if (collection) {
-			console.warn('findLibraryTracks: Collection filtering is not yet supported in MM5 - ignoring collection filter');
+			logger?.warn('Library', 'findLibraryTracks: Collection filtering is not yet supported in MM5 - ignoring collection filter');
 		}
 
 		// Different query structure depending on whether we're filtering by artist
@@ -157,7 +201,7 @@ async function findLibraryTracks(artistName, trackTitles, limit = 100, options =
 
 		// Return the tracklist directly - MM5 tracklists can be used for adding to playlists
 		// We need to return track objects that can be added to a playlist
-		const results = [];
+		let results = [];
 		if (typeof tracklist.locked === 'function') {
 			tracklist.locked(() => {
 				const count = tracklist.count || 0;
@@ -169,17 +213,27 @@ async function findLibraryTracks(artistName, trackTitles, limit = 100, options =
 			});
 		}
 
+		// Apply format filtering post-query (FileType/FileExtension are track properties, not SQL columns)
+		if (formatPreference && formatPreference !== 'Mixed (all formats)') {
+			const beforeFilter = results.length;
+			results = results.filter(track => matchesFormatPreference(track, formatPreference));
+			if (results.length < beforeFilter) {
+				logger?.debug('Library', `findLibraryTracks: Format filter "${formatPreference}" removed ${beforeFilter - results.length} tracks (${results.length} remain)`);
+			}
+		}
+
 		if (results.length > 0) {
 			const searchDesc = artistName ? `"${artistName}"` : 'entire library';
 			const summary = results.slice(0, 3).map(r =>
 				`"${r.title || r.SongTitle || ''}" by ${r.artist || r.Artist || ''}`
 			).join(', ');
-			console.log(`findLibraryTracks: Found ${results.length} track(s) from ${searchDesc}: ${summary}${results.length > 3 ? '...' : ''}`);
+			logger?.info('Library', `findLibraryTracks: Found ${results.length} track(s) from ${searchDesc}: ${summary}${results.length > 3 ? '...' : ''}`);
 		}
 
 		return results;
 	} catch (e) {
-		console.error('findLibraryTracks error: ' + e.toString());
+		const logger = _getLibraryLogger();
+		logger?.error('Library', 'findLibraryTracks error: ' + e.toString());
 		return [];
 	}
 }
@@ -210,20 +264,22 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 		resultMap.set(title, []);
 	}
 
+	const logger = _getLibraryLogger();
+
 	try {
 		// Validate MM5 environment
 		if (typeof app === 'undefined' || !app.db || !app.db.getTracklist) {
-			console.warn('findLibraryTracksBatch: MM5 app.db.getTracklist not available');
+			logger?.warn('Library', 'findLibraryTracksBatch: MM5 app.db.getTracklist not available');
 			return resultMap;
 		}
 
 		const normalizedArtist = window.matchMonkeyPrefixes?.fixPrefixes?.(artistName) || artistName;
 		if (!normalizedArtist) {
-			console.warn('findLibraryTracksBatch: Invalid artist name');
+			logger?.warn('Library', 'findLibraryTracksBatch: Invalid artist name');
 			return resultMap;
 		}
 
-		const { best = false, minRating = 0, allowUnknown = false, collection = '' } = options;
+		const { formatPreference = 'Mixed (all formats)', minRating = 0, allowUnknown = false, collection = '' } = options;
 		const ratingThreshold = Number(minRating) || 0;
 
 		// SQL escaping helpers
@@ -305,11 +361,14 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 			whereParts.push(`(Songs.Rating >= 0 AND Songs.Rating <= 100)`);
 		}
 
-		const orderClause = best ? ' ORDER BY Songs.Rating DESC, Random()' : ' ORDER BY Random()';
+		// Note: Format filtering is applied post-query in JavaScript (Songs.FileType/FileExtension are not SQL columns)
+
+		// Always order by bitrate descending for quality, then random for variety
+		const orderClause = ' ORDER BY Songs.Bitrate DESC, Random()';
 
 		// Collection filtering - disabled until MM5 schema is confirmed
 		if (collection) {
-			console.warn('findLibraryTracksBatch: Collection filtering is not yet supported in MM5 - ignoring collection filter');
+			logger?.warn('Library', 'findLibraryTracksBatch: Collection filtering is not yet supported in MM5 - ignoring collection filter');
 		}
 
 		const query = `
@@ -323,6 +382,9 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 					${orderClause}
 					LIMIT ${Math.max(1, Math.min(limit * wanted.length, 10000))}
 				`;
+
+		// Log SQL query in debug mode
+		logger?.debug('Library', `findLibraryTracksBatch SQL: ${query.replace(/\s+/g, ' ').trim()}`);
 
 		// Execute query via MM5 API
 		const tl = app.db.getTracklist(query, -1);
@@ -361,18 +423,40 @@ async function findLibraryTracksBatch(artistName, trackTitles, limit = 100, opti
 			});
 		}
 
+		// Apply format filtering post-query (FileType/FileExtension are track properties, not SQL columns)
+		if (formatPreference && formatPreference !== 'Mixed (all formats)') {
+			let totalBeforeFilter = 0;
+			let totalAfterFilter = 0;
+
+			for (const [title, tracks] of resultMap.entries()) {
+				const beforeCount = tracks.length;
+				totalBeforeFilter += beforeCount;
+
+				// Filter tracks by format preference
+				const filtered = tracks.filter(track => matchesFormatPreference(track, formatPreference));
+				totalAfterFilter += filtered.length;
+
+				// Update the map with filtered results
+				resultMap.set(title, filtered);
+			}
+
+			if (totalAfterFilter < totalBeforeFilter) {
+				logger?.debug('Library', `findLibraryTracksBatch: Format filter "${formatPreference}" removed ${totalBeforeFilter - totalAfterFilter} tracks (${totalAfterFilter} remain)`);
+			}
+		}
+
 		// Log summary
 		let totalMatches = 0;
 		for (const arr of resultMap.values()) {
 			totalMatches += arr.length;
 		}
 		if (totalMatches > 0) {
-			console.log(`findLibraryTracksBatch: Found ${totalMatches} match(es) for "${artistName}" across ${wanted.length} title(s)`);
+			logger?.info('Library', `findLibraryTracksBatch: Found ${totalMatches} match(es) for "${artistName}" across ${wanted.length} title(s)`);
 		}
 
 		return resultMap;
 	} catch (e) {
-		console.error('findLibraryTracksBatch error: ' + e.toString());
+		logger?.error('Library', 'findLibraryTracksBatch error: ' + e.toString());
 	}
 
 	return resultMap;

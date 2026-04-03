@@ -77,7 +77,7 @@
 						<label class="inline">API min match (%):</label>
 						<div data-id="ApiMinMatch"
 							 data-control-class="Edit"
-							 data-tip="Minimum match/popularity threshold (0.00-99.99%). Used for both Last.fm match and ReccoBeats popularity filtering. Recommendations below this threshold are ignored."
+							 data-tip="Minimum match/popularity threshold (0.00-99.99%). Used for both Last.fm match and ReccoBeats popularity filtering. Leave blank or set to 0 to disable filtering (accept all recommendations)."
 							 data-init-params='{type:"number",min:0,max:99.99,step:0.01}'></div>
 					</div>
 
@@ -104,7 +104,12 @@
 					</div>
 
 					<div class="uiRow">
-						<div data-id="PreferHighQuality" data-control-class="Checkbox" data-tip="When possible, prefer higher bitrate / better quality versions of tracks.">Prefer high quality versions?</div>
+						<label class="inline">Audio format preference:</label>
+						<div data-id="AudioFormatPreference" data-control-class="Dropdown" data-tip="Choose which audio formats to include and how to prioritize quality. Mixed = all formats (prefer highest bitrate), Lossless = only FLAC/APE/WAV/ALAC/WavPack, Lossy = only MP3/OGG/AAC/WMA. All modes order by bitrate descending.">
+							<option>Mixed (all formats)</option>
+							<option>Lossless only</option>
+							<option>Lossy only</option>
+						</div>
 					</div>
 
 					<div class="uiRow">

@@ -264,7 +264,8 @@ function parseListSetting(raw) {
 
 		return [];
 	} catch (e) {
-		console.error('Match Monkey: parseListSetting error: ' + e.toString());
+		const logger = window.matchMonkeyLogger;
+		logger?.error('Helpers', 'parseListSetting error: ' + e.toString());
 		return [];
 	}
 }

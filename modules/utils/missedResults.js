@@ -13,8 +13,11 @@
 
 'use strict';
 
+// Get logger reference
+const _getMissedLogger = () => window.matchMonkeyLogger;
+
 const STORAGE_KEY = 'MatchMonkey_MissedResults';
-const MAX_RESULTS = 10000; // Maximum number of missed results to store
+const MAX_RESULTS = 50000; // Maximum number of missed results to store
 
 /**
  * Missed result structure:
@@ -37,6 +40,7 @@ const MAX_RESULTS = 10000; // Maximum number of missed results to store
  * Initialize the missed results storage
  */
 function init() {
+	const logger = _getMissedLogger();
 	try {
 		// Get current value
 		const current = app.getValue(STORAGE_KEY, []);
@@ -44,17 +48,17 @@ function init() {
 		// If null, undefined, or not an array, initialize with empty array
 		if (!current || !Array.isArray(current)) {
 			app.setValue(STORAGE_KEY, []);
-			console.log('MatchMonkey Missed Results: Initialized with empty array');
+			logger?.debug('MissedResults', 'Initialized with empty array');
 		} else {
-			console.log(`MatchMonkey Missed Results: Initialized with ${current.length} existing results`);
+			logger?.debug('MissedResults', `Initialized with ${current.length} existing results`);
 		}
 	} catch (e) {
-		console.error('MatchMonkey Missed Results: Initialization error:', e);
+		logger?.error('MissedResults', 'Initialization error: ' + e.toString());
 		// Try to set empty array as fallback
 		try {
 			app.setValue(STORAGE_KEY, []);
 		} catch (e2) {
-			console.error('MatchMonkey Missed Results: Failed to initialize storage:', e2);
+			logger?.error('MissedResults', 'Failed to initialize storage: ' + e2.toString());
 		}
 	}
 }
@@ -65,6 +69,7 @@ function init() {
  * @returns {Array} Array of missed results
  */
 function getAll() {
+	const logger = _getMissedLogger();
 	try {
 		const results = app.getValue(STORAGE_KEY, []);
 
@@ -74,13 +79,13 @@ function getAll() {
 		}
 
 		if (!Array.isArray(results)) {
-			console.warn('MatchMonkey Missed Results: Storage contained non-array, returning empty array');
+			logger?.warn('MissedResults', 'Storage contained non-array, returning empty array');
 			return [];
 		}
 
 		return results;
 	} catch (e) {
-		console.error('MatchMonkey Missed Results: Error getting results:', e);
+		logger?.error('MissedResults', 'Error getting results: ' + e.toString());
 		return [];
 	}
 }
@@ -91,6 +96,7 @@ function getAll() {
  * @returns {object} Statistics {total, uniqueArtists, totalOccurrences, avgPopularity}
  */
 function getStats() {
+	const logger = _getMissedLogger();
 	try {
 		const results = getAll();
 
@@ -105,7 +111,7 @@ function getStats() {
 
 		return stats;
 	} catch (e) {
-		console.error('MatchMonkey Missed Results: Error getting stats:', e);
+		logger?.error('MissedResults', 'Error getting stats: ' + e.toString());
 		return { total: 0, uniqueArtists: 0, totalOccurrences: 0, avgPopularity: 0 };
 	}
 }
@@ -120,9 +126,10 @@ function getStats() {
  * @param {object} additionalInfo - Optional additional information (source, playcount, etc.)
  */
 function add(artist, title, album = '', popularity = 0, additionalInfo = {}) {
+	const logger = _getMissedLogger();
 	// Validate inputs
 	if (!artist || !title) {
-		console.warn('MatchMonkey Missed Results: Cannot add result without artist and title');
+		logger?.warn('MissedResults', 'Cannot add result without artist and title');
 		return;
 	}
 
@@ -134,12 +141,12 @@ function add(artist, title, album = '', popularity = 0, additionalInfo = {}) {
 		popularity = isNaN(popularity) ? 0 : Math.max(0, Math.min(100, Number(popularity)));
 		additionalInfo = (typeof additionalInfo === 'object' && additionalInfo !== null) ? additionalInfo : {};
 	} catch (e) {
-		console.error('MatchMonkey Missed Results: Error sanitizing inputs:', e);
+		logger?.error('MissedResults', 'Error sanitizing inputs: ' + e.toString());
 		return;
 	}
 
 	if (!artist || !title) {
-		console.warn('MatchMonkey Missed Results: Cannot add result - artist or title empty after sanitization');
+		logger?.warn('MissedResults', 'Cannot add result - artist or title empty after sanitization');
 		return;
 	}
 
@@ -184,7 +191,7 @@ function add(artist, title, album = '', popularity = 0, additionalInfo = {}) {
 				...additionalInfo
 			};
 
-			console.log(`MatchMonkey Missed Results: Updated existing - ${artist} - ${title} (occurrences: ${results[existingIndex].occurrences}, popularity: ${popularity}%)`);
+			//console.log(`MatchMonkey Missed Results: Updated existing - ${artist} - ${title} (occurrences: ${results[existingIndex].occurrences}, popularity: ${popularity}%)`);
 		} else {
 			// Create new result object
 			const result = {
@@ -198,7 +205,7 @@ function add(artist, title, album = '', popularity = 0, additionalInfo = {}) {
 			// Add to beginning of array (most recent first)
 			results.unshift(result);
 
-			console.log(`MatchMonkey Missed Results: Added new - ${artist} - ${title} (popularity: ${popularity}%)`);
+			//console.log(`MatchMonkey Missed Results: Added new - ${artist} - ${title} (popularity: ${popularity}%)`);
 		}
 
 		// Limit size
@@ -220,7 +227,7 @@ function add(artist, title, album = '', popularity = 0, additionalInfo = {}) {
 		}
 
 	} catch (e) {
-		console.error('MatchMonkey Missed Results: Error adding result:', e);
+		logger?.error('MissedResults', 'Error adding result: ' + e.toString());
 	}
 }
 
@@ -230,11 +237,12 @@ function add(artist, title, album = '', popularity = 0, additionalInfo = {}) {
  * @param {Array} results - Array of result objects with {artist, title, album, popularity, additionalInfo}
  */
 function addBatch(results) {
+	const logger = _getMissedLogger();
 	if (!Array.isArray(results) || results.length === 0) {
 		return;
 	}
 
-	console.log(`MatchMonkey Missed Results: Adding batch of ${results.length} results`);
+	logger?.debug('MissedResults', `Adding batch of ${results.length} results`);
 
 	let successCount = 0;
 	let errorCount = 0;
@@ -243,13 +251,13 @@ function addBatch(results) {
 		try {
 			// Validate result object
 			if (!result || typeof result !== 'object') {
-				console.warn(`MatchMonkey Missed Results: Invalid result at index ${index} - not an object`);
+				logger?.warn('MissedResults', `Invalid result at index ${index} - not an object`);
 				errorCount++;
 				return;
 			}
 
 			if (!result.artist || !result.title) {
-				console.warn(`MatchMonkey Missed Results: Invalid result at index ${index} - missing artist or title`);
+				logger?.warn('MissedResults', `Invalid result at index ${index} - missing artist or title`);
 				errorCount++;
 				return;
 			}
@@ -263,15 +271,30 @@ function addBatch(results) {
 			);
 			successCount++;
 		} catch (e) {
-			console.error(`MatchMonkey Missed Results: Error adding result at index ${index}:`, e);
+			logger?.error('MissedResults', `Error adding result at index ${index}: ${e}`);
 			errorCount++;
 		}
 	});
 
 	if (errorCount > 0) {
-		console.warn(`MatchMonkey Missed Results: Batch complete - ${successCount} succeeded, ${errorCount} failed`);
+		logger?.warn('MissedResults', `Batch complete - ${successCount} succeeded, ${errorCount} failed`);
 	} else {
-		console.log(`MatchMonkey Missed Results: Batch complete - ${successCount} results added`);
+		logger?.info('MissedResults', `Batch complete - ${successCount} results added`);
+	}
+
+	// Log final storage size after batch
+	try {
+		const allResults = getAll();
+		const jsonSize = JSON.stringify(allResults).length;
+		const sizeKB = (jsonSize / 1024).toFixed(2);
+		const sizeMB = (jsonSize / (1024 * 1024)).toFixed(2);
+		if (jsonSize > 1024 * 1024) {
+			logger?.debug('MissedResults', `Total storage size: ${sizeMB} MB (${allResults.length} results)`);
+		} else {
+			logger?.debug('MissedResults', `Total storage size: ${sizeKB} KB (${allResults.length} results)`);
+		}
+	} catch (e) {
+		// Size monitoring not critical
 	}
 }
 
@@ -282,11 +305,12 @@ function addBatch(results) {
  * @returns {Array} Filtered results
  */
 function getByArtist(artist) {
+	const logger = _getMissedLogger();
 	try {
 		const results = getAll();
 		return results.filter(r => r.artist === artist);
 	} catch (e) {
-		console.error('MatchMonkey Missed Results: Error filtering by artist:', e);
+		logger?.error('MissedResults', 'Error filtering by artist: ' + e.toString());
 		return [];
 	}
 }
@@ -295,8 +319,9 @@ function getByArtist(artist) {
  * Clear all missed results
  */
 function clear() {
+	const logger = _getMissedLogger();
 	try {
-		console.log('MatchMonkey Missed Results: Clearing all results');
+		logger?.info('MissedResults', 'Clearing all results');
 		app.setValue(STORAGE_KEY, []);
 
 		// Dispatch event
@@ -307,7 +332,7 @@ function clear() {
 			// Event dispatch not critical
 		}
 	} catch (e) {
-		console.error('MatchMonkey Missed Results: Error clearing:', e);
+		logger?.error('MissedResults', 'Error clearing: ' + e.toString());
 	}
 }
 

@@ -26,6 +26,7 @@ localRequirejs('matchMonkey');  // -> window.matchMonkey
 localRequirejs('modules/config');
 
 // Utilities (no dependencies)
+localRequirejs('modules/utils/logger');          // CRITICAL: Load logger first - all other modules depend on it
 localRequirejs('modules/utils/normalization');
 localRequirejs('modules/utils/helpers');
 localRequirejs('modules/utils/sql');
@@ -57,9 +58,13 @@ localRequirejs('modules/core/orchestration');
 localRequirejs('modules/core/autoMode');
 localRequirejs('modules/core/mm5Integration');
 
-/*
+// ============================================================================
+// DEBUGGING TOOLS (UNCOMMENT TO ENABLE)
+// ============================================================================
 
-//Debuging tools (depend on utils)
+/* ********************************* Debugging Tools TURN ON HERE *****************************************
+
+//Debugging tools (depend on utils)
 requirejs('helpers/debugTools');
 registerDebuggerEntryPoint.call(this, 'start');
 
@@ -142,7 +147,7 @@ function start() {
 		NavigateAfter: 'Navigate to new playlist', // Navigation after completion
 
 		// === Mood/Activity Discovery (ReccoBeats) ===
-		MoodActivityBlendRatio: 0.5,    // Blend ratio: 0.5 = 50% seeds + 50% mood (0=all mood, 1=all seeds)
+		MoodActivityBlendRatio: 0.3,    // Blend ratio: 0.3 = 70% seeds + 30% mood/activity (0=all mood, 1=all seeds)
 
 		// === Underdeveloped / Experimental Features ===
 		HybridMode: false,               // Combine ReccoBeats + Last.fm
