@@ -261,7 +261,12 @@ window.matchMonkeyOrchestration = {
 			// Log discovery results with appropriate message based on mode
 			if (discoveryMode === 'mood' || discoveryMode === 'activity') {
 				const audioFiltered = discoveryStats.audioFeatureFilteredCount || 0;
-				logger.info('Discovery', `Found ${candidates.length} candidates (${audioFiltered} filtered by audio features)`);
+				const apiFiltered = discoveryStats.apiFilteredCount || 0;
+				const filterParts = [];
+				if (audioFiltered > 0) filterParts.push(`${audioFiltered} filtered by audio features`);
+				if (apiFiltered > 0) filterParts.push(`${apiFiltered} filtered by API threshold`);
+				const filterMsg = filterParts.length > 0 ? ` (${filterParts.join(', ')})` : '';
+				logger.info('Discovery', `Found ${candidates.length} candidates${filterMsg}`);
 			} else {
 				const apiFiltered = discoveryStats.apiFilteredCount || 0;
 				logger.info('Discovery', `Found ${candidates.length} candidates${apiFiltered > 0 ? ` (${apiFiltered} filtered by API threshold)` : ''}`);
@@ -808,101 +813,140 @@ window.matchMonkeyOrchestration = {
 							}
 						);
 
-						// Helper to check if track passes rating filter
-						const passesRatingFilter = (track) => {
-							if (!track || config.minRating <= 0) return true;
-							const rating = track.rating || track.Rating || -1;
-							// If allowUnknown is true, include unrated tracks (-1)
-							if (config.allowUnknown && rating < 0) return true;
-							// Otherwise check if rating meets threshold
-							return rating >= config.minRating && rating <= 100;
+						// Helper: determine audio quality priority (higher = better)
+						const getFormatPriority = (track) => {
+							if (!track) return 0;
+							const ext = (track.fileExtension || track.FileExtension || '').toLowerCase().replace('.', '');
+							const type = (track.fileType || track.FileType || '').toLowerCase();
+							if (ext === 'flac' || type === 'flac') return 100;
+							if (ext === 'ape' || type === 'ape') return 95;
+							if (ext === 'wav' || type === 'wav') return 90;
+							if (ext === 'alac' || ext === 'm4a' || type === 'alac') return 85;
+							if (ext === 'wv' || type === 'wavpack') return 80;
+							if (ext === 'mp3' || type === 'mp3') {
+								const bitrate = track.bitrate || track.Bitrate || 0;
+								if (bitrate >= 320) return 70;
+								if (bitrate >= 256) return 65;
+								if (bitrate >= 192) return 60;
+								return 50;
+							}
+							if (ext === 'ogg' || type === 'ogg') return 55;
+							if (ext === 'aac' || type === 'aac') return 52;
+							if (ext === 'wma' || type === 'wma') return 45;
+							return 0;
+						};
+
+						// Helper: decide whether the track group should be included
+						// based on the BEST rating across all versions of the same track.
+						// Rules:
+						//  1. If ANY version is rated >= minRating -> include (pick best quality later)
+						//  2. If versions exist but ALL rated below minRating -> exclude
+						//  3. If ALL versions are unrated -> respect allowUnknown setting
+						const shouldIncludeTrackGroup = (groupTracks) => {
+							if (config.minRating <= 0) return true; // No rating filter active
+
+							let hasRated = false;
+							let bestRating = -1;
+
+							for (const t of groupTracks) {
+								const r = t.rating ?? t.Rating ?? -1;
+								if (r >= 0) {
+									hasRated = true;
+									if (r > bestRating) bestRating = r;
+								}
+							}
+
+							if (!hasRated) {
+								// All versions are unrated – defer to allowUnknown
+								return config.allowUnknown;
+							}
+
+							// At least one version is rated – include if best meets threshold
+							return bestRating >= config.minRating;
 						};
 
 						// Process each title and separate into matched vs filtered
 						for (const [title, allTracks] of allTracksMap.entries()) {
-							// Apply rating filter in-memory
-							const matchedTracks = allTracks.filter(passesRatingFilter);
+							if (allTracks.length > 0) {
+								if (shouldIncludeTrackGroup(allTracks)) {
+									// Pick the highest-quality version regardless of its individual rating
+									const bestTrack = allTracks.reduce((best, cur) =>
+										getFormatPriority(cur) > getFormatPriority(best) ? cur : best
+									);
+									tracks.push(bestTrack);
 
-							if (matchedTracks.length > 0) {
-								// Found tracks that pass the rating filter
-								tracks.push(...matchedTracks);
-
-								// Log matched track with its API popularity/match value
-								const originalTrack = candidate.tracks.find(t => {
-									const trackTitle = typeof t === 'string' ? t : (t.title || '');
-									return trackTitle === title;
-								});
-								let matchVal = 0;
-								if (typeof originalTrack === 'object') {
-									matchVal = originalTrack.match || originalTrack.popularity || 0;
-								}
-								if (matchVal === 0 && candidate.matchScore) {
-									matchVal = candidate.matchScore;
-								}
-								const matchValNorm = matchVal <= 1 ? (matchVal * 100).toFixed(1) : Number(matchVal).toFixed(1);
-								//console.log(`Match Monkey: MATCHED in library - "${candidate.artist} - ${title}" (API score: ${matchValNorm}%)`);
-							} else {
-								// No tracks passed rating filter - check if any exist at all
-								const filteredByRating = allTracks.length > 0;
-
-								if (filteredByRating) {
-									filteredByRatingCount++;
-									//console.log(`Match Monkey: FILTERED BY RATING - "${candidate.artist} - ${title}" exists but below minRating ${config.minRating}`);
-								} else {
-									// Find the original track data to get popularity
+									// Log matched track with its API popularity/match value
 									const originalTrack = candidate.tracks.find(t => {
 										const trackTitle = typeof t === 'string' ? t : (t.title || '');
 										return trackTitle === title;
 									});
-
-									// Extract and normalize popularity from track data
-									const { popularity, rawPlaycount } = this.normalizePopularityFromTrack(originalTrack);
-
-									// Determine source for logging
-									const source = config.discoveryMode === 'acoustics' ||
-										config.discoveryMode === 'mood' ||
-										config.discoveryMode === 'activity' ? 'ReccoBeats' : 'Last.fm';
-
-									// Get match/popularity value for logging
-									// Try track-level match/popularity first, then fall back to candidate-level matchScore
 									let matchVal = 0;
 									if (typeof originalTrack === 'object') {
-										matchVal = originalTrack.popularity || originalTrack.match || 0;
+										matchVal = originalTrack.match || originalTrack.popularity || 0;
 									}
-									// If no track-level score, use candidate's artist similarity score
 									if (matchVal === 0 && candidate.matchScore) {
 										matchVal = candidate.matchScore;
 									}
-									const matchValDisplay = matchVal <= 1 ? (matchVal * 100).toFixed(1) : Number(matchVal).toFixed(1);
-
-									// Log ALL missed tracks - show source and API value
-									//console.log(`Match Monkey: NOT IN LIBRARY - "${candidate.artist} - ${title}" [${source} score: ${matchValDisplay}%, playcount: ${rawPlaycount}]`);
-									notInLibraryCount++;
-
-									// Track as missed result with normalized popularity
-									// Use matchVal (which may come from candidate.matchScore) for missed tracking
-									const normalizedMatchForStorage = matchVal <= 1 ? matchVal * 100 : matchVal;
-
-									// Sanitize all numeric values for JSON serialization
-									const safeNumber = (val) => {
-										const num = Number(val);
-										return (Number.isFinite(num) ? num : 0);
-									};
-
-									missedResults.push({
-										artist: String(candidate.artist || ''),
-										title: String(title || ''),
-										popularity: safeNumber(popularity || normalizedMatchForStorage),
-										additionalInfo: {
-											source: String(source || 'Last.fm'),
-											discoveryMode: String(config.discoveryMode || ''),
-											playcount: safeNumber(typeof originalTrack === 'object' ? (originalTrack.playcount || 0) : 0),
-											rank: safeNumber(typeof originalTrack === 'object' ? (originalTrack.rank || 0) : 0),
-											match: safeNumber(normalizedMatchForStorage),
-											reason: 'not_in_library'
-										}
-									});
+									const matchValNorm = matchVal <= 1 ? (matchVal * 100).toFixed(1) : Number(matchVal).toFixed(1);
+									//console.log(`Match Monkey: MATCHED in library - "${candidate.artist} - ${title}" (API score: ${matchValNorm}%)`);
+								} else {
+									filteredByRatingCount++;
+									//console.log(`Match Monkey: FILTERED BY RATING - "${candidate.artist} - ${title}" exists but below minRating ${config.minRating}`);
 								}
+							} else {
+								// Find the original track data to get popularity
+								const originalTrack = candidate.tracks.find(t => {
+									const trackTitle = typeof t === 'string' ? t : (t.title || '');
+									return trackTitle === title;
+								});
+
+								// Extract and normalize popularity from track data
+								const { popularity, rawPlaycount } = this.normalizePopularityFromTrack(originalTrack);
+
+								// Determine source for logging
+								const source = config.discoveryMode === 'acoustics' ||
+									config.discoveryMode === 'mood' ||
+									config.discoveryMode === 'activity' ? 'ReccoBeats' : 'Last.fm';
+
+								// Get match/popularity value for logging
+								// Try track-level match/popularity first, then fall back to candidate-level matchScore
+								let matchVal = 0;
+								if (typeof originalTrack === 'object') {
+									matchVal = originalTrack.popularity || originalTrack.match || 0;
+								}
+								// If no track-level score, use candidate's artist similarity score
+								if (matchVal === 0 && candidate.matchScore) {
+									matchVal = candidate.matchScore;
+								}
+								const matchValDisplay = matchVal <= 1 ? (matchVal * 100).toFixed(1) : Number(matchVal).toFixed(1);
+
+								// Log ALL missed tracks - show source and API value
+								//console.log(`Match Monkey: NOT IN LIBRARY - "${candidate.artist} - ${title}" [${source} score: ${matchValDisplay}%, playcount: ${rawPlaycount}]`);
+								notInLibraryCount++;
+
+								// Track as missed result with normalized popularity
+								// Use matchVal (which may come from candidate.matchScore) for missed tracking
+								const normalizedMatchForStorage = matchVal <= 1 ? matchVal * 100 : matchVal;
+
+								// Sanitize all numeric values for JSON serialization
+								const safeNumber = (val) => {
+									const num = Number(val);
+									return (Number.isFinite(num) ? num : 0);
+								};
+
+								missedResults.push({
+									artist: String(candidate.artist || ''),
+									title: String(title || ''),
+									popularity: safeNumber(popularity || normalizedMatchForStorage),
+									additionalInfo: {
+										source: String(source || 'Last.fm'),
+										discoveryMode: String(config.discoveryMode || ''),
+										playcount: safeNumber(typeof originalTrack === 'object' ? (originalTrack.playcount || 0) : 0),
+										rank: safeNumber(typeof originalTrack === 'object' ? (originalTrack.rank || 0) : 0),
+										match: safeNumber(normalizedMatchForStorage),
+										reason: 'not_in_library'
+									}
+								});
 							}
 						}
 					}

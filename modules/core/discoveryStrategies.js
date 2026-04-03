@@ -64,11 +64,13 @@ async function discoverByArtist(modules, seeds, config) {
 	const blacklist = buildBlacklist(modules);
 
 	// Extract unique artists from seeds (respecting seedLimit from user config)
-	const uniqueArtists = extractSeedArtists(seeds, config.seedLimit);
+	const similarLimit = config.similarLimit ?? 20;
+	const apiMinMatch = config.apiMinMatch ?? 0;
+	const uniqueArtists = extractSeedArtists(seeds, config.seedLimit ?? 20);
 	const artistCount = uniqueArtists.length;
 	const logger = _getLogger();
 
-	logger.info('Artist', `Processing ${artistCount} seed artist(s), max ${config.similarLimit} similar per artist`);
+	logger.info('Artist', `Processing ${artistCount} seed artist(s), max ${similarLimit} similar per artist`);
 	updateProgress(`Querying Last.fm for ${artistCount} seed artist(s)...`, 0.2);
 
 	let totalSimilarFound = 0;
@@ -82,7 +84,7 @@ async function discoverByArtist(modules, seeds, config) {
 
 		try {
 			const fixedName = fixPrefixes(artistName);
-			const similar = await fetchSimilarArtists(fixedName, config.similarLimit);
+			const similar = await fetchSimilarArtists(fixedName, similarLimit);
 
 			if (!similar || similar.length === 0) {
 				logger.debug('Artist', `No similar artists found for "${artistName}"`);
@@ -100,10 +102,10 @@ async function discoverByArtist(modules, seeds, config) {
 			}
 
 			// Add similar artists with match score as popularity indicator
-			for (const artist of similar.slice(0, config.similarLimit)) {
+			for (const artist of similar.slice(0, similarLimit)) {
 				if (artist?.name) {
 					// Respect user-defined API match threshold if provided
-					const minMatch = config.apiMinMatch;
+					const minMatch = apiMinMatch;
 					// Last.fm API returns match as 0.0-1.0, convert to percentage 0-100
 					const rawMatch = Number(artist.match) || 0;
 					const artistMatch = rawMatch <= 1 ? rawMatch * 100 : rawMatch;
@@ -188,8 +190,10 @@ async function discoverByTrack(modules, seeds, config) {
 	const blacklist = buildBlacklist(modules);
 
 	// Limit seeds for track-based discovery (more API-intensive)
-	const seedLimit = Math.min(seeds.length, config.seedLimit);
-	const trackSimilarLimit = config.trackSimilarLimit;
+	const seedLimit = Math.min(seeds.length, config.seedLimit ?? 20);
+	const trackSimilarLimit = config.trackSimilarLimit ?? 100;
+	const apiMinMatch = config.apiMinMatch ?? 0;
+	const tracksPerArtist = config.tracksPerArtist ?? 10000;
 	const logger = _getLogger();
 
 	logger.info('Track', `Processing ${seedLimit} seed tracks, max ${trackSimilarLimit} similar per track`);
@@ -234,7 +238,7 @@ async function discoverByTrack(modules, seeds, config) {
 					if (!simTrack?.artist || !simTrack?.title) continue;
 
 					// Respect API match threshold
-					const minMatch = config.apiMinMatch;
+					const minMatch = apiMinMatch;
 					// Last.fm API returns match as 0.0-1.0, convert to percentage 0-100
 					const rawMatch = Number(simTrack.match) || 0;
 					const m = rawMatch <= 1 ? rawMatch * 100 : rawMatch;
@@ -285,7 +289,7 @@ async function discoverByTrack(modules, seeds, config) {
 
 		candidates.push({
 			artist: data.artistName,
-			tracks: data.tracks.slice(0, config.tracksPerArtist)
+			tracks: data.tracks.slice(0, tracksPerArtist)
 		});
 	}
 
@@ -334,7 +338,7 @@ async function discoverByGenre(modules, seeds, config) {
 	const blacklist = buildBlacklist(modules);
 
 	// Apply limits
-	const maxCandidates = config.similarLimit;
+	const maxCandidates = config.similarLimit ?? 20;
 	const maxTagsToSearch = Math.min(5, Math.ceil(maxCandidates / 5));
 	const artistsPerTag = Math.ceil(maxCandidates / maxTagsToSearch);
 	const logger = _getLogger();
@@ -344,7 +348,7 @@ async function discoverByGenre(modules, seeds, config) {
 	// Step 1: Collect genres from seed tracks
 	updateProgress('Analyzing seed genres from tracks...', 0.1);
 
-	const seedLimit = Math.min(seeds.length, config.seedLimit);
+	const seedLimit = Math.min(seeds.length, config.seedLimit ?? 20);
 
 	// Include seed artists if configured
 	if (config.includeSeedArtist) {
@@ -475,7 +479,7 @@ function buildReccoCandidates(result, blacklist, seenArtists) {
 
 	const candidates = [];
 	// API match threshold (0-99.99%) - used for ReccoBeats popularity (0-100 scale)
-	const minMatch = result?.__apiMinMatch || 0;
+	const minMatch = result?.__apiMinMatch ?? 0;
 	let apiFilteredCount = 0;
 	const filteredDetails = []; // Track filtered items for debug mode
 
@@ -588,18 +592,20 @@ async function discoverByRecco(modules, seeds, config) {
 
 	// Step 1: Get ReccoBeats recommendations based on seed tracks
 	// Use seedLimit from config to determine how many seeds to try
-	const seedsToTry = seeds.slice(0, config.seedLimit);
+	const seedLimit = config.seedLimit ?? 20;
+	const similarLimit = config.similarLimit ?? 20;
+	const seedsToTry = seeds.slice(0, seedLimit);
 	updateProgress(`ReccoBeats: Searching database for seed tracks (trying ${seedsToTry.length})...`, 0.25);
-	logger.debug('ReccoBeats', `Requesting acoustic recommendations (limit: ${config.similarLimit}, trying ${seedsToTry.length} seeds)`);
+	logger.debug('ReccoBeats', `Requesting acoustic recommendations (limit: ${similarLimit}, trying ${seedsToTry.length} seeds)`);
 
 	const result = await reccobeatsApi.getReccoRecommendations(
 		seedsToTry,
-		config.similarLimit
+		similarLimit
 	);
 
 	// Attach configured API match threshold to result for downstream filtering
 	try {
-		result.__apiMinMatch = config.apiMinMatch;
+		result.__apiMinMatch = config.apiMinMatch ?? 0;
 	} catch (_) { }
 
 	if (!result.recommendations || result.recommendations.length === 0) {
@@ -871,7 +877,7 @@ async function fetchTracksForCandidates(modules, candidates, config) {
 	const { updateProgress } = notifications;
 	const logger = _getLogger();
 
-	const tracksPerArtist = config.tracksPerArtist;
+	const tracksPerArtist = config.tracksPerArtist ?? 10000;
 	const totalCandidates = candidates.length;
 
 	logger.debug('Tracks', `Fetching up to ${tracksPerArtist} tracks for ${totalCandidates} artists`);

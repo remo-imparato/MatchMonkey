@@ -397,11 +397,17 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 	}
 
 	const blacklist = buildBlacklist(modules);
-	const seedLimit = Math.min(seeds.length, config.seedLimit);
+	const seedLimit = Math.min(seeds.length, config.seedLimit ?? 20);
 	const targetFeatures = Object.keys(targets);
+
+	const trackSimilarLimit = config.trackSimilarLimit ?? 100;
+	const apiMinMatch = config.apiMinMatch ?? 0;
 
 	logger?.info('MoodActivity', `Processing ${seedLimit} seed track(s) for "${value}" ${type}`);
 	logger?.debug('MoodActivity', `Target features: ${targetFeatures.join(', ')}`);
+	if (apiMinMatch > 0) {
+		logger?.debug('MoodActivity', `API match threshold: ${apiMinMatch}%`);
+	}
 	updateProgress(`${typeName} "${value}": Finding similar tracks via Last.fm...`, 0.15);
 
 	// ==========================================================================
@@ -409,6 +415,7 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 	// ==========================================================================
 
 	const similarTracks = new Map(); // key: "ARTIST|TITLE" -> { artist, title, seeds: Set }
+	let apiFilteredCount = 0;
 
 	for (let i = 0; i < seedLimit; i++) {
 		const seed = seeds[i];
@@ -423,8 +430,7 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 		for (const artistName of artists) {
 			try {
 				const fixedArtistName = fixPrefixes(artistName);
-				// Request a large number to maximize library matching chances
-				const similar = await fetchSimilarTracks(fixedArtistName, seed.title, 100);
+				const similar = await fetchSimilarTracks(fixedArtistName, seed.title, trackSimilarLimit);
 
 				if (!similar || similar.length === 0) {
 					logger?.debug('MoodActivity', `No similar tracks for "${fixedArtistName} - ${seed.title}"`);
@@ -435,6 +441,16 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 
 				for (const track of similar) {
 					if (!track?.artist || !track?.title) continue;
+
+					// Respect API match threshold (consistent with track discovery)
+					if (apiMinMatch > 0) {
+						const rawMatch = Number(track.match) || 0;
+						const matchPct = rawMatch <= 1 ? rawMatch * 100 : rawMatch;
+						if (matchPct < apiMinMatch) {
+							apiFilteredCount++;
+							continue;
+						}
+					}
 
 					const key = `${track.artist.toUpperCase()}|${track.title.toUpperCase()}`;
 
@@ -456,7 +472,11 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 	}
 
 	const totalSimilar = similarTracks.size;
-	logger?.info('MoodActivity', `Last.fm returned ${totalSimilar} unique similar tracks`);
+	if (apiFilteredCount > 0) {
+		logger?.info('MoodActivity', `Last.fm returned ${totalSimilar} unique similar tracks (${apiFilteredCount} filtered by API threshold)`);
+	} else {
+		logger?.info('MoodActivity', `Last.fm returned ${totalSimilar} unique similar tracks`);
+	}
 
 	if (totalSimilar === 0) {
 		logger?.info('MoodActivity', 'No similar tracks found via Last.fm');
@@ -503,11 +523,10 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 			// Search library for this artist's tracks
 			const trackTitles = artistData.tracks.map(t => t.title);
 
-			// Use batch lookup - NO max count limit to get all possible matches
 			const libraryTracks = await db.findLibraryTracks(
 				artistData.artistName,
 				trackTitles,
-				10000, // High limit - we want ALL matches
+				config.tracksPerArtist ?? 10000,
 				{
 					formatPreference: config.formatPreference,
 					minRating: config.minRating,
@@ -688,6 +707,7 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 		candidates,
 		stats: {
 			audioFeatureFilteredCount: filteredCount, // Tracks filtered by audio feature matching
+			apiFilteredCount, // Tracks filtered by API match threshold
 			totalFromApi: totalSimilar
 		},
 		// Include the actual library tracks for direct playlist creation
