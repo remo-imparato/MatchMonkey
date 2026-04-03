@@ -58,10 +58,12 @@ const logger = {
 	 * Examples: workflow start/end, API responses, phase completions
 	 */
 	info: function (context, message, ...args) {
-		if (args.length > 0) {
-			console.info(`${LOG_PREFIX} [${context}]: ${message}`, ...args);
-		} else {
-			console.info(`${LOG_PREFIX} [${context}]: ${message}`);
+		if (isDebugMode()) {
+			if (args.length > 0) {
+				console.info(`${LOG_PREFIX} [${context}]: ${message}`, ...args);
+			} else {
+				console.info(`${LOG_PREFIX} [${context}]: ${message}`);
+			}
 		}
 	},
 
