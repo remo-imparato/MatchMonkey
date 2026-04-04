@@ -166,5 +166,8 @@ const logger = {
 
 // Export to window namespace
 window.matchMonkeyLogger = logger;
+// ============================================================================
+// DEBUGGING TOOLS (SET TO TRUE TO ENABLE)
+// ============================================================================
 window.matchMonkeyDebugMode = false; // Default: verbose logging disabled
 

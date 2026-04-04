@@ -126,19 +126,39 @@
 				</div>
 			</fieldset>
 
-			<!-- Filters -->
+			<!-- API Cache -->
 			<fieldset>
-				<legend>Filters</legend>
+				<legend>API Cache</legend>
 				<div class="uiRows">
-					<div class="uiRow">
-						<label class="inline">Exclude artists:</label>
-						<div data-id="ArtistBlacklist"
-							 data-control-class="Edit"
-							 data-tip="Comma-separated list of artist names to exclude from discovery results (case-insensitive)."
-							 data-init-params='{"hint":"e.g., Artist1, Artist2"}'></div>
+					<div class="uiRow" style="padding:0.5em;background:var(--panel-background,#f8f8f8);border-radius:4px;">
+						<span style="font-size:0.9em;color:var(--text-secondary,#666);">
+							API responses are cached to avoid redundant network calls.
+							The cache persists across restarts and entries expire automatically.
+							ReccoBeats ID lookups are cached 7&times; longer since IDs rarely change.
+						</span>
 					</div>
-				</div>
-			</fieldset>
+					<div class="uiRow">
+						<label class="inline">Cache expiry (hours):</label>
+						<div data-id="CacheTTLHours"
+							 data-control-class="Edit"
+							 data-tip="Hours before cached API responses expire. ReccoBeats ID lookups use 7x this value. Set to 0 to disable caching."
+							 data-init-params="{type:'number',min:0,max:720,step:1}"></div>
+					</div>
+						<div class="uiRow">
+								<div style="display:flex; gap:1em; align-items:center;">
+									<div data-id="btnClearCache" data-control-class="Button" style="padding:0.5em 1em;">
+										Clear Cache
+									</div>
+								</div>
+							</div>
+							<div class="uiRow" style="padding:0.5em;background:var(--panel-background,#f8f8f8);border-radius:4px;">
+								<span data-id="storageUsageInfo" style="font-size:0.9em;color:var(--text-secondary,#666);">
+									Calculating storage usage...
+								</span>
+							</div>
+						</div>
+					</fieldset>
+
 
 		</div>
 
@@ -222,6 +242,20 @@
 							<option>Navigate to now playing</option>
 							<option>Stay in current view</option>
 						</div>
+					</div>
+				</div>
+			</fieldset>
+
+			<!-- Filters -->
+			<fieldset>
+				<legend>Filters</legend>
+				<div class="uiRows">
+					<div class="uiRow">
+						<label class="inline">Exclude artists:</label>
+						<div data-id="ArtistBlacklist"
+							 data-control-class="Edit"
+							 data-tip="Comma-separated list of artist names to exclude from discovery results (case-insensitive)."
+							 data-init-params='{"hint":"e.g., Artist1, Artist2"}'></div>
 					</div>
 				</div>
 			</fieldset>

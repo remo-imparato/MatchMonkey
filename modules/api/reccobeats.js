@@ -15,9 +15,9 @@
  * - Recommendations: /v1/track/recommendation -> Get similar tracks
  * 
  * Caching Strategy:
- * - Per-session cache stored in lastfmCache.reccobeats Map
+ * - Per-session cache stored in matchMonkeyCache.reccobeats Maps
  * - Cache keys include all query parameters to avoid stale results
- * - Cache is cleared when lastfmCache.clear() is called at end of each run
+ * - Cache is cleared when matchMonkeyCache.clear() is called at end of each run
  * 
  * Rate Limiting:
  * - Respects 429 Too Many Requests responses with exponential backoff
@@ -58,6 +58,8 @@ const RECCOBEATS_API_KEY = 'c0bb1370-6d44-4e9d-8c25-64c3b09cc0b1';
 
 /** Track last request time for rate limiting */
 let lastRequestTime = 0;
+/** Next available time slot – ensures 200ms spacing even with concurrent callers */
+let nextAllowedTime = 0;
 
 // =============================================================================
 // AUDIO FEATURE DEFINITIONS
@@ -91,13 +93,13 @@ function normalize(s) {
  */
 async function enforceRateLimit() {
 	const now = Date.now();
-	const timeSinceLastRequest = now - lastRequestTime;
-
-	if (timeSinceLastRequest < RATE_LIMIT_DELAY_MS) {
-		const delay = RATE_LIMIT_DELAY_MS - timeSinceLastRequest;
+	// Claim the next available slot atomically — safe for concurrent callers
+	const slot = Math.max(now, nextAllowedTime);
+	nextAllowedTime = slot + RATE_LIMIT_DELAY_MS;
+	const delay = slot - now;
+	if (delay > 0) {
 		await new Promise(resolve => setTimeout(resolve, delay));
 	}
-
 	lastRequestTime = Date.now();
 }
 
@@ -165,14 +167,14 @@ async function rateLimitedFetch(url, options = {}, retryCount = 0) {
 }
 
 /**
- * Get the per-session cache Map.
+ * Get the per-session cache Map for a specific ReccoBeats data type.
+ * @param {string} mapName - One of: 'lookups', 'audioFeatures', 'recommendations'
  * @returns {Map|null} Cache map or null if not active
  */
-function getCache() {
-	const cache = window.lastfmCache;
+function getCache(mapName) {
+	const cache = window.matchMonkeyCache;
 	if (!cache?.isActive?.()) return null;
-	if (!cache.reccobeats) cache.reccobeats = new Map();
-	return cache.reccobeats;
+	return cache.getReccobeatsMap(mapName);
 }
 
 /**
@@ -216,7 +218,7 @@ async function searchArtistAll(artistName) {
 		return [];
 	}
 
-	const cache = getCache();
+	const cache = getCache('lookups');
 	const cacheKey = `artistall:${artistName}`.toUpperCase();
 	const updateProgress = getUpdateProgress();
 
@@ -310,7 +312,7 @@ async function searchAlbum(albumName) {
 		return null;
 	}
 
-	const cache = getCache();
+	const cache = getCache('lookups');
 	const cacheKey = `album:${albumName}`.toUpperCase();
 	const updateProgress = getUpdateProgress();
 
@@ -410,7 +412,7 @@ async function findAlbumInArtist(artistId, albumName) {
 		return albumName ? null : [];
 	}
 
-	const cache = getCache();
+	const cache = getCache('lookups');
 	const cacheKey = `artistalbums:${artistId}`.toUpperCase();
 	const updateProgress = getUpdateProgress();
 
@@ -459,8 +461,10 @@ async function findAlbumInArtist(artistId, albumName) {
 
 			logger?.debug('ReccoBeats', `findAlbumInArtist: Page ${page + 1}/${totalPages}, ${content.length} albums for artist ${artistId}`);
 
-			// Accumulate all albums (for caching)
-			allAlbums = allAlbums.concat(content);
+			// Accumulate albums trimmed to essential fields (for caching)
+			for (const a of content) {
+				allAlbums.push({ id: a.id, name: a.name });
+			}
 
 			// If searching for a specific album, try to match
 			if (normalizedSearch) {
@@ -519,7 +523,7 @@ async function findAlbumId(artist, album) {
 		return null;
 	}
 
-	const cache = getCache();
+	const cache = getCache('lookups');
 	const cacheKey = `albumid:${artist}:${album}`.toUpperCase();
 
 	// Check cache
@@ -580,7 +584,7 @@ async function getAlbumTracks(albumId) {
 		return [];
 	}
 
-	const cache = getCache();
+	const cache = getCache('lookups');
 	const cacheKey = `albumtracks:${albumId}`.toUpperCase();
 
 	// Check cache
@@ -601,7 +605,13 @@ async function getAlbumTracks(albumId) {
 		}
 
 		const data = await res.json();
-		const tracks = data?.content || [];
+		const rawTracks = data?.content || [];
+
+		// Trim to essential fields
+		const tracks = rawTracks.map(t => ({
+			id: t.id,
+			trackTitle: t.trackTitle || t.name || t.title || '',
+		}));
 
 		logger?.debug('ReccoBeats', `getAlbumTracks: Found ${tracks.length} tracks in album ${albumId}`);
 
@@ -727,7 +737,7 @@ async function findTrackId(artist, title, album) {
 		return null;
 	}
 
-	const cache = getCache();
+	const cache = getCache('lookups');
 	const cacheKey = `trackid:${artist}:${title}:${album || ''}`.toUpperCase();
 	const updateProgress = getUpdateProgress();
 
@@ -923,7 +933,7 @@ async function fetchTrackAudioFeatures(trackId) {
 		return null;
 	}
 
-	const cache = getCache();
+	const cache = getCache('audioFeatures');
 	const cacheKey = `audiofeatures:${trackId}`.toUpperCase();
 
 	// Check cache
@@ -1044,9 +1054,7 @@ async function fetchRecommendations(seedIds, audioTargets = {}, limit = 100, con
 		seeds = seedIds.slice(0, 5); // API max 5 seeds
 	}
 
-	// Build cache key (seeds optional)
-	// Include contextKey to differentiate between different mood/activity searches with same seeds
-	const cache = getCache();
+	const cache = getCache('recommendations');
 	const seedKey = seeds ? seeds.join(',') : 'NO_SEEDS';
 	const context = contextKey ? `:${contextKey}` : '';
 	const cacheKey = `recommendations:${seedKey}${context}:${JSON.stringify(audioTargets)}:${limit}`.toUpperCase();
@@ -1093,7 +1101,18 @@ async function fetchRecommendations(seedIds, audioTargets = {}, limit = 100, con
 		}
 
 		const data = await res.json();
-		const content = data?.content || [];
+		const rawContent = data?.content || [];
+
+		// Trim to essential fields
+		const content = rawContent.map(t => ({
+			id: t.id,
+			trackTitle: t.trackTitle || '',
+			title: t.title || '',
+			artist: t.artist || '',
+			album: t.album || '',
+			popularity: t.popularity || 0,
+			artists: Array.isArray(t.artists) ? t.artists.map(a => ({ name: a.name })) : [],
+		}));
 
 		// Cache result
 		cache?.set(cacheKey, content);
@@ -1135,31 +1154,30 @@ async function getReccoRecommendations(seeds, limit = 100) {
 
 	logger?.debug('ReccoBeats', `getReccoRecommendations: Processing ${seeds.length} seed track(s)`);
 
-	// ReccoBeats API allows max 5 seed track IDs for recommendations
-	// We try all provided seeds until we find enough matches
+	// ReccoBeats API allows max 5 seed IDs per recommendation request.
+	// We still process ALL seeds by splitting found seed IDs into blocks of 5.
 	const maxSeedsToTry = seeds.length;
-	const targetFoundCount = Math.min(5, seeds.length); // ReccoBeats API limit is 5 seed tracks
 
-	// Step 1: Find track IDs - try all seeds until we find enough matches
-	updateProgress(`Looking up tracks on ReccoBeats (trying ${maxSeedsToTry} seeds to find ${targetFoundCount} matches)...`, 0.1);
-	logger?.debug('ReccoBeats', `getReccoRecommendations: Step 1 - Looking up track IDs (trying ${maxSeedsToTry} seeds to find ${targetFoundCount} matches)`);
+	// Step 1: Find track IDs for all seeds (cache-first in findTrackId)
+	updateProgress(`Looking up tracks on ReccoBeats (trying ${maxSeedsToTry} seeds)...`, 0.1);
+	logger?.debug('ReccoBeats', `getReccoRecommendations: Step 1 - Looking up track IDs (trying ${maxSeedsToTry} seeds)`);
 
 	const allResults = [];
 	const foundTracks = [];
 
-	for (let i = 0; i < maxSeedsToTry && foundTracks.length < targetFoundCount; i++) {
+	for (let i = 0; i < maxSeedsToTry; i++) {
 		const seed = seeds[i];
 		const progress = 0.1 + ((i + 1) / maxSeedsToTry) * 0.2;
 
 		logger?.debug('ReccoBeats', `getReccoRecommendations: Trying seed ${i + 1}/${maxSeedsToTry}: "${seed.artist} - ${seed.title}" (Album: ${seed.album})`);
-		updateProgress(`ReccoBeats: Looking up "${seed.artist} - ${seed.title}" (${foundTracks.length}/${targetFoundCount} found)...`, progress);
+		updateProgress(`ReccoBeats: Looking up "${seed.artist} - ${seed.title}" (${foundTracks.length} found)...`, progress);
 
 		const trackId = await findTrackId(seed.artist, seed.title, seed.album);
 		allResults.push({ seed, trackId });
 
 		if (trackId) {
 			foundTracks.push({ seed, trackId });
-			logger?.debug('ReccoBeats', `getReccoRecommendations: FOUND track ID ${trackId} for "${seed.artist} - ${seed.title}" (${foundTracks.length}/${targetFoundCount})`);
+			logger?.debug('ReccoBeats', `getReccoRecommendations: FOUND track ID ${trackId} for "${seed.artist} - ${seed.title}" (${foundTracks.length} found)`);
 		} else {
 			logger?.debug('ReccoBeats', `getReccoRecommendations: NOT FOUND: "${seed.artist} - ${seed.title}" (Album: ${seed.album})`);
 		}
@@ -1176,7 +1194,6 @@ async function getReccoRecommendations(seeds, limit = 100) {
 
 	// Step 2: Fetch audio features
 	updateProgress(`Analyzing audio features of ${foundTracks.length} tracks...`, 0.35);
-
 	logger?.debug('ReccoBeats', 'getReccoRecommendations: Step 2 - Fetching audio features');
 
 	const audioFeatures = await getAudioFeatures(foundTracks);
@@ -1189,33 +1206,28 @@ async function getReccoRecommendations(seeds, limit = 100) {
 
 	logger?.debug('ReccoBeats', `getReccoRecommendations: Retrieved audio features for ${audioFeatures.length} track(s)`);
 
-	// Step 3: Get recommendations for each seed individually (using seed IDs only, no audio features)
-	updateProgress(`Requesting recommendations for ${foundTracks.length} seeds...`, 0.5);
-	logger?.debug('ReccoBeats', `getReccoRecommendations: Step 3 - Getting individual recommendations for each seed (${limit} per seed, seeds only - no audio features)`);
+	// Step 3: Request recommendations in blocks of 5 seed IDs
+	const seedBatchSize = 5;
+	const totalBatches = Math.ceil(foundTracks.length / seedBatchSize);
+	updateProgress(`Requesting recommendations for ${foundTracks.length} seeds in ${totalBatches} batch(es)...`, 0.5);
+	logger?.debug('ReccoBeats', `getReccoRecommendations: Step 3 - Getting recommendations in ${totalBatches} batch(es) of up to ${seedBatchSize} seeds`);
 
 	const allRecommendations = [];
 
-	// Fire off per-seed recommendation requests in parallel to reduce overall latency.
-	// NOTE: We do NOT pass audio features here - let ReccoBeats use the seed track alone
-	// to find similar music. Passing audio features over-constrains the API and returns
-	// mathematically-matching but obscure tracks instead of actually similar popular music.
-	const recommendationPromises = foundTracks.map((seedTrack, i) => {
-		const progressPercent = 0.5 + (0.3 * (i / foundTracks.length));
-		updateProgress(`Getting recommendations for seed ${i + 1}/${foundTracks.length}...`, progressPercent);
-		logger?.debug('ReccoBeats', `getReccoRecommendations: Processing seed ${i + 1}/${foundTracks.length} (${seedTrack.seed.artist} - ${seedTrack.seed.title})`);
+	for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+		const start = batchIndex * seedBatchSize;
+		const batch = foundTracks.slice(start, start + seedBatchSize);
+		const seedIds = batch.map(x => x.trackId);
+
+		const progressPercent = 0.5 + (0.3 * ((batchIndex + 1) / totalBatches));
+		updateProgress(`Getting recommendations for seed batch ${batchIndex + 1}/${totalBatches} (${seedIds.length} seeds)...`, progressPercent);
+		logger?.debug('ReccoBeats', `getReccoRecommendations: Processing batch ${batchIndex + 1}/${totalBatches} with ${seedIds.length} seed ID(s)`);
 
 		// Pass empty audioTargets - seeds alone are sufficient for Similar Acoustics mode
-		return fetchRecommendations([seedTrack.trackId], {}, limit)
-			.then((seedRecommendations) => {
-				logger?.debug('ReccoBeats', `getReccoRecommendations: Received ${seedRecommendations.length} recommendations for seed ${i + 1}`);
-				return seedRecommendations;
-			});
-	});
+		const batchRecommendations = await fetchRecommendations(seedIds, {}, limit);
+		logger?.debug('ReccoBeats', `getReccoRecommendations: Received ${batchRecommendations.length} recommendations for batch ${batchIndex + 1}`);
 
-	const perSeedResults = await Promise.all(recommendationPromises);
-
-	for (const seedRecommendations of perSeedResults) {
-		allRecommendations.push(...seedRecommendations);
+		allRecommendations.push(...batchRecommendations);
 	}
 
 	// Step 4: Deduplicate recommendations by track ID (fallback to artist/album/title if no ID)
@@ -1247,7 +1259,6 @@ async function getReccoRecommendations(seeds, limit = 100) {
 		audioFeatures
 	};
 }
-
 
 // =============================================================================
 // UTILITY FUNCTIONS

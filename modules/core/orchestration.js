@@ -87,7 +87,7 @@ window.matchMonkeyOrchestration = {
 		}
 
 		// Initialize cache for this run
-		const cache = window.lastfmCache;
+		const cache = window.matchMonkeyCache;
 		cache?.init?.();
 
 		let taskId = null;
@@ -464,7 +464,12 @@ window.matchMonkeyOrchestration = {
 			}
 
 			// Apply final limit
-			const finalResults = config_.totalLimit < 100000
+			// For mood/activity modes, skip the limit — tracks already survived expensive
+			// multi-step filtering (Last.fm similarity → library match → ReccoBeats audio
+			// features → mood/activity template filtering). The settings govern processing
+			// effort, but once a track passes all criteria it should be included.
+			const isMoodActivity = discoveryMode === 'mood' || discoveryMode === 'activity';
+			const finalResults = (!isMoodActivity && config_.totalLimit < 100000)
 				? dedupedResults.slice(0, config_.totalLimit)
 				: dedupedResults;
 
@@ -511,7 +516,7 @@ window.matchMonkeyOrchestration = {
 			updateProgress(`Complete! Added ${actualTracksAdded} track(s)`, 1.0);
 
 			terminateProgressTask(taskId);
-			cache?.clear?.();
+			cache?.save?.();
 
 			// Build comprehensive stats for final summary
 			const notInLibraryCount = matchStats?.notInLibrary || 0;
@@ -561,7 +566,7 @@ window.matchMonkeyOrchestration = {
 		} catch (e) {
 			logger.error('Workflow', 'Unexpected error', e);
 			terminateProgressTask(taskId);
-			cache?.clear?.();
+			cache?.save?.();
 			showToast(`Error: ${formatError(e)}`, { type: 'error', duration: 5000 });
 			return { success: false, error: formatError(e), tracksAdded: 0 };
 		}

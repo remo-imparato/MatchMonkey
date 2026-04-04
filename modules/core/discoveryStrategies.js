@@ -478,6 +478,7 @@ function buildReccoCandidates(result, blacklist, seenArtists) {
 	}
 
 	const candidates = [];
+	const candidateMap = new Map(); // artKey → candidate for O(1) lookups
 	// API match threshold (0-99.99%) - used for ReccoBeats popularity (0-100 scale)
 	const minMatch = result?.__apiMinMatch ?? 0;
 	let apiFilteredCount = 0;
@@ -511,12 +512,14 @@ function buildReccoCandidates(result, blacklist, seenArtists) {
 
 				seenArtists.add(artKey);
 
-				candidates.push({
+				const newCandidate = {
 					artist: artistName,
 					tracks: trackTitle
 						? [{ title: trackTitle, match: 1.0, popularity: popularity }]
 						: []
-				});
+				};
+				candidates.push(newCandidate);
+				candidateMap.set(artKey, newCandidate);
 			}
 			// Artist already exists → add track if unique
 			else if (trackTitle) {
@@ -528,9 +531,7 @@ function buildReccoCandidates(result, blacklist, seenArtists) {
 					continue;
 				}
 
-				const existing = candidates.find(
-					c => c.artist.toUpperCase() === artKey
-				);
+				const existing = candidateMap.get(artKey);
 
 				if (
 					existing &&
@@ -885,38 +886,40 @@ async function fetchTracksForCandidates(modules, candidates, config) {
 	let artistsWithTracks = 0;
 	let totalTracksFound = 0;
 
-	for (let i = 0; i < totalCandidates; i++) {
-		const candidate = candidates[i];
+	// Filter to only the candidates that actually need track data
+	const pending = candidates.filter(
+		c => !c.artist.startsWith('__') && (!c.tracks || c.tracks.length === 0)
+	);
 
-		// Skip special filter candidates
-		if (candidate.artist.startsWith('__')) continue;
+	const CONCURRENCY = 5;
+	updateProgress(`Last.fm: Getting tracks for ${pending.length} artists...`, 0.5);
 
-		// Skip if already has tracks (e.g., from track-based discovery)
-		if (candidate.tracks && candidate.tracks.length > 0) continue;
+	for (let i = 0; i < pending.length; i += CONCURRENCY) {
+		const batch = pending.slice(i, i + CONCURRENCY);
 
-		// Update progress every 5 artists
-		if (i % 5 === 0) {
-			const progress = 0.5 + ((i + 1) / totalCandidates) * 0.3;
-			updateProgress(`Last.fm: Getting tracks for "${candidate.artist}" (${i + 1}/${totalCandidates})...`, progress);
-		}
+		await Promise.all(batch.map(async (candidate) => {
+			try {
+				const fixedName = fixPrefixes(candidate.artist);
+				const topTracks = await fetchTopTracks(fixedName, tracksPerArtist, true);
 
-		try {
-			const fixedName = fixPrefixes(candidate.artist);
-			const topTracks = await fetchTopTracks(fixedName, tracksPerArtist, true);
+				if (topTracks && topTracks.length > 0) {
+					candidate.tracks = topTracks.map(t => ({
+						title: typeof t === 'string' ? t : (t.title || ''),
+						playcount: typeof t === 'object' ? (t.playcount || 0) : 0,
+						rank: typeof t === 'object' ? (t.rank || 0) : 0
+					})).filter(t => t.title);
 
-			if (topTracks && topTracks.length > 0) {
-				candidate.tracks = topTracks.map(t => ({
-					title: typeof t === 'string' ? t : (t.title || ''),
-					playcount: typeof t === 'object' ? (t.playcount || 0) : 0,
-					rank: typeof t === 'object' ? (t.rank || 0) : 0
-				})).filter(t => t.title);
-
-				artistsWithTracks++;
-				totalTracksFound += candidate.tracks.length;
+					artistsWithTracks++;
+					totalTracksFound += candidate.tracks.length;
+				}
+			} catch (e) {
+				logger.warn('Tracks', `Error for "${candidate.artist}": ${e.message}`);
 			}
-		} catch (e) {
-			logger.warn('Tracks', `Error for "${candidate.artist}": ${e.message}`);
-		}
+		}));
+
+		const doneCount = Math.min(i + CONCURRENCY, pending.length);
+		const progress = 0.5 + (doneCount / Math.max(pending.length, 1)) * 0.3;
+		updateProgress(`Last.fm: Got tracks for ${doneCount}/${pending.length} artists...`, progress);
 	}
 
 	logger.debug('Tracks', `Retrieved ${totalTracksFound} tracks from ${artistsWithTracks} artists`);

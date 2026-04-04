@@ -162,6 +162,12 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function (sett, 
 		// === Missed Results ===
 		this._setupMissedResults(UI);
 
+		// === API Cache ===
+		if (UI.CacheTTLHours && UI.CacheTTLHours.controlClass) {
+			UI.CacheTTLHours.controlClass.value = (typeof cfg.CacheTTLHours === 'number') ? cfg.CacheTTLHours : 24;
+		}
+		this._setupCacheSection(UI);
+
 		console.log('Match Monkey Options: Settings loaded successfully');
 
 	} catch (e) {
@@ -370,6 +376,12 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 		// === Filters ===
 		this.config.ArtistBlacklist = UI.ArtistBlacklist.controlClass.value || '';
 
+		// === Cache TTL ===
+		if (UI.CacheTTLHours && UI.CacheTTLHours.controlClass) {
+			const ttl = parseInt(UI.CacheTTLHours.controlClass.value, 10);
+			this.config.CacheTTLHours = Number.isFinite(ttl) && ttl >= 0 ? ttl : 24;
+		}
+
 		// Save all settings
 		try {
 			app.setValue(SCRIPT_ID, this.config);
@@ -460,4 +472,117 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._openMissedResultsDialog = fu
 	} catch (e) {
 		console.error('Match Monkey Options: Error opening missed results dialog:', e);
 	}
+};
+
+/**
+ * Setup API Cache section - Clear Cache button and storage usage display.
+ */
+optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setupCacheSection = function (UI) {
+	try {
+		// Wire up Clear Cache button
+		if (UI.btnClearCache && UI.btnClearCache.controlClass) {
+			app.listen(UI.btnClearCache, 'click', () => {
+				try {
+					if (window.matchMonkeyCache?.clear) {
+						window.matchMonkeyCache.clear();
+					} else {
+						// Fallback: clear the storage key directly
+						app.setValue('MatchMonkeyCache', null);
+					}
+					console.log('Match Monkey Options: Cache cleared');
+					this._updateStorageUsage(UI);
+				} catch (e) {
+					console.error('Match Monkey Options: Error clearing cache:', e);
+				}
+			});
+		}
+
+		// Show storage usage
+		this._updateStorageUsage(UI);
+	} catch (e) {
+		console.error('Match Monkey Options: Error setting up cache section:', e);
+	}
+};
+
+/**
+ * Calculate and display storage usage for all MatchMonkey persistent data.
+ */
+optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._updateStorageUsage = function (UI) {
+	try {
+		if (!UI.storageUsageInfo) return;
+
+		var storageKeys = [
+			{ key: 'MatchMonkey', label: 'Settings' },
+			{ key: 'MatchMonkeyCache', label: 'API Cache' },
+			{ key: 'MatchMonkey_MissedResults', label: 'Missed Results' }
+		];
+
+		var lines = [];
+		var totalBytes = 0;
+
+		for (var i = 0; i < storageKeys.length; i++) {
+			var entry = storageKeys[i];
+			var value = null;
+			try {
+				value = app.getValue(entry.key, null);
+			} catch (e) {
+				// ignore read errors
+			}
+
+			var sizeBytes = 0;
+			var detail = '';
+
+			if (value !== null && value !== undefined) {
+				try {
+					var json = JSON.stringify(value);
+					sizeBytes = json.length * 2; // JS strings are UTF-16 (2 bytes per char)
+				} catch (e) {
+					sizeBytes = 0;
+				}
+
+				// Add entry count detail where applicable
+				if (entry.key === 'MatchMonkeyCache' && typeof value === 'object') {
+					var entryCount = 0;
+					for (var group in value) {
+						if (!value.hasOwnProperty(group)) continue;
+						var maps = value[group];
+						for (var mapName in maps) {
+							if (!maps.hasOwnProperty(mapName)) continue;
+							var arr = maps[mapName];
+							if (Array.isArray(arr)) {
+								entryCount += arr.length;
+							}
+						}
+					}
+					detail = ' (' + entryCount + ' entries)';
+				} else if (entry.key === 'MatchMonkey_MissedResults' && Array.isArray(value)) {
+					detail = ' (' + value.length + ' tracks)';
+				}
+			}
+
+			totalBytes += sizeBytes;
+			lines.push(entry.label + ': ' + this._formatBytes(sizeBytes) + detail);
+		}
+
+		lines.push('Total: ' + this._formatBytes(totalBytes));
+		UI.storageUsageInfo.innerHTML = lines.join('<br>');
+
+	} catch (e) {
+		console.error('Match Monkey Options: Error calculating storage usage:', e);
+		if (UI.storageUsageInfo) {
+			UI.storageUsageInfo.innerText = 'Unable to calculate storage usage';
+		}
+	}
+};
+
+/**
+ * Format byte count to a human-readable string.
+ * @param {number} bytes - Size in bytes.
+ * @returns {string} Formatted string (e.g., "1.5 KB", "3.2 MB").
+ */
+optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._formatBytes = function (bytes) {
+	if (bytes === 0) return '0 B';
+	if (bytes < 1024) return bytes + ' B';
+	if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+	return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
 };

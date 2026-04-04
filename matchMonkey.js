@@ -49,7 +49,7 @@
 					notifications: globalArg.matchMonkeyNotifications,
 				},
 				api: {
-					cache: globalArg.lastfmCache,
+					cache: globalArg.matchMonkeyCache,
 					lastfmApi: globalArg.matchMonkeyLastfmAPI,
 				},
 				db: globalArg.matchMonkeyDB,
@@ -282,21 +282,16 @@
 		/**
 		 * Clear all API caches (Last.fm and ReccoBeats).
 		 * 
-		 * The cache module stores both Last.fm and ReccoBeats responses in a single
-		 * cache structure with separate Maps for each type:
-		 * - similarArtists: Last.fm similar artists
-		 * - topTracks: Last.fm top tracks
-		 * - similarTracks: Last.fm similar tracks
-		 * - artistInfo: Last.fm artist info
-		 * - reccobeats: ReccoBeats API responses
+		 * Wipes both the in-memory cache and the persistent store
+		 * so the next discovery run starts from scratch.
 		 * 
 		 * @returns {object} Result object with success status and stats
 		 */
 		function clearCache() {
 			console.log('Match Monkey: Clearing API caches...');
-			
+
 			try {
-				if (!window.lastfmCache) {
+				if (!window.matchMonkeyCache) {
 					console.warn('Match Monkey: Cache module not available');
 					return { 
 						success: false, 
@@ -305,15 +300,18 @@
 					};
 				}
 
+				// Ensure cache is loaded so we can report stats
+				window.matchMonkeyCache.init();
+
 				// Get stats before clearing
-				const statsBefore = window.lastfmCache.getStats?.() || {};
+				const statsBefore = window.matchMonkeyCache.getStats?.() || {};
 				console.log('Match Monkey: Cache stats before clear:', statsBefore);
 
-				// Clear the cache (this now properly clears all Maps)
-				window.lastfmCache.clear();
+				// Clear in-memory AND persistent store
+				window.matchMonkeyCache.clear();
 
 				// Get stats after clearing
-				const statsAfter = window.lastfmCache.getStats?.() || {};
+				const statsAfter = window.matchMonkeyCache.getStats?.() || {};
 				console.log('Match Monkey: Cache stats after clear:', statsAfter);
 
 				console.log('Match Monkey: Last.fm and ReccoBeats caches cleared successfully');

@@ -98,22 +98,76 @@ const MOOD_AUDIO_TARGETS = {
  * Audio feature targets for different activities.
  */
 const ACTIVITY_AUDIO_TARGETS = {
-	workout: {
-		energy: { target: 0.9, min: 0.75, max: 1.0 },
-		tempo: { target: 145, min: 120, max: 185 },
-		danceability: { target: 0.8, min: 0.6, max: 1.0 }
+	cardio: {
+		energy: { target: 0.9, min: 0.7, max: 1.0 },
+		tempo: { target: 155, min: 130, max: 185 },
+		danceability: { target: 0.65, min: 0.45, max: 0.9 }
 	},
 
-	study: {
+	cleaning: {
+		energy: { target: 0.8, min: 0.55, max: 1.0 },
+		danceability: { target: 0.75, min: 0.5, max: 1.0 },
+		tempo: { target: 130, min: 100, max: 165 }
+	},
+
+	cooking: {
+		valence: { target: 0.7, min: 0.4, max: 1.0 },
+		energy: { target: 0.5, min: 0.3, max: 0.7 },
+		danceability: { target: 0.55, min: 0.35, max: 0.75 }
+	},
+
+	driving: {
+		energy: { target: 0.55, min: 0.35, max: 0.75 },
+		tempo: { target: 115, min: 90, max: 140 },
+		valence: { target: 0.6, min: 0.4, max: 0.9 }
+	},
+
+	evening_winddown: {
+		energy: { target: 0.2, min: 0.0, max: 0.4 },
+		acousticness: { target: 0.7, min: 0.4, max: 1.0 },
+		valence: { target: 0.45, min: 0.2, max: 0.7 }
+	},
+
+	focus_work: {
 		instrumentalness: { target: 0.75, min: 0.45, max: 1.0 },
 		speechiness: { target: 0.04, min: 0.0, max: 0.12 },
-		energy: { target: 0.25, min: 0.1, max: 0.45 }
+		energy: { target: 0.3, min: 0.1, max: 0.5 }
+	},
+
+	gaming: {
+		energy: { target: 0.75, min: 0.55, max: 0.95 },
+		instrumentalness: { target: 0.4, min: 0.1, max: 0.8 },
+		tempo: { target: 130, min: 100, max: 160 }
+	},
+
+	getting_ready: {
+		danceability: { target: 0.85, min: 0.65, max: 1.0 },
+		energy: { target: 0.75, min: 0.5, max: 1.0 },
+		valence: { target: 0.75, min: 0.5, max: 1.0 }
+	},
+
+	hiit: {
+		energy: { target: 0.95, min: 0.8, max: 1.0 },
+		tempo: { target: 165, min: 145, max: 200 },
+		loudness: { target: -5, min: -10, max: -2 }
+	},
+
+	meditation: {
+		instrumentalness: { target: 0.9, min: 0.6, max: 1.0 },
+		acousticness: { target: 0.9, min: 0.5, max: 1.0 },
+		energy: { target: 0.15, min: 0.0, max: 0.35 }
 	},
 
 	party: {
 		danceability: { target: 0.9, min: 0.7, max: 1.0 },
 		energy: { target: 0.85, min: 0.65, max: 1.0 },
 		valence: { target: 0.75, min: 0.5, max: 1.0 }
+	},
+
+	road_trip: {
+		valence: { target: 0.7, min: 0.45, max: 1.0 },
+		energy: { target: 0.6, min: 0.4, max: 0.85 },
+		tempo: { target: 120, min: 95, max: 145 }
 	},
 
 	sleep: {
@@ -123,64 +177,23 @@ const ACTIVITY_AUDIO_TARGETS = {
 		tempo: { target: 55, min: 40, max: 85 }
 	},
 
-	driving: {
-		energy: { target: 0.6, min: 0.4, max: 0.8 },
-		tempo: { target: 115, min: 90, max: 140 },
-		valence: { target: 0.6, min: 0.4, max: 0.9 }
-	},
-
-	meditation: {
-		instrumentalness: { target: 0.9, min: 0.6, max: 1.0 },
-		acousticness: { target: 0.9, min: 0.5, max: 1.0 },
-		energy: { target: 0.15, min: 0.0, max: 0.35 }
-	},
-
-	cooking: {
-		valence: { target: 0.7, min: 0.4, max: 1.0 },
-		energy: { target: 0.5, min: 0.3, max: 0.7 },
-		danceability: { target: 0.55, min: 0.35, max: 0.75 }
-	},
-
-	cleaning: {
-		energy: { target: 0.8, min: 0.55, max: 1.0 },
-		danceability: { target: 0.75, min: 0.5, max: 1.0 },
-		tempo: { target: 130, min: 100, max: 165 }
-	},
-
 	walking: {
 		energy: { target: 0.55, min: 0.35, max: 0.75 },
 		tempo: { target: 115, min: 90, max: 140 },
 		valence: { target: 0.6, min: 0.4, max: 0.9 }
 	},
 
-	coding: {
-		instrumentalness: { target: 0.75, min: 0.45, max: 1.0 },
-		speechiness: { target: 0.04, min: 0.0, max: 0.12 },
-		energy: { target: 0.35, min: 0.15, max: 0.55 }
+	yoga: {
+		energy: { target: 0.2, min: 0.0, max: 0.4 },
+		acousticness: { target: 0.75, min: 0.4, max: 1.0 },
+		instrumentalness: { target: 0.6, min: 0.3, max: 1.0 },
+		tempo: { target: 70, min: 50, max: 95 }
 	}
 };
 
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
-
-///**
-// * Get the defining features for a mood.
-// * @param {string} mood - Mood name (e.g., 'energetic', 'relaxed')
-// * @returns {string[]} Array of feature names that define this mood
-// */
-//function getMoodDefiningFeatures(mood) {
-//	return MOOD_DEFINING_FEATURES[mood?.toLowerCase()] || ['energy', 'valence'];
-//}
-
-///**
-// * Get the defining features for an activity.
-// * @param {string} activity - Activity name (e.g., 'workout', 'study')
-// * @returns {string[]} Array of feature names that define this activity
-// */
-//function getActivityDefiningFeatures(activity) {
-//	return ACTIVITY_DEFINING_FEATURES[activity?.toLowerCase()] || ['energy', 'danceability'];
-//}
 
 /**
  * Get audio targets for a mood.
@@ -374,7 +387,7 @@ async function discoverByActivity(modules, seeds, config) {
 async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 	const logger = _getMoodActivityLogger();
 	const { api: { lastfmApi }, settings: { prefixes }, ui: { notifications }, db } = modules;
-	const { fetchSimilarTracks } = lastfmApi;
+	const { fetchSimilarTracks, fetchSimilarArtists } = lastfmApi;
 	const { fixPrefixes } = prefixes;
 	const { updateProgress } = notifications;
 	const reccobeatsApi = window.matchMonkeyReccoBeatsAPI;
@@ -401,6 +414,7 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 	const targetFeatures = Object.keys(targets);
 
 	const trackSimilarLimit = config.trackSimilarLimit ?? 100;
+	const similarArtistLimit = config.similarLimit ?? 25;
 	const apiMinMatch = config.apiMinMatch ?? 0;
 
 	logger?.info('MoodActivity', `Processing ${seedLimit} seed track(s) for "${value}" ${type}`);
@@ -408,10 +422,10 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 	if (apiMinMatch > 0) {
 		logger?.debug('MoodActivity', `API match threshold: ${apiMinMatch}%`);
 	}
-	updateProgress(`${typeName} "${value}": Finding similar tracks via Last.fm...`, 0.15);
+	updateProgress(`${typeName} "${value}": Finding similar tracks via Last.fm...`, 0.1);
 
 	// ==========================================================================
-	// STEP 1: Find similar tracks via Last.fm
+	// STEP 1a: Find similar tracks via Last.fm (track.getSimilar)
 	// ==========================================================================
 
 	const similarTracks = new Map(); // key: "ARTIST|TITLE" -> { artist, title, seeds: Set }
@@ -421,7 +435,7 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 		const seed = seeds[i];
 		if (!seed?.artist || !seed?.title) continue;
 
-		const progress = 0.15 + ((i + 1) / seedLimit) * 0.2;
+		const progress = 0.1 + ((i + 1) / seedLimit) * 0.1;
 		updateProgress(`Last.fm: Finding tracks similar to "${seed.title}" (${i + 1}/${seedLimit})...`, progress);
 
 		// Split artists by ';' and query each
@@ -478,22 +492,81 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 		logger?.info('MoodActivity', `Last.fm returned ${totalSimilar} unique similar tracks`);
 	}
 
-	if (totalSimilar === 0) {
-		logger?.info('MoodActivity', 'No similar tracks found via Last.fm');
-		updateProgress(`Last.fm: No similar tracks found for your seeds`, 0.4);
+	// ==========================================================================
+	// STEP 1b: Find similar artists via Last.fm (artist.getSimilar) to expand pool
+	// ==========================================================================
+
+	const expandedArtists = new Set(); // Uppercase artist names from artist expansion
+	const seedArtists = extractSeedArtists(seeds.slice(0, seedLimit), seedLimit);
+
+	updateProgress(`${typeName} "${value}": Finding similar artists to expand pool...`, 0.2);
+
+	for (let i = 0; i < seedArtists.length; i++) {
+		const artistName = seedArtists[i];
+		const progress = 0.2 + ((i + 1) / seedArtists.length) * 0.05;
+		updateProgress(`Last.fm: Finding artists similar to "${artistName}" (${i + 1}/${seedArtists.length})...`, progress);
+
+		try {
+			const fixedName = fixPrefixes(artistName);
+			const similar = await fetchSimilarArtists(fixedName, similarArtistLimit);
+
+			if (!similar || similar.length === 0) {
+				logger?.debug('MoodActivity', `No similar artists for "${artistName}"`);
+				continue;
+			}
+
+			logger?.debug('MoodActivity', `Found ${similar.length} similar artists for "${artistName}"`);
+
+			// Include seed artist itself
+			expandedArtists.add(artistName.toUpperCase());
+
+			for (const artist of similar) {
+				if (!artist?.name) continue;
+
+				// Respect API match threshold
+				if (apiMinMatch > 0) {
+					const rawMatch = Number(artist.match) || 0;
+					const matchPct = rawMatch <= 1 ? rawMatch * 100 : rawMatch;
+					if (matchPct < apiMinMatch) continue;
+				}
+
+				const artKey = artist.name.toUpperCase();
+				if (!blacklist.has(artKey)) {
+					expandedArtists.add(artKey);
+				}
+			}
+		} catch (e) {
+			logger?.warn('MoodActivity', `Error getting similar artists for "${artistName}": ${e.message}`);
+		}
+	}
+
+	// Also add artists discovered from track similarity
+	for (const [key, trackInfo] of similarTracks) {
+		const artKey = trackInfo.artist.toUpperCase();
+		if (!blacklist.has(artKey)) {
+			expandedArtists.add(artKey);
+		}
+	}
+
+	logger?.info('MoodActivity', `Artist expansion: ${expandedArtists.size} unique artists (from ${seedArtists.length} seed artist(s))`);
+
+	if (totalSimilar === 0 && expandedArtists.size === 0) {
+		logger?.info('MoodActivity', 'No similar tracks or artists found via Last.fm');
+		updateProgress(`Last.fm: No similar content found for your seeds`, 0.4);
 		return emptyResult;
 	}
 
-	updateProgress(`Last.fm: Found ${totalSimilar} similar tracks, searching library...`, 0.35);
+	updateProgress(`Found ${totalSimilar} similar tracks + ${expandedArtists.size} related artists, searching library...`, 0.25);
 
 	// ==========================================================================
-	// STEP 2: Match similar tracks against local library
+	// STEP 2: Match against local library (track-specific + artist expansion)
 	// ==========================================================================
 
 	const matchedTracks = [];
-	const tracksByArtist = new Map(); // Group by artist for efficient batch lookup
+	const matchedTrackKeys = new Set(); // Track dedup: "ARTIST_UPPER|TITLE_UPPER"
+	const tracksByArtist = new Map(); // Group tracks by artist for track-specific lookup
 
-	// Group tracks by artist
+	// Group similar tracks by artist (for specific title matching)
 	for (const [key, trackInfo] of similarTracks) {
 		const artKey = trackInfo.artist.toUpperCase();
 		if (blacklist.has(artKey)) continue;
@@ -508,19 +581,19 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 	}
 
 	const artistCount = tracksByArtist.size;
-	logger?.debug('MoodActivity', `Searching library for tracks from ${artistCount} artists`);
+	logger?.debug('MoodActivity', `Searching library for specific tracks from ${artistCount} artists`);
 
+	// Step 2a: Match specific tracks from track.getSimilar
 	let artistsProcessed = 0;
 	for (const [artKey, artistData] of tracksByArtist) {
 		artistsProcessed++;
 
 		if (artistsProcessed % 10 === 0) {
-			const progress = 0.35 + ((artistsProcessed / artistCount) * 0.15);
-			updateProgress(`Searching library: ${artistsProcessed}/${artistCount} artists...`, progress);
+			const progress = 0.25 + ((artistsProcessed / artistCount) * 0.05);
+			updateProgress(`Searching library: ${artistsProcessed}/${artistCount} artists (specific tracks)...`, progress);
 		}
 
 		try {
-			// Search library for this artist's tracks
 			const trackTitles = artistData.tracks.map(t => t.title);
 
 			const libraryTracks = await db.findLibraryTracks(
@@ -537,11 +610,12 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 
 			if (libraryTracks && libraryTracks.length > 0) {
 				for (const track of libraryTracks) {
-					matchedTracks.push({
-						track,
-						artist: artistData.artistName,
-						title: track.title || track.SongTitle || track.Title || ''
-					});
+					const title = track.title || track.SongTitle || track.Title || '';
+					const dedupKey = `${artistData.artistName.toUpperCase()}|${title.toUpperCase()}`;
+					if (!matchedTrackKeys.has(dedupKey)) {
+						matchedTrackKeys.add(dedupKey);
+						matchedTracks.push({ track, artist: artistData.artistName, title });
+					}
 				}
 			}
 		} catch (e) {
@@ -549,7 +623,68 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 		}
 	}
 
-	logger?.info('MoodActivity', `Library matching found ${matchedTracks.length} tracks`);
+	const trackSpecificCount = matchedTracks.length;
+	logger?.info('MoodActivity', `Track-specific matching found ${trackSpecificCount} tracks`);
+
+	// Step 2b: Artist expansion — get ALL tracks from similar artists in the library
+	// This dramatically increases the pool available for mood filtering
+	// Cap the total pool to avoid spending excessive time on ReccoBeats lookups
+	// for tracks that will mostly be filtered out by audio feature matching.
+	const expandedArtistList = Array.from(expandedArtists);
+	let expandedTrackCount = 0;
+	const expansionPoolLimit = config.expansionPoolLimit ?? 2000;
+
+	logger?.info('MoodActivity', `Expanding pool: searching library for all tracks by ${expandedArtistList.length} related artists (pool limit: ${expansionPoolLimit})`);
+
+	for (let i = 0; i < expandedArtistList.length; i++) {
+		const artKey = expandedArtistList[i];
+		if (blacklist.has(artKey)) continue;
+
+		// Stop expanding once we have enough tracks to work with
+		if (matchedTracks.length >= expansionPoolLimit) {
+			logger?.info('MoodActivity', `Pool limit reached (${matchedTracks.length} tracks), stopping artist expansion at ${i}/${expandedArtistList.length} artists`);
+			break;
+		}
+
+		if (i % 10 === 0) {
+			const progress = 0.3 + ((i / expandedArtistList.length) * 0.1);
+			updateProgress(`Expanding pool: ${i}/${expandedArtistList.length} artists (${matchedTracks.length} tracks)...`, progress);
+		}
+
+		try {
+			// Use the original casing from tracksByArtist if available, otherwise use the uppercase key
+			const artistName = tracksByArtist.get(artKey)?.artistName || artKey;
+
+			// Fetch ALL tracks by this artist (null trackTitles = no title filter)
+			const libraryTracks = await db.findLibraryTracks(
+				artistName,
+				null,
+				config.tracksPerArtist ?? 10000,
+				{
+					formatPreference: config.formatPreference,
+					minRating: config.minRating,
+					allowUnknown: config.allowUnknown,
+					collection: config.localCollection || ''
+				}
+			);
+
+			if (libraryTracks && libraryTracks.length > 0) {
+				for (const track of libraryTracks) {
+					const title = track.title || track.SongTitle || track.Title || '';
+					const dedupKey = `${artistName.toUpperCase()}|${title.toUpperCase()}`;
+					if (!matchedTrackKeys.has(dedupKey)) {
+						matchedTrackKeys.add(dedupKey);
+						matchedTracks.push({ track, artist: artistName, title });
+						expandedTrackCount++;
+					}
+				}
+			}
+		} catch (e) {
+			logger?.warn('MoodActivity', `Library expansion error for artist "${artKey}": ${e.message}`);
+		}
+	}
+
+	logger?.info('MoodActivity', `Artist expansion added ${expandedTrackCount} tracks (${trackSpecificCount} from track matching + ${expandedTrackCount} from artist expansion = ${matchedTracks.length} total)`);
 
 	if (matchedTracks.length === 0) {
 		logger?.info('MoodActivity', 'No matching tracks found in library');
@@ -557,7 +692,7 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 		return emptyResult;
 	}
 
-	updateProgress(`Found ${matchedTracks.length} tracks in library, analyzing audio features...`, 0.5);
+	updateProgress(`Found ${matchedTracks.length} tracks in library, analyzing audio features...`, 0.4);
 
 	// ==========================================================================
 	// STEP 3: Look up audio features via ReccoBeats
@@ -572,9 +707,14 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 	const tracksWithFeatures = [];
 	const batchSize = 20; // Process in batches to show progress
 
+	// Sort matched tracks so tracks from the same artist are grouped together.
+	// This maximises ReccoBeats cache hits: the first track triggers artist/album
+	// lookups, and subsequent tracks by the same artist reuse cached results.
+	matchedTracks.sort((a, b) => a.artist.toUpperCase().localeCompare(b.artist.toUpperCase()));
+
 	for (let i = 0; i < matchedTracks.length; i += batchSize) {
 		const batch = matchedTracks.slice(i, i + batchSize);
-		const progress = 0.5 + ((i / matchedTracks.length) * 0.2);
+		const progress = 0.4 + ((i / matchedTracks.length) * 0.35);
 		updateProgress(`Analyzing audio features: ${Math.min(i + batchSize, matchedTracks.length)}/${matchedTracks.length}...`, progress);
 
 		for (const { track, artist, title } of batch) {
@@ -667,29 +807,28 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 	// STEP 5: Convert to candidate format for orchestration
 	// ==========================================================================
 
-	// Build candidates array (one entry per track, maintaining compatibility with orchestration)
-	const seenArtists = new Set();
+	// Build candidates array (one entry per artist, maintaining compatibility with orchestration)
+	// Use a Map for O(1) artist lookups instead of linear scan
+	const candidatesByArtist = new Map();
 	const candidates = [];
 
 	for (const { track, artist, title, matchScore } of filteredTracks) {
 		const artKey = artist.toUpperCase();
 
-		if (!seenArtists.has(artKey)) {
-			seenArtists.add(artKey);
-			candidates.push({
+		if (!candidatesByArtist.has(artKey)) {
+			const candidate = {
 				artist,
 				tracks: [{ title, match: matchScore }],
 				// Store the actual library track for direct use
 				_libraryTracks: [track]
-			});
+			};
+			candidatesByArtist.set(artKey, candidate);
+			candidates.push(candidate);
 		} else {
-			// Add to existing artist
-			const existing = candidates.find(c => c.artist.toUpperCase() === artKey);
-			if (existing) {
-				existing.tracks.push({ title, match: matchScore });
-				existing._libraryTracks = existing._libraryTracks || [];
-				existing._libraryTracks.push(track);
-			}
+			// Add to existing artist — O(1) lookup
+			const existing = candidatesByArtist.get(artKey);
+			existing.tracks.push({ title, match: matchScore });
+			existing._libraryTracks.push(track);
 		}
 	}
 

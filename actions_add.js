@@ -259,64 +259,48 @@ actions.similarMoodDark = {
 // ACTIVITY ACTIONS - Use predefined audio profiles
 // ============================================================================
 
-actions.similarActivityWorkout = {
-	title: _('&Workout'),
+actions.similarActivityCardio = {
+	title: _('&Cardio'),
 	icon: 'mediamonkey',
 	hotkeyAble: true,
 	visible: true,
 	disabled: uitools.notMediaListSelected,
-	tooltip: _('Find fast, high‑energy workout music'),
+	tooltip: _('Find fast, high\u2011energy cardio music'),
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
-			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'workout' });
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'cardio' });
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
 	}
 };
 
-actions.similarActivityStudy = {
-	title: _('&Study'),
+actions.similarActivityCleaning = {
+	title: _('C&leaning'),
 	icon: 'mediamonkey',
 	hotkeyAble: true,
 	visible: true,
 	disabled: uitools.notMediaListSelected,
-	tooltip: _('Find calm, instrumental study tracks'),
+	tooltip: _('Find rhythmic, motivating cleaning tracks'),
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
-			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'study' });
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'cleaning' });
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
 	}
 };
 
-actions.similarActivityParty = {
-	title: _('&Party'),
+actions.similarActivityCooking = {
+	title: _('C&ooking'),
 	icon: 'mediamonkey',
 	hotkeyAble: true,
 	visible: true,
 	disabled: uitools.notMediaListSelected,
-	tooltip: _('Find fun, dance‑ready party songs'),
+	tooltip: _('Find pleasant, upbeat cooking music'),
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
-			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'party' });
-		} else {
-			console.error('Match Monkey: Add-on not loaded');
-		}
-	}
-};
-
-actions.similarActivitySleep = {
-	title: _('S&leep'),
-	icon: 'mediamonkey',
-	hotkeyAble: true,
-	visible: true,
-	disabled: uitools.notMediaListSelected,
-	tooltip: _('Find soft, quiet, sleep‑friendly music'),
-	execute: function () {
-		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
-			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'sleep' });
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'cooking' });
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
@@ -339,6 +323,86 @@ actions.similarActivityDriving = {
 	}
 };
 
+actions.similarActivityEveningWinddown = {
+	title: _('&Winddown'),
+	icon: 'mediamonkey',
+	hotkeyAble: true,
+	visible: true,
+	disabled: uitools.notMediaListSelected,
+	tooltip: _('Find calm, soothing music to wind down'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'evening_winddown' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarActivityFocusWork = {
+	title: _('&Focus Work'),
+	icon: 'mediamonkey',
+	hotkeyAble: true,
+	visible: true,
+	disabled: uitools.notMediaListSelected,
+	tooltip: _('Find minimal, instrumental focus music'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'focus_work' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarActivityGaming = {
+	title: _('&Gaming'),
+	icon: 'mediamonkey',
+	hotkeyAble: true,
+	visible: true,
+	disabled: uitools.notMediaListSelected,
+	tooltip: _('Find immersive, energetic gaming music'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'gaming' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarActivityGettingReady = {
+	title: _('Getting &Ready'),
+	icon: 'mediamonkey',
+	hotkeyAble: true,
+	visible: true,
+	disabled: uitools.notMediaListSelected,
+	tooltip: _('Find upbeat, danceable getting\u2011ready tracks'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'getting_ready' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarActivityHiit = {
+	title: _('&HIIT'),
+	icon: 'mediamonkey',
+	hotkeyAble: true,
+	visible: true,
+	disabled: uitools.notMediaListSelected,
+	tooltip: _('Find intense, fast\u2011paced HIIT tracks'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'hiit' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
 actions.similarActivityMeditation = {
 	title: _('&Meditation'),
 	icon: 'mediamonkey',
@@ -355,32 +419,48 @@ actions.similarActivityMeditation = {
 	}
 };
 
-actions.similarActivityCooking = {
-	title: _('&Cooking'),
+actions.similarActivityParty = {
+	title: _('&Party'),
 	icon: 'mediamonkey',
 	hotkeyAble: true,
 	visible: true,
 	disabled: uitools.notMediaListSelected,
-	tooltip: _('Find pleasant, upbeat cooking music'),
+	tooltip: _('Find fun, dance\u2011ready party songs'),
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
-			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'cooking' });
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'party' });
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
 	}
 };
 
-actions.similarActivityCleaning = {
-	title: _('&Cleaning'),
+actions.similarActivityRoadTrip = {
+	title: _('Road &Trip'),
 	icon: 'mediamonkey',
 	hotkeyAble: true,
 	visible: true,
 	disabled: uitools.notMediaListSelected,
-	tooltip: _('Find rhythmic, motivating cleaning tracks'),
+	tooltip: _('Find sing\u2011along, feel\u2011good road trip music'),
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
-			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'cleaning' });
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'road_trip' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
+actions.similarActivitySleep = {
+	title: _('&Sleep'),
+	icon: 'mediamonkey',
+	hotkeyAble: true,
+	visible: true,
+	disabled: uitools.notMediaListSelected,
+	tooltip: _('Find soft, quiet, sleep\u2011friendly music'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'sleep' });
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
@@ -393,7 +473,7 @@ actions.similarActivityWalking = {
 	hotkeyAble: true,
 	visible: true,
 	disabled: uitools.notMediaListSelected,
-	tooltip: _('Find smooth, mid‑tempo walking music'),
+	tooltip: _('Find smooth, mid\u2011tempo walking music'),
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
 			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'walking' });
@@ -403,16 +483,16 @@ actions.similarActivityWalking = {
 	}
 };
 
-actions.similarActivityCoding = {
-	title: _('&Coding'),
+actions.similarActivityYoga = {
+	title: _('&Yoga'),
 	icon: 'mediamonkey',
 	hotkeyAble: true,
 	visible: true,
 	disabled: uitools.notMediaListSelected,
-	tooltip: _('Find minimal, electronic, focus music'),
+	tooltip: _('Find gentle, flowing yoga music'),
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
-			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'coding' });
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'yoga' });
 		} else {
 			console.error('Match Monkey: Add-on not loaded');
 		}
@@ -547,29 +627,34 @@ actions.matchMonkeyViewMissedResults = {
 
 // Mood submenu items
 var moodSubmenuItems = [
-	{ action: actions.similarMoodHappy, order: 10 },
-	{ action: actions.similarMoodRelaxed, order: 20 },
+	{ action: actions.similarMoodAngry, order: 10 },
+	{ action: actions.similarMoodDark, order: 20 },
 	{ action: actions.similarMoodEnergetic, order: 30 },
-	{ action: actions.similarMoodSad, order: 40 },
-	{ action: actions.similarMoodFocused, order: 50 },
-	{ action: actions.similarMoodRomantic, order: 60 },
-	{ action: actions.similarMoodDark, order: 70 },
-	{ action: actions.similarMoodUplifting, order: 80 },
-	{ action: actions.similarMoodAngry, order: 90 }
+	{ action: actions.similarMoodFocused, order: 40 },
+	{ action: actions.similarMoodHappy, order: 50 },
+	{ action: actions.similarMoodRelaxed, order: 60 },
+	{ action: actions.similarMoodRomantic, order: 70 },
+	{ action: actions.similarMoodSad, order: 80 },
+	{ action: actions.similarMoodUplifting, order: 90 }
 ];
 
 // Activity submenu items
 var activitySubmenuItems = [
-	{ action: actions.similarActivityWorkout, order: 10 },
-	{ action: actions.similarActivityStudy, order: 20 },
-	{ action: actions.similarActivityDriving, order: 30 },
-	{ action: actions.similarActivityWalking, order: 40 },
-	{ action: actions.similarActivityCooking, order: 50 },
-	{ action: actions.similarActivityCleaning, order: 60 },
-	{ action: actions.similarActivityParty, order: 70 },
-	{ action: actions.similarActivityMeditation, order: 80 },
-	{ action: actions.similarActivitySleep, order: 90 },
-	{ action: actions.similarActivityCoding, order: 100 }
+	{ action: actions.similarActivityCardio, order: 10 },
+	{ action: actions.similarActivityCleaning, order: 20 },
+	{ action: actions.similarActivityCooking, order: 30 },
+	{ action: actions.similarActivityDriving, order: 40 },
+	{ action: actions.similarActivityEveningWinddown, order: 50 },
+	{ action: actions.similarActivityFocusWork, order: 60 },
+	{ action: actions.similarActivityGaming, order: 70 },
+	{ action: actions.similarActivityGettingReady, order: 80 },
+	{ action: actions.similarActivityHiit, order: 90 },
+	{ action: actions.similarActivityMeditation, order: 100 },
+	{ action: actions.similarActivityParty, order: 110 },
+	{ action: actions.similarActivityRoadTrip, order: 120 },
+	{ action: actions.similarActivitySleep, order: 130 },
+	{ action: actions.similarActivityWalking, order: 140 },
+	{ action: actions.similarActivityYoga, order: 150 }
 ];
 
 // Match Monkey submenu for Tools menu

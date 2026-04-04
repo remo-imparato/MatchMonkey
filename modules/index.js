@@ -42,7 +42,7 @@ window.matchMonkeyModules = {
 
 	// API modules
 	api: {
-		cache: window.lastfmCache,
+		cache: window.matchMonkeyCache,
 		lastfmApi: window.matchMonkeyLastfmAPI,
 		reccobeatsApi: window.matchMonkeyReccoBeatsAPI,
 	},

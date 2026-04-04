@@ -154,6 +154,9 @@ function start() {
 		ArtistBlacklist: '',            // Comma-separated blacklisted artists
 		GenreBlacklist: '',             // Comma-separated blacklisted genres
 		TitleExclusions: '',            // Comma-separated title words to exclude
+
+		// === Cache ===
+		CacheTTLHours: 24,              // Hours before cached API responses expire (ReccoBeats lookups use 7x this value)
 	};
 
 	/**

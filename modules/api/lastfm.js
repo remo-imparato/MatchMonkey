@@ -56,7 +56,7 @@ async function fetchSimilarArtists(artistName, limit) {
 		if (!artistName) return [];
 
 		// Get dependencies
-		const cache = window.lastfmCache;
+		const cache = window.matchMonkeyCache;
 		const updateProgress = window.matchMonkeyNotifications?.updateProgress || (() => { });
 
 		// Check cache first
@@ -146,16 +146,18 @@ async function fetchSimilarArtists(artistName, limit) {
 			updateProgress(`Last.fm: Found ${asArr.length} similar artists for "${artistName}"`, undefined);
 		}
 
-		// Cache results for subsequent calls in this run
-		cache?.cacheSimilarArtists?.(artistName, asArr);
+		// Trim to only the fields we use and cache
+		const trimmed = asArr.map(a => ({ name: a.name, match: Number(a.match) || 0 }));
 
-		return asArr;
+		cache?.cacheSimilarArtists?.(artistName, trimmed);
+
+		return trimmed;
 
 	} catch (e) {
 		const logger = _getLastfmLogger();
 		logger?.error('Last.fm', `Exception for artist="${artistName}": ${e.toString()}`);
 		window.matchMonkeyNotifications?.updateProgress?.(`Last.fm: Error fetching similar artists for "${artistName}"`, undefined);
-		window.lastfmCache?.cacheSimilarArtists?.(artistName, []);
+		window.matchMonkeyCache?.cacheSimilarArtists?.(artistName, []);
 		return [];
 	}
 }
@@ -175,7 +177,7 @@ async function fetchTopTracks(artistName, limit, includePlaycount = false) {
 		if (!artistName) return [];
 
 		// Get dependencies
-		const cache = window.lastfmCache;
+		const cache = window.matchMonkeyCache;
 		const updateProgress = window.matchMonkeyNotifications?.updateProgress || (() => { });
 
 		// Check cache first
@@ -290,7 +292,7 @@ async function fetchTopTracks(artistName, limit, includePlaycount = false) {
 	} catch (e) {
 		logger?.error('Last.fm', `Exception fetching top tracks for "${artistName}": ${e.toString()}`);
 		window.matchMonkeyNotifications?.updateProgress?.(`Last.fm: Error fetching tracks for "${artistName}"`, undefined);
-		window.lastfmCache?.cacheTopTracks?.(artistName, limit, includePlaycount, []);
+		window.matchMonkeyCache?.cacheTopTracks?.(artistName, limit, includePlaycount, []);
 		return [];
 	}
 }
@@ -311,15 +313,16 @@ async function fetchSimilarTracks(artistName, trackName, limit = 100) {
 		if (!artistName || !trackName) return [];
 
 		// Get dependencies
-		const cache = window.lastfmCache;
+		const cache = window.matchMonkeyCache;
 		const updateProgress = window.matchMonkeyNotifications?.updateProgress || (() => { });
 
 		// Build cache key
 		const cacheKey = `track:${artistName}|${trackName}|${limit}`.toUpperCase();
 
 		// Check cache first
-		if (cache?.isActive?.() && cache.similarTracks?.has?.(cacheKey)) {
-			const cached = cache.similarTracks.get(cacheKey) || [];
+		const similarTracksMap = cache?.getLastfmMap?.('similarTracks');
+		if (similarTracksMap?.has(cacheKey)) {
+			const cached = similarTracksMap.get(cacheKey) || [];
 			logger?.debug('Last.fm', `Cache hit for similar tracks: "${artistName} - ${trackName}" (${cached.length} tracks)`);
 			return cached;
 		}
@@ -396,7 +399,6 @@ async function fetchSimilarTracks(artistName, trackName, limit = 100) {
 				artist,
 				match: Number(t.match) || 0,
 				playcount: Number(t.playcount) || 0,
-				url: t.url || ''
 			});
 		}
 
@@ -412,10 +414,7 @@ async function fetchSimilarTracks(artistName, trackName, limit = 100) {
 		}
 
 		// Cache results
-		if (cache?.isActive?.()) {
-			if (!cache.similarTracks) cache.similarTracks = new Map();
-			cache.similarTracks.set(cacheKey, results);
-		}
+		cache?.getLastfmMap?.('similarTracks')?.set(cacheKey, results);
 
 		return results;
 
@@ -438,15 +437,16 @@ async function fetchArtistInfo(artistName) {
 	try {
 		if (!artistName) return null;
 
-		const cache = window.lastfmCache;
+		const cache = window.matchMonkeyCache;
 		const updateProgress = window.matchMonkeyNotifications?.updateProgress || (() => { });
 
 		// Build cache key
 		const cacheKey = `artistinfo:${artistName}`.toUpperCase();
 
 		// Check cache
-		if (cache?.isActive?.() && cache.artistInfo?.has?.(cacheKey)) {
-			const cached = cache.artistInfo.get(cacheKey);
+		const artistInfoMap = cache?.getLastfmMap?.('artistInfo');
+		if (artistInfoMap?.has(cacheKey)) {
+			const cached = artistInfoMap.get(cacheKey);
 			logger?.debug('Last.fm', `Cache hit for artist info: "${artistName}"`);
 			return cached;
 		}
@@ -514,10 +514,6 @@ async function fetchArtistInfo(artistName) {
 		const result = {
 			name: artist.name || artistName,
 			tags: tagList.map(t => t.name || t).filter(Boolean),
-			listeners: Number(artist.stats?.listeners) || 0,
-			playcount: Number(artist.stats?.playcount) || 0,
-			similar: (artist.similar?.artist || []).map(a => a.name || a).filter(Boolean),
-			bio: artist.bio?.summary || ''
 		};
 
 		logger?.debug('Last.fm', `Retrieved artist info for "${artistName}" (${result.tags.length} tags)`);
@@ -532,10 +528,7 @@ async function fetchArtistInfo(artistName) {
 		}
 
 		// Cache result
-		if (cache?.isActive?.()) {
-			if (!cache.artistInfo) cache.artistInfo = new Map();
-			cache.artistInfo.set(cacheKey, result);
-		}
+		cache?.getLastfmMap?.('artistInfo')?.set(cacheKey, result);
 
 		return result;
 
