@@ -78,6 +78,7 @@ async function discoverByArtist(modules, seeds, config) {
 	const filteredArtists = []; // Track details for debug mode
 
 	for (let i = 0; i < artistCount; i++) {
+		if (window.matchMonkeyNotifications?.isCancelled?.()) break;
 		const artistName = uniqueArtists[i];
 		const progress = 0.2 + ((i + 1) / artistCount) * 0.25;
 		updateProgress(`Last.fm: Finding artists similar to "${artistName}" (${i + 1}/${artistCount})...`, progress);
@@ -209,6 +210,7 @@ async function discoverByTrack(modules, seeds, config) {
 	const filteredTracks = []; // Track details for debug mode
 
 	for (let i = 0; i < seedLimit; i++) {
+		if (window.matchMonkeyNotifications?.isCancelled?.()) break;
 		const seed = seeds[i];
 		if (!seed?.artist || !seed?.title) continue;
 
@@ -411,6 +413,7 @@ async function discoverByGenre(modules, seeds, config) {
 	let totalArtistsFromTags = 0;
 
 	for (let i = 0; i < numTags; i++) {
+		if (window.matchMonkeyNotifications?.isCancelled?.()) break;
 		if (candidates.length >= maxCandidates) {
 			logger.debug('Genre', `Reached limit of ${maxCandidates} candidates`);
 			break;
@@ -895,6 +898,7 @@ async function fetchTracksForCandidates(modules, candidates, config) {
 	updateProgress(`Last.fm: Getting tracks for ${pending.length} artists...`, 0.5);
 
 	for (let i = 0; i < pending.length; i += CONCURRENCY) {
+		if (window.matchMonkeyNotifications?.isCancelled?.()) break;
 		const batch = pending.slice(i, i + CONCURRENCY);
 
 		await Promise.all(batch.map(async (candidate) => {

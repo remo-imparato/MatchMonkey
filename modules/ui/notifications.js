@@ -129,6 +129,15 @@ function getProgressTask() {
 	return globalProgressTask;
 }
 
+/**
+ * Check if the current progress task has been cancelled by the user.
+ * MM5 sets task.cancelled = true when the user clicks Cancel in the bottom status bar.
+ * @returns {boolean} True if the user has requested cancellation.
+ */
+function isCancelled() {
+	return Boolean(globalProgressTask?.cancelled);
+}
+
 // Export to window namespace for MM5
 window.matchMonkeyNotifications = {
 	showToast,
@@ -137,6 +146,7 @@ window.matchMonkeyNotifications = {
 	terminateProgressTask,
 	terminateProgressTaskAfterDelay,
 	getProgressTask,
+	isCancelled,
 };
 
 // Also export updateProgress globally for backward compatibility

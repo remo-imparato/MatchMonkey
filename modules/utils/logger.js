@@ -169,5 +169,5 @@ window.matchMonkeyLogger = logger;
 // ============================================================================
 // DEBUGGING TOOLS (SET TO TRUE TO ENABLE)
 // ============================================================================
-window.matchMonkeyDebugMode = false; // Default: verbose logging disabled
+window.matchMonkeyDebugMode = true; // Default: verbose logging disabled
 

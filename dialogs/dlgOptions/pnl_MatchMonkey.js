@@ -484,11 +484,11 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setupCacheSection = function
 			app.listen(UI.btnClearCache, 'click', () => {
 				try {
 					if (window.matchMonkeyCache?.clear) {
-						window.matchMonkeyCache.clear();
-					} else {
-						// Fallback: clear the storage key directly
-						app.setValue('MatchMonkeyCache', null);
-					}
+							window.matchMonkeyCache.clear();
+						} else {
+							// Fallback: clear the storage key directly (null crashes MM5, use empty object)
+							app.setValue('MatchMonkeyCache', {});
+						}
 					console.log('Match Monkey Options: Cache cleared');
 					this._updateStorageUsage(UI);
 				} catch (e) {

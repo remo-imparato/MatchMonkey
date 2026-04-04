@@ -73,9 +73,10 @@ window.matchMonkeyOrchestration = {
 			_moodActivityContext,
 		} = modules;
 
-		const { getSetting, intSetting, boolSetting, stringSetting } = storage;
-		const { showToast, updateProgress, createProgressTask, terminateProgressTask } = notifications;
+		const { getSetting, intSetting, boolSetting, stringSetting, refreshSettings } = storage;
+		const { showToast, updateProgress, createProgressTask, terminateProgressTask, isCancelled } = notifications;
 		const { formatError, shuffle: shuffleUtil, shuffleWithDispersion } = helpers;
+		const checkCancelled = () => { if (isCancelled()) throw new Error('__CANCELLED__'); };
 
 		// Get logger and discovery strategies
 		const logger = window.matchMonkeyLogger;
@@ -89,6 +90,10 @@ window.matchMonkeyOrchestration = {
 		// Initialize cache for this run
 		const cache = window.matchMonkeyCache;
 		cache?.init?.();
+
+		// Refresh settings from persistent store so any changes saved in the
+		// options panel are picked up without needing a restart.
+		refreshSettings?.();
 
 		let taskId = null;
 		const startTime = Date.now();
@@ -201,8 +206,9 @@ window.matchMonkeyOrchestration = {
 				}
 
 				logger.info('Seeds', `Collected ${seeds.length} seed track(s)`);
-				updateProgress(`Found ${seeds.length} seed track(s)`, 0.1);
-			} else {
+					updateProgress(`Found ${seeds.length} seed track(s)`, 0.1);
+					checkCancelled();
+				} else {
 				// Mood/Activity modes don't need seeds
 				logger.info('Seeds', `${discoveryMode} mode - no seeds required`);
 				updateProgress(`Starting ${modeName} discovery...`, 0.1);
@@ -230,11 +236,12 @@ window.matchMonkeyOrchestration = {
 					config_._preMatchedLibraryTracks = discoveryResult.libraryTracks;
 				}
 			} catch (discoveryError) {
-				logger.error('Discovery', 'Discovery failed', discoveryError);
-				terminateProgressTask(taskId);
-				showToast(`Discovery failed: ${formatError(discoveryError)}`, { type: 'error', duration: 5000 });
-				return { success: false, error: formatError(discoveryError), tracksAdded: 0 };
-			}
+					if (discoveryError?.message === '__CANCELLED__') throw discoveryError;
+					logger.error('Discovery', 'Discovery failed', discoveryError);
+					terminateProgressTask(taskId);
+					showToast(`Discovery failed: ${formatError(discoveryError)}`, { type: 'error', duration: 5000 });
+					return { success: false, error: formatError(discoveryError), tracksAdded: 0 };
+				}
 
 			if (!candidates || candidates.length === 0) {
 				terminateProgressTask(taskId);
@@ -301,11 +308,12 @@ window.matchMonkeyOrchestration = {
 					matchStats = matchResult.stats;
 				}
 			} catch (matchError) {
-				logger.error('Library', 'Library matching error', matchError);
-				terminateProgressTask(taskId);
-				showToast(`Library search failed: ${formatError(matchError)}`, { type: 'error', duration: 5000 });
-				return { success: false, error: formatError(matchError), tracksAdded: 0 };
-			}
+					if (matchError?.message === '__CANCELLED__') throw matchError;
+					logger.error('Library', 'Library matching error', matchError);
+					terminateProgressTask(taskId);
+					showToast(`Library search failed: ${formatError(matchError)}`, { type: 'error', duration: 5000 });
+					return { success: false, error: formatError(matchError), tracksAdded: 0 };
+				}
 
 			if (!results || results.length === 0) {
 				terminateProgressTask(taskId);
@@ -564,6 +572,13 @@ window.matchMonkeyOrchestration = {
 			};
 
 		} catch (e) {
+			if (e?.message === '__CANCELLED__') {
+				terminateProgressTask(taskId);
+				cache?.save?.();
+				logger.info('Workflow', 'Cancelled by user');
+				showToast('Discovery cancelled.', { type: 'info', duration: 2000 });
+				return { success: false, error: 'Cancelled', tracksAdded: 0 };
+			}
 			logger.error('Workflow', 'Unexpected error', e);
 			terminateProgressTask(taskId);
 			cache?.save?.();
@@ -751,7 +766,7 @@ window.matchMonkeyOrchestration = {
 	 */
 	async matchCandidatesToLibrary(modules, candidates, config) {
 		const { db, ui: { notifications } } = modules;
-		const { updateProgress } = notifications;
+		const { updateProgress, isCancelled } = notifications;
 		const logger = window.matchMonkeyLogger;
 		const results = [];
 		const seenTrackIds = new Set();
@@ -779,6 +794,7 @@ window.matchMonkeyOrchestration = {
 		let filteredByRatingCount = 0;
 
 		for (let i = 0; i < totalCandidates; i++) {
+			if (isCancelled()) throw new Error('__CANCELLED__');
 			const candidate = candidates[i];
 			if (!candidate?.artist) continue;
 
