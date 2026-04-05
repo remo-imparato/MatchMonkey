@@ -188,6 +188,15 @@ const ACTIVITY_AUDIO_TARGETS = {
 		acousticness: { target: 0.75, min: 0.4, max: 1.0 },
 		instrumentalness: { target: 0.6, min: 0.3, max: 1.0 },
 		tempo: { target: 70, min: 50, max: 95 }
+	},
+
+	hype_sports: {
+		energy: { target: 0.95, min: 0.8, max: 1.0 },
+		tempo: { target: 165, min: 140, max: 200 },
+		loudness: { target: -5, min: -12, max: -2 },
+		valence: { target: 0.55, min: 0.3, max: 0.85 },
+		danceability: { target: 0.65, min: 0.4, max: 0.9 },
+		instrumentalness: { target: 0.2, min: 0.0, max: 0.6 }
 	}
 };
 
@@ -389,7 +398,8 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 	const { api: { lastfmApi }, settings: { prefixes }, ui: { notifications }, db } = modules;
 	const { fetchSimilarTracks, fetchSimilarArtists } = lastfmApi;
 	const { fixPrefixes } = prefixes;
-	const { updateProgress } = notifications;
+	const { updateProgress, isCancelled } = notifications;
+	const checkCancelled = () => { if (isCancelled()) throw new Error('__CANCELLED__'); };
 	const reccobeatsApi = window.matchMonkeyReccoBeatsAPI;
 
 	const emptyResult = { candidates: [], stats: { audioFeatureFilteredCount: 0, totalFromApi: 0 } };
@@ -432,6 +442,7 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 	let apiFilteredCount = 0;
 
 	for (let i = 0; i < seedLimit; i++) {
+		checkCancelled();
 		const seed = seeds[i];
 		if (!seed?.artist || !seed?.title) continue;
 
@@ -442,6 +453,7 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 		const artists = seed.artist.split(';').map(a => a.trim()).filter(Boolean);
 
 		for (const artistName of artists) {
+			checkCancelled();
 			try {
 				const fixedArtistName = fixPrefixes(artistName);
 				const similar = await fetchSimilarTracks(fixedArtistName, seed.title, trackSimilarLimit);
@@ -480,6 +492,7 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 					similarTracks.get(key).seeds.add(`${seed.artist} - ${seed.title}`);
 				}
 			} catch (e) {
+				if (e?.message === '__CANCELLED__') throw e;
 				logger?.warn('MoodActivity', `Error for "${artistName} - ${seed.title}": ${e.message}`);
 			}
 		}
@@ -502,6 +515,7 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 	updateProgress(`${typeName} "${value}": Finding similar artists to expand pool...`, 0.2);
 
 	for (let i = 0; i < seedArtists.length; i++) {
+		checkCancelled();
 		const artistName = seedArtists[i];
 		const progress = 0.2 + ((i + 1) / seedArtists.length) * 0.05;
 		updateProgress(`Last.fm: Finding artists similar to "${artistName}" (${i + 1}/${seedArtists.length})...`, progress);
@@ -536,6 +550,7 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 				}
 			}
 		} catch (e) {
+			if (e?.message === '__CANCELLED__') throw e;
 			logger?.warn('MoodActivity', `Error getting similar artists for "${artistName}": ${e.message}`);
 		}
 	}
@@ -586,6 +601,7 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 	// Step 2a: Match specific tracks from track.getSimilar
 	let artistsProcessed = 0;
 	for (const [artKey, artistData] of tracksByArtist) {
+		checkCancelled();
 		artistsProcessed++;
 
 		if (artistsProcessed % 10 === 0) {
@@ -619,6 +635,7 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 				}
 			}
 		} catch (e) {
+			if (e?.message === '__CANCELLED__') throw e;
 			logger?.warn('MoodActivity', `Library search error for "${artistData.artistName}": ${e.message}`);
 		}
 	}
@@ -637,6 +654,7 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 	logger?.info('MoodActivity', `Expanding pool: searching library for all tracks by ${expandedArtistList.length} related artists (pool limit: ${expansionPoolLimit})`);
 
 	for (let i = 0; i < expandedArtistList.length; i++) {
+		checkCancelled();
 		const artKey = expandedArtistList[i];
 		if (blacklist.has(artKey)) continue;
 
@@ -680,6 +698,7 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 				}
 			}
 		} catch (e) {
+			if (e?.message === '__CANCELLED__') throw e;
 			logger?.warn('MoodActivity', `Library expansion error for artist "${artKey}": ${e.message}`);
 		}
 	}
@@ -713,11 +732,13 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 	matchedTracks.sort((a, b) => a.artist.toUpperCase().localeCompare(b.artist.toUpperCase()));
 
 	for (let i = 0; i < matchedTracks.length; i += batchSize) {
+		checkCancelled();
 		const batch = matchedTracks.slice(i, i + batchSize);
 		const progress = 0.4 + ((i / matchedTracks.length) * 0.35);
 		updateProgress(`Analyzing audio features: ${Math.min(i + batchSize, matchedTracks.length)}/${matchedTracks.length}...`, progress);
 
 		for (const { track, artist, title } of batch) {
+			checkCancelled();
 			try {
 				// Get album from track if available
 				const album = track.album || track.Album || '';
@@ -742,6 +763,7 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 					});
 				}
 			} catch (e) {
+				if (e?.message === '__CANCELLED__') throw e;
 				logger?.debug('MoodActivity', `Audio features error for "${artist} - ${title}": ${e.message}`);
 			}
 		}

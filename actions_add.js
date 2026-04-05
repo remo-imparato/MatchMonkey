@@ -255,17 +255,33 @@ actions.similarMoodDark = {
 	}
 };
 
+actions.similarHypeSports = {
+	title: _('&Hype Sports'),
+	icon: 'actor',
+	hotkeyAble: true,
+	visible: true,
+	disabled: uitools.notMediaListSelected,
+	tooltip: _('Find high-energy, adrenaline-pumping hype tracks for sports'),
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'hype_sports' });
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	}
+};
+
 // ============================================================================
 // ACTIVITY ACTIONS - Use predefined audio profiles
 // ============================================================================
 
 actions.similarActivityCardio = {
-	title: _('&Cardio'),
+	title: _('High &Energy'),
 	icon: 'mediamonkey',
 	hotkeyAble: true,
 	visible: true,
 	disabled: uitools.notMediaListSelected,
-	tooltip: _('Find fast, high\u2011energy cardio music'),
+	tooltip: _('Find fast, high\u2011energy tracks'),
 	execute: function () {
 		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
 			window.matchMonkey.runMatchMonkey(false, 'activity', { moodActivityValue: 'cardio' });
@@ -638,22 +654,23 @@ var moodSubmenuItems = [
 	{ action: actions.similarMoodUplifting, order: 90 }
 ];
 
-// Activity submenu items
+// Activity submenu items (alphabetical by display name)
 var activitySubmenuItems = [
-	{ action: actions.similarActivityCardio, order: 10 },
-	{ action: actions.similarActivityCleaning, order: 20 },
-	{ action: actions.similarActivityCooking, order: 30 },
-	{ action: actions.similarActivityDriving, order: 40 },
-	{ action: actions.similarActivityEveningWinddown, order: 50 },
-	{ action: actions.similarActivityFocusWork, order: 60 },
-	{ action: actions.similarActivityGaming, order: 70 },
-	{ action: actions.similarActivityGettingReady, order: 80 },
-	{ action: actions.similarActivityHiit, order: 90 },
-	{ action: actions.similarActivityMeditation, order: 100 },
-	{ action: actions.similarActivityParty, order: 110 },
-	{ action: actions.similarActivityRoadTrip, order: 120 },
-	{ action: actions.similarActivitySleep, order: 130 },
-	{ action: actions.similarActivityWalking, order: 140 },
+	{ action: actions.similarActivityCleaning, order: 10 },
+	{ action: actions.similarActivityCooking, order: 20 },
+	{ action: actions.similarActivityDriving, order: 30 },
+	{ action: actions.similarActivityFocusWork, order: 40 },
+	{ action: actions.similarActivityGaming, order: 50 },
+	{ action: actions.similarActivityGettingReady, order: 60 },
+	{ action: actions.similarActivityCardio, order: 70 },
+	{ action: actions.similarActivityHiit, order: 80 },
+	{ action: actions.similarHypeSports, order: 85 },
+	{ action: actions.similarActivityMeditation, order: 90 },
+	{ action: actions.similarActivityParty, order: 100 },
+	{ action: actions.similarActivityRoadTrip, order: 110 },
+	{ action: actions.similarActivitySleep, order: 120 },
+	{ action: actions.similarActivityWalking, order: 130 },
+	{ action: actions.similarActivityEveningWinddown, order: 140 },
 	{ action: actions.similarActivityYoga, order: 150 }
 ];
 

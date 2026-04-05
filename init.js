@@ -156,7 +156,7 @@ function start() {
 		TitleExclusions: '',            // Comma-separated title words to exclude
 
 		// === Cache ===
-		CacheTTLHours: 24,              // Hours before cached API responses expire (ReccoBeats lookups use 7x this value)
+		CacheTTLHours: 72,              // Hours before cached API responses expire (ReccoBeats lookups use 7x this value)
 	};
 
 	/**

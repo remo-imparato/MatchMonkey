@@ -72,12 +72,10 @@ const logger = {
 	 * Examples: workflow start/end, API responses, phase completions
 	 */
 	info: function (context, message, ...args) {
-		if (isDebugMode()) {
-			if (args.length > 0) {
-				console.info(`${LOG_PREFIX} [${context}]: ${message}`, ...args);
-			} else {
-				console.info(`${LOG_PREFIX} [${context}]: ${message}`);
-			}
+		if (args.length > 0) {
+			console.info(`${LOG_PREFIX} [${context}]: ${message}`, ...args);
+		} else {
+			console.info(`${LOG_PREFIX} [${context}]: ${message}`);
 		}
 	},
 
@@ -169,5 +167,5 @@ window.matchMonkeyLogger = logger;
 // ============================================================================
 // DEBUGGING TOOLS (SET TO TRUE TO ENABLE)
 // ============================================================================
-window.matchMonkeyDebugMode = true; // Default: verbose logging disabled
+window.matchMonkeyDebugMode = false; // Default: verbose logging disabled
 

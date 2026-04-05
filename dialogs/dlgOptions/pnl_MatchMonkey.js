@@ -164,7 +164,7 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function (sett, 
 
 		// === API Cache ===
 		if (UI.CacheTTLHours && UI.CacheTTLHours.controlClass) {
-			UI.CacheTTLHours.controlClass.value = (typeof cfg.CacheTTLHours === 'number') ? cfg.CacheTTLHours : 24;
+			UI.CacheTTLHours.controlClass.value = (typeof cfg.CacheTTLHours === 'number') ? cfg.CacheTTLHours : 72;
 		}
 		this._setupCacheSection(UI);
 
@@ -524,14 +524,12 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._updateStorageUsage = functio
 			var entry = storageKeys[i];
 			var value = null;
 			try {
-				value = app.getValue(entry.key, null);
+				value = app.getValue(entry.key, {});
 			} catch (e) {
 				// ignore read errors
 			}
 
 			var sizeBytes = 0;
-			var detail = '';
-
 			if (value !== null && value !== undefined) {
 				try {
 					var json = JSON.stringify(value);
@@ -539,32 +537,35 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._updateStorageUsage = functio
 				} catch (e) {
 					sizeBytes = 0;
 				}
-
-				// Add entry count detail where applicable
-				if (entry.key === 'MatchMonkeyCache' && typeof value === 'object') {
-					var entryCount = 0;
-					for (var group in value) {
-						if (!value.hasOwnProperty(group)) continue;
-						var maps = value[group];
-						for (var mapName in maps) {
-							if (!maps.hasOwnProperty(mapName)) continue;
-							var arr = maps[mapName];
-							if (Array.isArray(arr)) {
-								entryCount += arr.length;
-							}
-						}
-					}
-					detail = ' (' + entryCount + ' entries)';
-				} else if (entry.key === 'MatchMonkey_MissedResults' && Array.isArray(value)) {
-					detail = ' (' + value.length + ' tracks)';
-				}
 			}
 
 			totalBytes += sizeBytes;
-			lines.push(entry.label + ': ' + this._formatBytes(sizeBytes) + detail);
+
+			if (entry.key === 'MatchMonkeyCache') {
+				var counts = this._getCacheCounts(value);
+				lines.push('<strong>' + entry.label + '</strong>: ' + this._formatBytes(sizeBytes));
+				lines.push(
+					'\u00a0\u00a0<em>Last.fm</em>: ' +
+					counts.similarArtists + ' artists \u00b7 ' +
+					counts.topTracks + ' top tracks \u00b7 ' +
+					counts.similarTracks + ' similar tracks \u00b7 ' +
+					counts.artistInfo + ' artist info'
+				);
+				lines.push(
+					'\u00a0\u00a0<em>ReccoBeats</em>: ' +
+					counts.artistLookups + ' artist IDs \u00b7 ' +
+					counts.albumLookups + ' album IDs \u00b7 ' +
+					counts.trackLookups + ' track IDs \u00b7 ' +
+					counts.audioFeatures + ' audio features'
+				);
+			} else if (entry.key === 'MatchMonkey_MissedResults' && Array.isArray(value)) {
+				lines.push(entry.label + ': ' + this._formatBytes(sizeBytes) + ' (' + value.length + ' tracks)');
+			} else {
+				lines.push(entry.label + ': ' + this._formatBytes(sizeBytes));
+			}
 		}
 
-		lines.push('Total: ' + this._formatBytes(totalBytes));
+		lines.push('<strong>Total: ' + this._formatBytes(totalBytes) + '</strong>');
 		UI.storageUsageInfo.innerHTML = lines.join('<br>');
 
 	} catch (e) {
@@ -574,6 +575,66 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._updateStorageUsage = functio
 		}
 	}
 };
+
+/**
+ * Get per-map cache entry counts.
+ * Uses live in-memory detailed stats when the cache is active,
+ * otherwise falls back to counting entries in the raw persistent store data.
+ * @param {object} rawCacheValue - Raw value from app.getValue('MatchMonkeyCache')
+ * @returns {object} Counts keyed by map name
+ */
+optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._getCacheCounts = function (rawCacheValue) {
+	// Prefer live in-memory stats (accurate for current session)
+	if (window.matchMonkeyCache?.getDetailedStats) {
+		var live = window.matchMonkeyCache.getDetailedStats();
+		if (live.active) {
+			return {
+				similarArtists: live.lastfm?.similarArtists || 0,
+				topTracks: live.lastfm?.topTracks || 0,
+				similarTracks: live.lastfm?.similarTracks || 0,
+				artistInfo: live.lastfm?.artistInfo || 0,
+				artistLookups: live.reccobeats?.artistLookups || 0,
+				albumLookups: live.reccobeats?.albumLookups || 0,
+				trackLookups: live.reccobeats?.trackLookups || 0,
+				audioFeatures: live.reccobeats?.audioFeatures || 0,
+			};
+		}
+	}
+
+	// Fall back to counting from raw persistent store data
+	var counts = {
+		similarArtists: 0, topTracks: 0, similarTracks: 0, artistInfo: 0,
+		artistLookups: 0, albumLookups: 0, trackLookups: 0, audioFeatures: 0,
+	};
+
+	if (!rawCacheValue || typeof rawCacheValue !== 'object') return counts;
+
+	var rawLf = rawCacheValue.lastfm;
+	if (rawLf && typeof rawLf === 'object') {
+		if (Array.isArray(rawLf.similarArtists)) counts.similarArtists = rawLf.similarArtists.length;
+		if (Array.isArray(rawLf.topTracks)) counts.topTracks = rawLf.topTracks.length;
+		if (Array.isArray(rawLf.similarTracks)) counts.similarTracks = rawLf.similarTracks.length;
+		if (Array.isArray(rawLf.artistInfo)) counts.artistInfo = rawLf.artistInfo.length;
+	}
+
+	var rawRb = rawCacheValue.reccobeats;
+	if (rawRb && typeof rawRb === 'object') {
+		if (Array.isArray(rawRb.audioFeatures)) counts.audioFeatures = rawRb.audioFeatures.length;
+		if (Array.isArray(rawRb.lookups)) {
+			for (var j = 0; j < rawRb.lookups.length; j++) {
+				var pair = rawRb.lookups[j];
+				if (!Array.isArray(pair) || !pair[0]) continue;
+				var k = String(pair[0]).toUpperCase();
+				if (k.startsWith('TRACKID:')) counts.trackLookups++;
+				else if (k.startsWith('ALBUMID:') || k.startsWith('ALBUM:') || k.startsWith('ARTISTALBUMS:') || k.startsWith('ALBUMTRACKS:')) counts.albumLookups++;
+				else if (k.startsWith('ARTISTALL:')) counts.artistLookups++;
+			}
+		}
+	}
+
+	return counts;
+};
+
 
 /**
  * Format byte count to a human-readable string.

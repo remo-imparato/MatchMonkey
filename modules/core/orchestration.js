@@ -199,6 +199,7 @@ window.matchMonkeyOrchestration = {
 
 				if (!seeds || seeds.length === 0) {
 					terminateProgressTask(taskId);
+					cache?.save?.();
 					const modeMsg = autoMode ? 'No tracks in Now Playing queue.' : 'Select tracks or play something first.';
 					showToast(`No seed tracks found. ${modeMsg}`, { type: 'warning', duration: 5000 });
 					logger.info('Seeds', 'No seed tracks found, exiting');
@@ -239,12 +240,14 @@ window.matchMonkeyOrchestration = {
 					if (discoveryError?.message === '__CANCELLED__') throw discoveryError;
 					logger.error('Discovery', 'Discovery failed', discoveryError);
 					terminateProgressTask(taskId);
+					cache?.save?.();
 					showToast(`Discovery failed: ${formatError(discoveryError)}`, { type: 'error', duration: 5000 });
 					return { success: false, error: formatError(discoveryError), tracksAdded: 0 };
 				}
 
 			if (!candidates || candidates.length === 0) {
 				terminateProgressTask(taskId);
+				cache?.save?.();
 
 				// Provide specific guidance based on discovery mode
 				let errorMsg = `No ${modeName} candidates found.`;
@@ -311,12 +314,14 @@ window.matchMonkeyOrchestration = {
 					if (matchError?.message === '__CANCELLED__') throw matchError;
 					logger.error('Library', 'Library matching error', matchError);
 					terminateProgressTask(taskId);
+					cache?.save?.();
 					showToast(`Library search failed: ${formatError(matchError)}`, { type: 'error', duration: 5000 });
 					return { success: false, error: formatError(matchError), tracksAdded: 0 };
 				}
 
 			if (!results || results.length === 0) {
 				terminateProgressTask(taskId);
+				cache?.save?.();
 				showToast(`No matching tracks found in your library. Try different seeds or adjust filters.`, { type: 'info', duration: 5000 });
 				logger.info('Library', 'No tracks matched in library');
 				return { success: false, error: 'No matching tracks found.', tracksAdded: 0 };
@@ -384,11 +389,14 @@ window.matchMonkeyOrchestration = {
 					const existingPriority = getFormatPriority(existing);
 					const newPriority = getFormatPriority(track);
 
-					if (newPriority > existingPriority) {
+					const existingBitrate = existing.bitrate || existing.Bitrate || 0;
+					const newBitrate = track.bitrate || track.Bitrate || 0;
+					const existingExt = (existing.fileExtension || existing.FileExtension || 'unknown').toUpperCase();
+					const newExt = (track.fileExtension || track.FileExtension || 'unknown').toUpperCase();
+
+					if (newPriority > existingPriority || (newPriority === existingPriority && newBitrate > existingBitrate)) {
 						duplicateMap.set(dupKey, track);
-						const existingExt = (existing.fileExtension || existing.FileExtension || 'unknown').toUpperCase();
-						const newExt = (track.fileExtension || track.FileExtension || 'unknown').toUpperCase();
-						logger.debug('Dedup', `Preferring ${newExt} over ${existingExt} for "${makeDupKey(track).replace('||', ' - ')}"`);
+						logger.debug('Dedup', `Preferring ${newExt}/${newBitrate}kbps over ${existingExt}/${existingBitrate}kbps for "${makeDupKey(track).replace('||', ' - ')}"`);
 					}
 				}
 			}
@@ -502,7 +510,8 @@ window.matchMonkeyOrchestration = {
 				if (config_.autoMode || enqueueEnabled) {
 					output = await this.queueResults(modules, finalResults, config_);
 				} else {
-					const seedName = seeds.length > 0 ? this.buildPlaylistSeedName(seeds) : config_.moodActivityValue || 'Selection';
+					const formatActivityName = (val) => String(val || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+					const seedName = seeds.length > 0 ? this.buildPlaylistSeedName(seeds) : formatActivityName(config_.moodActivityValue) || 'Selection';
 					const genreName = seeds.length > 0 && config_.discoveryMode === 'genre' ? this.buildPlaylistGenreName(seeds) : null;
 					config_.seedName = seedName;
 					config_.genreName = genreName;
@@ -513,6 +522,7 @@ window.matchMonkeyOrchestration = {
 			} catch (outputError) {
 				logger.error('Output', 'Output error', outputError);
 				terminateProgressTask(taskId);
+				cache?.save?.();
 				showToast(`Failed to create ${outputMode}: ${formatError(outputError)}`, { type: 'error', duration: 5000 });
 				return { success: false, error: formatError(outputError), tracksAdded: 0 };
 			}
@@ -543,7 +553,7 @@ window.matchMonkeyOrchestration = {
 			if (dedupRemovedCount > 0) filterParts.push(`${dedupRemovedCount} duplicates removed`);
 			if (missedCount > 0) filterParts.push(`${missedCount} missed results tracked`);
 			if (filterParts.length > 0) summaryParts.push(`Skipped: ${filterParts.join(', ')}`);
-			logger.log('Complete', summaryParts.join(' | '));
+			logger.info('Complete', summaryParts.join(' | '));
 
 			// Build success message for toast
 			let successMsg = `Successfully added ${actualTracksAdded} ${modeName} track(s) in ${elapsed}s`;
@@ -890,10 +900,17 @@ window.matchMonkeyOrchestration = {
 						for (const [title, allTracks] of allTracksMap.entries()) {
 							if (allTracks.length > 0) {
 								if (shouldIncludeTrackGroup(allTracks)) {
-									// Pick the highest-quality version regardless of its individual rating
-									const bestTrack = allTracks.reduce((best, cur) =>
-										getFormatPriority(cur) > getFormatPriority(best) ? cur : best
-									);
+									// Pick the highest-quality version regardless of its individual rating.
+									// When two tracks share the same format priority bucket (e.g. both
+									// 192-255 kbps MP3 = priority 60), use actual bitrate as tiebreaker
+									// so the higher-bitrate version always wins.
+									const bestTrack = allTracks.reduce((best, cur) => {
+										const curPri = getFormatPriority(cur);
+										const bestPri = getFormatPriority(best);
+										if (curPri !== bestPri) return curPri > bestPri ? cur : best;
+										// Same format priority – prefer the higher actual bitrate
+										return (cur.bitrate || cur.Bitrate || 0) > (best.bitrate || best.Bitrate || 0) ? cur : best;
+									});
 									tracks.push(bestTrack);
 
 									// Log matched track with its API popularity/match value
@@ -1349,8 +1366,8 @@ window.matchMonkeyOrchestration = {
 			let actionText = 'Artists'; // Default
 
 			if (config.moodActivityValue && (config.discoveryMode === 'mood' || config.discoveryMode === 'activity')) {
-				// Mood/Activity: Use the capitalized mood/activity value
-				actionText = config.moodActivityValue.charAt(0).toUpperCase() + config.moodActivityValue.slice(1);
+				// Mood/Activity: Use the formatted mood/activity value (underscores → spaces, title-case)
+				actionText = String(config.moodActivityValue).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 			} else if (config.discoveryMode === 'genre') {
 				actionText = 'Genres';
 			} else if (config.discoveryMode === 'track') {
@@ -1383,7 +1400,7 @@ window.matchMonkeyOrchestration = {
 			// Auto-generate name based on discovery mode (when template is empty)
 			if (config.moodActivityValue && (config.discoveryMode === 'mood' || config.discoveryMode === 'activity')) {
 				// Mood/Activity: "Similar %mood/activity% (%artist%)"
-				const capitalizedValue = config.moodActivityValue.charAt(0).toUpperCase() + config.moodActivityValue.slice(1);
+				const capitalizedValue = String(config.moodActivityValue).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 				playlistName = `Similar ${capitalizedValue} (${seedName})`;
 			} else if (config.discoveryMode === 'genre') {
 				// Genre: "Similar Genres (%genre%)"

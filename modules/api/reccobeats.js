@@ -124,7 +124,9 @@ function createHeaders() {
  */
 async function rateLimitedFetch(url, options = {}, retryCount = 0) {
 	const logger = _getReccoLogger();
+	if (window.matchMonkeyNotifications?.isCancelled?.()) throw new Error('__CANCELLED__');
 	await enforceRateLimit();
+	if (window.matchMonkeyNotifications?.isCancelled?.()) throw new Error('__CANCELLED__');
 
 	const controller = new AbortController();
 	const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
@@ -240,6 +242,7 @@ async function searchArtistAll(artistName) {
 	const allMatches = [];
 
 	while (page < maxPages && page < maxPagesLimit) {
+		if (window.matchMonkeyNotifications?.isCancelled?.()) throw new Error('__CANCELLED__');
 		try {
 			const url = `${RECCOBEATS_API_BASE}/artist/search?searchText=${encodeURIComponent(artistName)}&page=${page}&size=50`;
 
@@ -272,6 +275,7 @@ async function searchArtistAll(artistName) {
 			// Move to next page
 			page++;
 		} catch (e) {
+			if (e?.message === '__CANCELLED__') throw e;
 			logger?.error('ReccoBeats', `searchArtistAll: Error for artist="${artistName}": ${e.message}`);
 			updateProgress(`ReccoBeats: Error searching for artist "${artistName}"`, undefined);
 			break;
@@ -333,6 +337,7 @@ async function searchAlbum(albumName) {
 	const maxPagesLimit = 50; // Safety limit to prevent infinite loops
 
 	while (page < maxPages && page < maxPagesLimit) {
+		if (window.matchMonkeyNotifications?.isCancelled?.()) throw new Error('__CANCELLED__');
 		try {
 			const url = `${RECCOBEATS_API_BASE}/album/search?searchText=${encodeURIComponent(albumName)}&page=${page}&size=50`;
 
@@ -381,6 +386,7 @@ async function searchAlbum(albumName) {
 
 			page++;
 		} catch (e) {
+			if (e?.message === '__CANCELLED__') throw e;
 			logger?.error('ReccoBeats', `searchAlbum: Error for album="${albumName}": ${e.message}`);
 			updateProgress(`ReccoBeats: Error searching for album "${albumName}"`, undefined);
 			break;
@@ -416,10 +422,23 @@ async function findAlbumInArtist(artistId, albumName) {
 	const cacheKey = `artistalbums:${artistId}`.toUpperCase();
 	const updateProgress = getUpdateProgress();
 
-	// If no albumName is provided, we can return cached full list
-	if (!albumName && cache?.has(cacheKey)) {
-		logger?.debug('ReccoBeats', `findAlbumInArtist: Cache hit for artist ID ${artistId}`);
-		return cache.get(cacheKey) || [];
+	// If the full album list is cached, serve both list and search requests from it
+	if (cache?.has(cacheKey)) {
+		const cachedAlbums = cache.get(cacheKey) || [];
+		if (!albumName) {
+			logger?.debug('ReccoBeats', `findAlbumInArtist: Cache hit for artist ID ${artistId} (${cachedAlbums.length} albums)`);
+			return cachedAlbums;
+		}
+		// Search the cached list for the specific album — no API call needed
+		const cleanedSearch = matchMonkeyHelpers.cleanAlbumName(normalize(albumName));
+		const match = cachedAlbums.find(a => matchMonkeyHelpers.cleanAlbumName(normalize(a.name || '')) === cleanedSearch);
+		if (match) {
+			logger?.debug('ReccoBeats', `findAlbumInArtist: Cache hit for album="${albumName}" in artist ${artistId} (${cachedAlbums.length} albums cached)`);
+			return { id: match.id, name: match.name };
+		}
+		// We have the full list and the album isn't in it — no point hitting the API
+		logger?.debug('ReccoBeats', `findAlbumInArtist: Album "${albumName}" not in ${cachedAlbums.length} cached albums for artist ${artistId}`);
+		return null;
 	}
 
 	const normalizedSearch = albumName ? normalize(albumName) : null;
@@ -437,6 +456,7 @@ async function findAlbumInArtist(artistId, albumName) {
 	let allAlbums = [];
 
 	while (page < maxPages && page < maxPagesLimit) {
+		if (window.matchMonkeyNotifications?.isCancelled?.()) throw new Error('__CANCELLED__');
 		try {
 			const url = `${RECCOBEATS_API_BASE}/artist/${artistId}/album?page=${page}&size=${size}`;
 
@@ -487,6 +507,7 @@ async function findAlbumInArtist(artistId, albumName) {
 			// Move to next page
 			page++;
 		} catch (e) {
+			if (e?.message === '__CANCELLED__') throw e;
 			logger?.error('ReccoBeats', `findAlbumInArtist: Error for artist ${artistId}: ${e.message}`);
 			if (albumName) {
 				updateProgress(`ReccoBeats: Error searching for album "${albumName}"`, undefined);
@@ -547,6 +568,7 @@ async function findAlbumId(artist, album) {
 
 	// Step 2: Try each matching artist until we find the album
 	for (let i = 0; i < allArtists.length; i++) {
+		if (window.matchMonkeyNotifications?.isCancelled?.()) throw new Error('__CANCELLED__');
 		const artistInfo = allArtists[i];
 		logger?.debug('ReccoBeats', `findAlbumId: Trying artist ${i + 1}/${allArtists.length}: "${artistInfo.name}" (ID: ${artistInfo.id})`);
 
@@ -619,6 +641,7 @@ async function getAlbumTracks(albumId) {
 		cache?.set(cacheKey, tracks);
 		return tracks;
 	} catch (e) {
+		if (e?.message === '__CANCELLED__') throw e;
 		logger?.error('ReccoBeats', `getAlbumTracks: Error for album ${albumId}: ${e.message}`);
 		return [];
 	}
@@ -766,6 +789,7 @@ async function findTrackId(artist, title, album) {
 
 	// Step 2: Try each matching artist until we find the track
 	for (let artistIndex = 0; artistIndex < allArtists.length; artistIndex++) {
+		if (window.matchMonkeyNotifications?.isCancelled?.()) throw new Error('__CANCELLED__');
 		const artistInfo = allArtists[artistIndex];
 		logger?.debug('ReccoBeats', `findTrackId: Trying artist ${artistIndex + 1}/${allArtists.length}: "${artistInfo.name}" (ID: ${artistInfo.id})`);
 
@@ -806,6 +830,7 @@ async function findTrackId(artist, title, album) {
 		logger?.debug('ReccoBeats', `findTrackId: Searching ${allAlbums.length} album(s) for "${title}" in artist ${artistInfo.id}`);
 
 		for (const albumEntry of allAlbums) {
+			if (window.matchMonkeyNotifications?.isCancelled?.()) throw new Error('__CANCELLED__');
 			const albumTracks = await getAlbumTracks(albumEntry.id);
 			for (const t of albumTracks) {
 				const trackRaw = t.trackTitle || t.name || t.title || '';
@@ -986,6 +1011,7 @@ async function fetchTrackAudioFeatures(trackId) {
 		cache?.set(cacheKey, features);
 		return features;
 	} catch (e) {
+		if (e?.message === '__CANCELLED__') throw e;
 		logger?.error('ReccoBeats', `fetchTrackAudioFeatures: Error for track ${trackId}: ${e.message}`);
 		return null;
 	}

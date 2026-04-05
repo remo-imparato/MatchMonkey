@@ -78,7 +78,7 @@ async function discoverByArtist(modules, seeds, config) {
 	const filteredArtists = []; // Track details for debug mode
 
 	for (let i = 0; i < artistCount; i++) {
-		if (window.matchMonkeyNotifications?.isCancelled?.()) break;
+		if (window.matchMonkeyNotifications?.isCancelled?.()) throw new Error('__CANCELLED__');
 		const artistName = uniqueArtists[i];
 		const progress = 0.2 + ((i + 1) / artistCount) * 0.25;
 		updateProgress(`Last.fm: Finding artists similar to "${artistName}" (${i + 1}/${artistCount})...`, progress);
@@ -208,9 +208,10 @@ async function discoverByTrack(modules, seeds, config) {
 	let totalSimilarTracks = 0;
 	let apiFilteredCount = 0; // Track items filtered by API threshold
 	const filteredTracks = []; // Track details for debug mode
+	let maxMatchSeen = 0; // Track highest match value seen (for diagnostics)
 
 	for (let i = 0; i < seedLimit; i++) {
-		if (window.matchMonkeyNotifications?.isCancelled?.()) break;
+		if (window.matchMonkeyNotifications?.isCancelled?.()) throw new Error('__CANCELLED__');
 		const seed = seeds[i];
 		if (!seed?.artist || !seed?.title) continue;
 
@@ -232,7 +233,7 @@ async function discoverByTrack(modules, seeds, config) {
 				}
 
 				totalSimilarTracks += similarTracks.length;
-				logger.debug('Track', `Found ${similarTracks.length} similar to "${fixedArtistName} - ${seed.title}"`);
+				logger.debug('Track', `Found ${similarTracks.length} similar to "${fixedArtistName} - ${seed.title}" (apiMinMatch=${apiMinMatch > 0 ? apiMinMatch + '%' : 'disabled'})`);
 				updateProgress(`Last.fm: Found ${similarTracks.length} tracks similar to "${seed.title}"`, progress);
 
 				// Group by artist
@@ -244,6 +245,8 @@ async function discoverByTrack(modules, seeds, config) {
 					// Last.fm API returns match as 0.0-1.0, convert to percentage 0-100
 					const rawMatch = Number(simTrack.match) || 0;
 					const m = rawMatch <= 1 ? rawMatch * 100 : rawMatch;
+
+					if (m > maxMatchSeen) maxMatchSeen = m;
 
 					if (minMatch > 0 && m < minMatch) {
 						// Count filtered tracks but don't log each one (performance optimization)
@@ -283,9 +286,6 @@ async function discoverByTrack(modules, seeds, config) {
 
 	// Convert to candidate format, sorted by match score
 	for (const [artKey, data] of tracksByArtist) {
-		if (seenArtists.has(artKey)) continue;
-		seenArtists.add(artKey);
-
 		// Sort tracks by match score (highest first)
 		data.tracks.sort((a, b) => (b.match || 0) - (a.match || 0));
 
@@ -301,6 +301,12 @@ async function discoverByTrack(modules, seeds, config) {
 		totalFromApi: totalSimilarTracks,
 		filtered: apiFilteredCount
 	}, filteredTracks);
+
+	// If the threshold filtered everything out, log a visible hint with the actual match range
+	if (candidates.length === 0 && apiFilteredCount > 0 && apiMinMatch > 0) {
+		logger.info('Track', `All ${apiFilteredCount} tracks were below the ${apiMinMatch}% threshold (highest match seen: ${maxMatchSeen.toFixed(1)}%). track.getSimilar typically returns values in the 1–15% range — try lowering API Min Match.`);
+	}
+
 	updateProgress(`Last.fm returned ${totalSimilarTracks} similar tracks → ${candidates.length} artists`, 0.5);
 
 	// Return candidates with stats
@@ -389,6 +395,7 @@ async function discoverByGenre(modules, seeds, config) {
 					}
 				}
 			} catch (e) {
+				if (e?.message === '__CANCELLED__') throw e;
 				logger.warn('Genre', `Error getting tags for "${artistName}": ${e.message}`);
 			}
 		}
@@ -413,7 +420,7 @@ async function discoverByGenre(modules, seeds, config) {
 	let totalArtistsFromTags = 0;
 
 	for (let i = 0; i < numTags; i++) {
-		if (window.matchMonkeyNotifications?.isCancelled?.()) break;
+		if (window.matchMonkeyNotifications?.isCancelled?.()) throw new Error('__CANCELLED__');
 		if (candidates.length >= maxCandidates) {
 			logger.debug('Genre', `Reached limit of ${maxCandidates} candidates`);
 			break;
@@ -441,6 +448,7 @@ async function discoverByGenre(modules, seeds, config) {
 				}
 			}
 		} catch (e) {
+			if (e?.message === '__CANCELLED__') throw e;
 			logger.warn('Genre', `Error for tag "${tag}": ${e.message}`);
 		}
 	}
@@ -898,7 +906,7 @@ async function fetchTracksForCandidates(modules, candidates, config) {
 	updateProgress(`Last.fm: Getting tracks for ${pending.length} artists...`, 0.5);
 
 	for (let i = 0; i < pending.length; i += CONCURRENCY) {
-		if (window.matchMonkeyNotifications?.isCancelled?.()) break;
+		if (window.matchMonkeyNotifications?.isCancelled?.()) throw new Error('__CANCELLED__');
 		const batch = pending.slice(i, i + CONCURRENCY);
 
 		await Promise.all(batch.map(async (candidate) => {
@@ -917,6 +925,7 @@ async function fetchTracksForCandidates(modules, candidates, config) {
 					totalTracksFound += candidate.tracks.length;
 				}
 			} catch (e) {
+				if (e?.message === '__CANCELLED__') throw e;
 				logger.warn('Tracks', `Error for "${candidate.artist}": ${e.message}`);
 			}
 		}));

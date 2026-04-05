@@ -38,6 +38,7 @@ function getApiKey() {
  */
 async function lastfmFetch(url) {
 	const logger = _getLastfmLogger();
+	if (window.matchMonkeyNotifications?.isCancelled?.()) throw new Error('__CANCELLED__');
 	logger?.debug('Last.fm', `API GET ${url}`);
 	return fetch(url);
 }
@@ -52,18 +53,22 @@ async function lastfmFetch(url) {
  *                              Returns empty array on error.
  */
 async function fetchSimilarArtists(artistName, limit) {
+	const logger = _getLastfmLogger();
 	try {
 		if (!artistName) return [];
 
 		// Get dependencies
 		const cache = window.matchMonkeyCache;
 		const updateProgress = window.matchMonkeyNotifications?.updateProgress || (() => { });
+		const lim = Number(limit) || undefined;
+
+		// Log request URL before cache check so it's always visible in debug output
+		logger?.debug('Last.fm', `API GET ${API_BASE}?method=artist.getSimilar&artist=${encodeURIComponent(artistName)}${lim ? '&limit=' + lim : ''}&api_key=${MATCHMONKEY_API_KEY}&format=json&autocorrect=1`);
 
 		// Check cache first
 		if (cache?.getCachedSimilarArtists) {
 			const cached = cache.getCachedSimilarArtists(artistName);
 			if (cached !== null) {
-				const logger = _getLastfmLogger();
 				logger?.debug('Last.fm', `Cache hit for artist="${artistName}" (${cached.length} artists)`);
 				return cached;
 			}
@@ -72,15 +77,13 @@ async function fetchSimilarArtists(artistName, limit) {
 		// Get API key
 		const apiKey = getApiKey();
 		if (!apiKey) {
-			const logger = _getLastfmLogger();
 			logger?.error('Last.fm', 'No API key available');
 			updateProgress('Last.fm: API key not configured - contact developer', undefined);
 			cache?.cacheSimilarArtists?.(artistName, []);
 			return [];
 		}
 
-		// Build API request
-		const lim = Number(limit) || undefined;
+		// Build API request (lim already computed above)
 		const params = new URLSearchParams({
 			method: 'artist.getSimilar',
 			api_key: apiKey,
@@ -91,7 +94,6 @@ async function fetchSimilarArtists(artistName, limit) {
 		if (lim) params.set('limit', String(lim));
 
 		const url = API_BASE + '?' + params.toString();
-		const logger = _getLastfmLogger();
 		logger?.debug('Last.fm', `Searching for artist="${artistName}", limit=${lim || 'default'}`);
 		updateProgress(`Last.fm: Finding artists similar to "${artistName}"...`, undefined);
 
@@ -154,7 +156,7 @@ async function fetchSimilarArtists(artistName, limit) {
 		return trimmed;
 
 	} catch (e) {
-		const logger = _getLastfmLogger();
+		if (e?.message === '__CANCELLED__') throw e;
 		logger?.error('Last.fm', `Exception for artist="${artistName}": ${e.toString()}`);
 		window.matchMonkeyNotifications?.updateProgress?.(`Last.fm: Error fetching similar artists for "${artistName}"`, undefined);
 		window.matchMonkeyCache?.cacheSimilarArtists?.(artistName, []);
@@ -179,6 +181,10 @@ async function fetchTopTracks(artistName, limit, includePlaycount = false) {
 		// Get dependencies
 		const cache = window.matchMonkeyCache;
 		const updateProgress = window.matchMonkeyNotifications?.updateProgress || (() => { });
+		const lim = Number(limit) || undefined;
+
+		// Log request URL before cache check so it's always visible in debug output
+		logger?.debug('Last.fm', `API GET ${API_BASE}?method=artist.getTopTracks&artist=${encodeURIComponent(artistName)}${lim ? '&limit=' + lim : ''}&api_key=${MATCHMONKEY_API_KEY}&format=json&autocorrect=1`);
 
 		// Check cache first
 		if (cache?.getCachedTopTracks) {
@@ -198,8 +204,7 @@ async function fetchTopTracks(artistName, limit, includePlaycount = false) {
 			return [];
 		}
 
-		// Build API request
-		const lim = Number(limit) || undefined;
+		// Build API request (lim already computed above)
 		const params = new URLSearchParams({
 			method: 'artist.getTopTracks',
 			api_key: apiKey,
@@ -290,6 +295,7 @@ async function fetchTopTracks(artistName, limit, includePlaycount = false) {
 		return out;
 
 	} catch (e) {
+		if (e?.message === '__CANCELLED__') throw e;
 		logger?.error('Last.fm', `Exception fetching top tracks for "${artistName}": ${e.toString()}`);
 		window.matchMonkeyNotifications?.updateProgress?.(`Last.fm: Error fetching tracks for "${artistName}"`, undefined);
 		window.matchMonkeyCache?.cacheTopTracks?.(artistName, limit, includePlaycount, []);
@@ -315,6 +321,10 @@ async function fetchSimilarTracks(artistName, trackName, limit = 100) {
 		// Get dependencies
 		const cache = window.matchMonkeyCache;
 		const updateProgress = window.matchMonkeyNotifications?.updateProgress || (() => { });
+		const lim = Number(limit) || undefined;
+
+		// Log request URL before cache check so it's always visible in debug output
+		logger?.debug('Last.fm', `API GET ${API_BASE}?method=track.getSimilar&artist=${encodeURIComponent(artistName)}&track=${encodeURIComponent(trackName)}${lim ? '&limit=' + lim : ''}&api_key=${MATCHMONKEY_API_KEY}&format=json&autocorrect=1`);
 
 		// Build cache key
 		const cacheKey = `track:${artistName}|${trackName}|${limit}`.toUpperCase();
@@ -335,8 +345,7 @@ async function fetchSimilarTracks(artistName, trackName, limit = 100) {
 			return [];
 		}
 
-		// Build API request
-		const lim = Number(limit) || undefined;
+		// Build API request (lim already computed above)
 		const params = new URLSearchParams({
 			method: 'track.getSimilar',
 			api_key: apiKey,
@@ -404,7 +413,7 @@ async function fetchSimilarTracks(artistName, trackName, limit = 100) {
 
 		logger?.debug('Last.fm', `Found ${results.length} similar tracks for "${artistName} - ${trackName}"`);
 		if (results.length > 0) {
-			logger?.debug('Last.fm', `Top 5: ${results.slice(0, 5).map(t => `${t.artist} - ${t.title} (match: ${t.match.toFixed(3)})`).join(', ')}`);
+			results.forEach(t => logger?.debug('Last.fm', `  ${t.artist} - ${t.title} match=${(Number(t.match) * 100).toFixed(1)}%`));
 		}
 
 		if (results.length === 0) {
@@ -419,6 +428,7 @@ async function fetchSimilarTracks(artistName, trackName, limit = 100) {
 		return results;
 
 	} catch (e) {
+		if (e?.message === '__CANCELLED__') throw e;
 		logger?.error('Last.fm', `Exception for similar tracks "${artistName} - ${trackName}": ${e.toString()}`);
 		window.matchMonkeyNotifications?.updateProgress?.(`Last.fm: Error finding similar tracks for "${trackName}"`, undefined);
 		return [];
@@ -533,6 +543,7 @@ async function fetchArtistInfo(artistName) {
 		return result;
 
 	} catch (e) {
+		if (e?.message === '__CANCELLED__') throw e;
 		logger?.error('Last.fm', `Exception for artist info "${artistName}": ${e.toString()}`);
 		window.matchMonkeyNotifications?.updateProgress?.(`Last.fm: Error getting artist info`, undefined);
 		return null;
@@ -618,6 +629,7 @@ async function fetchArtistsByTag(tag, limit = 30) {
 		return results;
 
 	} catch (e) {
+		if (e?.message === '__CANCELLED__') throw e;
 		logger?.error('Last.fm', `Exception for tag="${tag}": ${e.toString()}`);
 		window.matchMonkeyNotifications?.updateProgress?.(`Last.fm: Error searching genre`, undefined);
 		return [];

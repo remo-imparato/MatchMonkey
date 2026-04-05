@@ -20,9 +20,9 @@
  * 
  * TTL behaviour:
  * - Last.fm maps and reccobeats.audioFeatures / reccobeats.recommendations
- *   use the user-configurable CacheTTLHours (default 24h).
- * - reccobeats.lookups uses CacheTTLHours * 7 because IDs rarely change
- *   and lookups are expensive (many paginated API calls).
+ *   use the user-configurable CacheTTLHours (default 72h).
+ * - reccobeats.lookups uses a fixed 1-year TTL because artist/album/track IDs
+ *   are permanent and lookups are expensive (many paginated API calls).
  * 
  * Only essential fields are stored in each cache entry to minimize memory.
  * API responses are trimmed to the fields actually consumed downstream.
@@ -45,10 +45,12 @@ const _getCacheLogger = () => window.matchMonkeyLogger;
 let cacheStore = null;
 
 /**
- * Map category names that receive a longer TTL.
- * Everything else uses the standard TTL.
+ * Map category names that use a fixed 1-year TTL.
+ * ReccoBeats IDs are permanent, so lookup results never need to expire.
  */
 const LONG_TTL_MAPS = new Set(['lookups']);
+
+const LOOKUP_TTL_MS = 365 * 24 * 60 * 60 * 1000; // 1 year — IDs don't change
 
 // =========================================================================
 // CACHE KEY HELPERS
@@ -86,7 +88,7 @@ function cacheKeyTopTracks(artistName, limit, withPlaycount = false) {
 function getStandardTTL() {
 	let hours = 24;
 	if (window.matchMonkeyStorage?.getSetting) {
-		const configured = window.matchMonkeyStorage.getSetting('CacheTTLHours', 24);
+		const configured = window.matchMonkeyStorage.getSetting('CacheTTLHours', 72);
 		const parsed = parseFloat(configured);
 		if (Number.isFinite(parsed) && parsed > 0) hours = parsed;
 	}
@@ -100,11 +102,10 @@ function getStandardTTL() {
  * @returns {number} TTL in milliseconds.
  */
 function getTTLForMap(groupName, mapName) {
-	const base = getStandardTTL();
 	if (groupName === 'reccobeats' && LONG_TTL_MAPS.has(mapName)) {
-		return base * 7; // lookups survive 7x longer
+		return LOOKUP_TTL_MS; // fixed 1-year — IDs are permanent
 	}
-	return base;
+	return getStandardTTL();
 }
 
 /**
@@ -210,6 +211,11 @@ function saveToPersistentStore() {
 	if (typeof app === 'undefined' || !app.setValue) return;
 	try {
 		const data = serialiseStore();
+		if (data === null) {
+			// cacheStore is null — nothing to save, skip to avoid writing null
+			_getCacheLogger()?.warn('Cache', 'saveToPersistentStore: skipped (cacheStore is null)');
+			return;
+		}
 		app.setValue(CACHE_STORAGE_KEY, data);
 		_getCacheLogger()?.debug('Cache', 'Saved cache to persistent store');
 	} catch (e) {
@@ -262,6 +268,7 @@ function saveCache() {
  * Used by the "Clear Cache" button in options.
  */
 function clearCache() {
+	console.trace('Match Monkey: clearCache() called — see stack trace for caller');
 	if (cacheStore) {
 		for (const group of Object.values(cacheStore)) {
 			for (const map of Object.values(group)) {
@@ -270,10 +277,10 @@ function clearCache() {
 		}
 	}
 	cacheStore = null;
-	// Also wipe persistent copy
+	// Also wipe persistent copy (use empty object — null can crash MM5)
 	if (typeof app !== 'undefined' && app.setValue) {
 		try {
-			app.setValue(CACHE_STORAGE_KEY, null);
+			app.setValue(CACHE_STORAGE_KEY, {});
 		} catch (e) {
 			_getCacheLogger()?.warn('Cache', `Failed to clear persistent cache: ${e}`);
 		}
@@ -480,6 +487,41 @@ function getCacheStats() {
 	};
 }
 
+/**
+ * Get detailed cache statistics including ReccoBeats lookup breakdown by type.
+ * Iterates the live lookups Map and classifies entries by key prefix.
+ * @returns {object} Detailed cache statistics
+ */
+function getDetailedStats() {
+	if (!cacheStore) return { active: false };
+	const stats = {
+		active: true,
+		lastfm: {
+			similarArtists: cacheStore.lastfm.similarArtists?.size || 0,
+			topTracks: cacheStore.lastfm.topTracks?.size || 0,
+			similarTracks: cacheStore.lastfm.similarTracks?.size || 0,
+			artistInfo: cacheStore.lastfm.artistInfo?.size || 0,
+		},
+		reccobeats: {
+			artistLookups: 0,
+			albumLookups: 0,
+			trackLookups: 0,
+			audioFeatures: cacheStore.reccobeats.audioFeatures?.size || 0,
+			recommendations: cacheStore.reccobeats.recommendations?.size || 0,
+		}
+	};
+	const lookupsMap = cacheStore.reccobeats.lookups;
+	if (lookupsMap) {
+		for (const key of lookupsMap.keys()) {
+			const k = String(key).toUpperCase();
+			if (k.startsWith('TRACKID:')) stats.reccobeats.trackLookups++;
+			else if (k.startsWith('ALBUMID:') || k.startsWith('ALBUM:') || k.startsWith('ARTISTALBUMS:') || k.startsWith('ALBUMTRACKS:')) stats.reccobeats.albumLookups++;
+			else if (k.startsWith('ARTISTALL:')) stats.reccobeats.artistLookups++;
+		}
+	}
+	return stats;
+}
+
 // Export to window namespace
 window.matchMonkeyCache = {
 	init: initCache,
@@ -487,6 +529,7 @@ window.matchMonkeyCache = {
 	clear: clearCache,
 	isActive: isCacheActive,
 	getStats: getCacheStats,
+	getDetailedStats,
 	getCachedSimilarArtists,
 	cacheSimilarArtists,
 	getCachedTopTracks,
