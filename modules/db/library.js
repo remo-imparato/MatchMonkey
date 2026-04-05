@@ -231,7 +231,7 @@ async function findLibraryTracks(artistName, trackTitles, limit = 100, options =
 			const summary = results.slice(0, 3).map(r =>
 				`"${r.title || r.SongTitle || ''}" by ${r.artist || r.Artist || ''}`
 			).join(', ');
-			logger?.info('Library', `findLibraryTracks: Found ${results.length} track(s) from ${searchDesc}: ${summary}${results.length > 3 ? '...' : ''}`);
+			logger?.debug('Library', `findLibraryTracks: Found ${results.length} track(s) from ${searchDesc}: ${summary}${results.length > 3 ? '...' : ''}`);
 		}
 
 		return results;
