@@ -175,7 +175,7 @@ async function rateLimitedFetch(url, options = {}, retryCount = 0) {
  */
 function getCache(mapName) {
 	const cache = window.matchMonkeyCache;
-	if (!cache?.isActive?.()) return null;
+	if (!cache?.isCacheActive?.()) return null;
 	return cache.getReccobeatsMap(mapName);
 }
 
@@ -941,6 +941,180 @@ async function findTrackIdsBatch(seeds) {
 	return results;
 }
 
+/**
+ * Find track IDs for multiple seeds, grouped by artist to minimize redundant API calls.
+ *
+ * When multiple seeds share the same artist, this performs:
+ * - One artist search (searchArtistAll) per unique artist name
+ * - One album list fetch (findAlbumInArtist) per artist ID
+ * - One track fetch (getAlbumTracks) per album, shared across all seeds for that artist
+ *
+ * This avoids the N × (artist search + album scan) cost of calling findTrackId
+ * individually — critical for common artist names (e.g. "DIO") that require
+ * scanning many pages of search results.
+ *
+ * @param {object[]} seeds - Array of {artist, title, album} objects
+ * @returns {Promise<Array<{seed: object, trackId: string|null}>>} Results parallel to seeds array
+ */
+async function findTrackIdsGroupedBatch(seeds) {
+	const logger = _getReccoLogger();
+	if (!seeds || seeds.length === 0) return [];
+
+	const updateProgress = getUpdateProgress();
+	const cache = getCache('lookups');
+
+	// Initialize results parallel to seeds input
+	const results = seeds.map(seed => ({ seed, trackId: null }));
+
+	// Check cache first — separate already-resolved from seeds that need API calls
+	const pendingIndices = [];
+	for (let i = 0; i < seeds.length; i++) {
+		const seed = seeds[i];
+		const cacheKey = `trackid:${seed.artist}:${seed.title}:${seed.album || ''}`.toUpperCase();
+		if (cache?.has(cacheKey)) {
+			const cached = cache.get(cacheKey);
+			if (cached !== undefined) {
+				results[i].trackId = cached;
+				continue;
+			}
+		}
+		pendingIndices.push(i);
+	}
+
+	if (pendingIndices.length === 0) {
+		logger?.debug('ReccoBeats', 'findTrackIdsGroupedBatch: All results from cache');
+		return results;
+	}
+
+	// Group pending seeds by artist (case-insensitive key, preserving original casing)
+	const artistGroups = new Map(); // artistKeyUpper -> [{index, seed}, ...]
+	for (const i of pendingIndices) {
+		const seed = seeds[i];
+		const artistKey = seed.artist.toUpperCase();
+		if (!artistGroups.has(artistKey)) {
+			artistGroups.set(artistKey, []);
+		}
+		artistGroups.get(artistKey).push({ index: i, seed });
+	}
+
+	const totalGroups = artistGroups.size;
+	logger?.debug('ReccoBeats', `findTrackIdsGroupedBatch: ${pendingIndices.length} track(s) grouped into ${totalGroups} unique artist(s)`);
+
+	let groupsDone = 0;
+
+	for (const [artistKey, seedEntries] of artistGroups) {
+		if (window.matchMonkeyNotifications?.isCancelled?.()) throw new Error('__CANCELLED__');
+
+		groupsDone++;
+		const artistName = seedEntries[0].seed.artist;
+		updateProgress(`ReccoBeats: Looking up ${seedEntries.length} track(s) for "${artistName}" (${groupsDone}/${totalGroups})...`, undefined);
+		logger?.debug('ReccoBeats', `findTrackIdsGroupedBatch: Artist group "${artistName}": ${seedEntries.length} track(s) to resolve`);
+
+		// ONE artist search for all seeds from this artist name
+		const allArtists = await searchArtistAll(artistName);
+		if (allArtists.length === 0) {
+			logger?.debug('ReccoBeats', `findTrackIdsGroupedBatch: Artist "${artistName}" not found, caching null for ${seedEntries.length} track(s)`);
+			for (const { seed } of seedEntries) {
+				cache?.set(`trackid:${seed.artist}:${seed.title}:${seed.album || ''}`.toUpperCase(), null);
+			}
+			continue;
+		}
+
+		let pending = [...seedEntries]; // Copy so resolved entries can be removed
+
+		// Try each matching artist ID until all pending tracks are resolved
+		for (let artistIdx = 0; artistIdx < allArtists.length && pending.length > 0; artistIdx++) {
+			if (window.matchMonkeyNotifications?.isCancelled?.()) throw new Error('__CANCELLED__');
+
+			const artistInfo = allArtists[artistIdx];
+			logger?.debug('ReccoBeats', `findTrackIdsGroupedBatch: Checking artist ${artistIdx + 1}/${allArtists.length} "${artistInfo.name}" (ID: ${artistInfo.id}) for ${pending.length} unresolved track(s)`);
+
+			// ONE album list fetch for this artist ID (result is cached per artistId)
+			const allAlbums = await findAlbumInArtist(artistInfo.id, null);
+			if (!allAlbums || allAlbums.length === 0) continue;
+
+			// Collect all tracks across all albums for this artist into a flat list.
+			// Each album's track list is fetched once and cached per albumId.
+			const allTracksFlat = []; // [{track, albumName}, ...]
+			for (const albumEntry of allAlbums) {
+				if (window.matchMonkeyNotifications?.isCancelled?.()) throw new Error('__CANCELLED__');
+				const albumTracks = await getAlbumTracks(albumEntry.id);
+				for (const t of albumTracks) {
+					allTracksFlat.push({ track: t, albumName: albumEntry.name });
+				}
+			}
+
+			if (allTracksFlat.length === 0) continue;
+
+			// Match each pending seed against all collected tracks for this artist.
+			// Exact matches are accepted immediately; contains matches are scored and
+			// the best is used, preferring the seed's specified album when available.
+			const stillPending = [];
+			for (const entry of pending) {
+				const { index, seed } = entry;
+				const nTitle = normalizeForMatch(seed.title);
+				const nAlbum = seed.album ? normalizeForMatch(seed.album) : null;
+
+				let exactMatch = null;
+				const containsMatches = [];
+
+				for (const { track: t, albumName } of allTracksFlat) {
+					const trackRaw = t.trackTitle || t.name || t.title || '';
+					const nTrack = normalizeForMatch(trackRaw);
+
+					if (nTrack === nTitle) {
+						exactMatch = t;
+						break;
+					}
+
+					if (nTitle.length >= 3 && nTrack.length >= 3 &&
+						(nTrack.includes(nTitle) || nTitle.includes(nTrack))) {
+						const score = Math.min(nTrack.length, nTitle.length) / Math.max(nTrack.length, nTitle.length) * 80;
+						containsMatches.push({ track: t, albumName, score });
+					}
+				}
+
+				let found = null;
+				if (exactMatch) {
+					found = exactMatch;
+				} else if (containsMatches.length > 0) {
+					let matches = containsMatches;
+					if (nAlbum && matches.length > 1) {
+						const albumPreferred = matches.filter(m => {
+							const mAlbum = normalizeForMatch(m.albumName || '');
+							return mAlbum === nAlbum || mAlbum.includes(nAlbum) || nAlbum.includes(mAlbum);
+						});
+						if (albumPreferred.length > 0) matches = albumPreferred;
+					}
+					matches.sort((a, b) => b.score - a.score);
+					found = matches[0].track;
+				}
+
+				if (found) {
+					results[index].trackId = found.id;
+					cache?.set(`trackid:${seed.artist}:${seed.title}:${seed.album || ''}`.toUpperCase(), found.id);
+					logger?.debug('ReccoBeats', `findTrackIdsGroupedBatch: Found "${seed.title}" -> "${found.trackTitle || found.title}" in "${artistInfo.name}" (ID: ${found.id})`);
+				} else {
+					stillPending.push(entry);
+				}
+			}
+
+			pending = stillPending;
+		}
+
+		// Cache null for any tracks not found across all artist IDs
+		for (const { seed } of pending) {
+			cache?.set(`trackid:${seed.artist}:${seed.title}:${seed.album || ''}`.toUpperCase(), null);
+			logger?.debug('ReccoBeats', `findTrackIdsGroupedBatch: Not found - "${artistName} - ${seed.title}"`);
+		}
+	}
+
+	const foundCount = results.filter(r => r.trackId).length;
+	logger?.info('ReccoBeats', `findTrackIdsGroupedBatch: Found ${foundCount}/${seeds.length} track ID(s) across ${totalGroups} artist group(s)`);
+
+	return results;
+}
+
 // =============================================================================
 // AUDIO FEATURES API
 // =============================================================================
@@ -1184,26 +1358,16 @@ async function getReccoRecommendations(seeds, limit = 100) {
 	// We still process ALL seeds by splitting found seed IDs into blocks of 5.
 	const maxSeedsToTry = seeds.length;
 
-	// Step 1: Find track IDs for all seeds (cache-first in findTrackId)
+	// Step 1: Find track IDs for all seeds, grouped by artist to minimize redundant API calls
 	updateProgress(`Looking up tracks on ReccoBeats (trying ${maxSeedsToTry} seeds)...`, 0.1);
 	logger?.debug('ReccoBeats', `getReccoRecommendations: Step 1 - Looking up track IDs (trying ${maxSeedsToTry} seeds)`);
 
-	const allResults = [];
-	const foundTracks = [];
+	const allResults = await findTrackIdsGroupedBatch(seeds.slice(0, maxSeedsToTry));
+	const foundTracks = allResults.filter(r => r.trackId);
 
-	for (let i = 0; i < maxSeedsToTry; i++) {
-		const seed = seeds[i];
-		const progress = 0.1 + ((i + 1) / maxSeedsToTry) * 0.2;
-
-		logger?.debug('ReccoBeats', `getReccoRecommendations: Trying seed ${i + 1}/${maxSeedsToTry}: "${seed.artist} - ${seed.title}" (Album: ${seed.album})`);
-		updateProgress(`ReccoBeats: Looking up "${seed.artist} - ${seed.title}" (${foundTracks.length} found)...`, progress);
-
-		const trackId = await findTrackId(seed.artist, seed.title, seed.album);
-		allResults.push({ seed, trackId });
-
+	for (const { seed, trackId } of allResults) {
 		if (trackId) {
-			foundTracks.push({ seed, trackId });
-			logger?.debug('ReccoBeats', `getReccoRecommendations: FOUND track ID ${trackId} for "${seed.artist} - ${seed.title}" (${foundTracks.length} found)`);
+			logger?.debug('ReccoBeats', `getReccoRecommendations: FOUND track ID ${trackId} for "${seed.artist} - ${seed.title}"`);
 		} else {
 			logger?.debug('ReccoBeats', `getReccoRecommendations: NOT FOUND: "${seed.artist} - ${seed.title}" (Album: ${seed.album})`);
 		}
@@ -1423,6 +1587,7 @@ window.matchMonkeyReccoBeatsAPI = {
 	findTrackInAlbum,
 	findTrackId,
 	findTrackIdsBatch,
+	findTrackIdsGroupedBatch,
 	fetchTrackAudioFeatures,
 	getAudioFeatures,
 

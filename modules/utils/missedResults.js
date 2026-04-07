@@ -93,6 +93,7 @@ function computeMissedMeta(results, sizeBytes) {
 
 function saveMissedMeta(meta) {
 	missedPersistentMeta = meta || createEmptyMissedMeta();
+	_getMissedLogger()?.debug('MissedResults', `Meta: total=${missedPersistentMeta.total || 0}, uniqueArtists=${missedPersistentMeta.uniqueArtists || 0}, totalOccurrences=${missedPersistentMeta.totalOccurrences || 0}, sizeBytes=${missedPersistentMeta.sizeBytes || 0}`);
 	if (typeof app === 'undefined' || !app.setValue) return;
 	try {
 		app.setValue(MISSED_META_STORAGE_KEY, missedPersistentMeta);
@@ -144,7 +145,9 @@ async function ensureMissedDbTableAsync() {
 	if (missedDbTableReady) return true;
 	if (!hasMissedDbAsyncApi()) return false;
 	try {
-		await app.db.executeQueryAsync(`CREATE TABLE IF NOT EXISTS ${MISSED_DB_TABLE} (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+		const sql = `CREATE TABLE IF NOT EXISTS ${MISSED_DB_TABLE} (key TEXT PRIMARY KEY, value TEXT NOT NULL)`;
+		_getMissedLogger()?.debug('MissedResults', `SQL: ${sql}`);
+		await app.db.executeQueryAsync(sql);
 		missedDbTableReady = true;
 		return true;
 	} catch (e) {
@@ -156,6 +159,7 @@ async function ensureMissedDbTableAsync() {
 async function saveMissedToDbAsync(json) {
 	if (!(await ensureMissedDbTableAsync())) return false;
 	try {
+		_getMissedLogger()?.debug('MissedResults', `SQL: INSERT OR REPLACE INTO ${MISSED_DB_TABLE} (key='${MISSED_DB_KEY}', ${json.length} chars)`);
 		await app.db.executeQueryAsync(
 			`INSERT OR REPLACE INTO ${MISSED_DB_TABLE} (key, value) VALUES (${sqlMissedStringLiteral(MISSED_DB_KEY)}, ${sqlMissedStringLiteral(json)})`
 		);
@@ -169,6 +173,7 @@ async function saveMissedToDbAsync(json) {
 async function loadMissedFromDbAsync() {
 	if (!(await ensureMissedDbTableAsync())) return null;
 	try {
+		_getMissedLogger()?.debug('MissedResults', `SQL: SELECT value FROM ${MISSED_DB_TABLE} WHERE key='${MISSED_DB_KEY}'`);
 		const rows = await app.db.getQueryResultAsync(
 			`SELECT value FROM ${MISSED_DB_TABLE} WHERE key = ${sqlMissedStringLiteral(MISSED_DB_KEY)}`
 		);
@@ -186,6 +191,7 @@ async function loadMissedFromDbAsync() {
 async function clearMissedFromDbAsync() {
 	if (!(await ensureMissedDbTableAsync())) return false;
 	try {
+		_getMissedLogger()?.debug('MissedResults', `SQL: DELETE FROM ${MISSED_DB_TABLE} WHERE key='${MISSED_DB_KEY}'`);
 		await app.db.executeQueryAsync(`DELETE FROM ${MISSED_DB_TABLE} WHERE key = ${sqlMissedStringLiteral(MISSED_DB_KEY)}`);
 		return true;
 	} catch (e) {
@@ -290,7 +296,6 @@ async function loadMissedResultsFromPersistentStore() {
  * Loads persisted data from the database (with legacy migration).
  */
 async function initMissedResults() {
-	if (missedStore !== null) return; // already initialized
 	await loadMissedResultsFromPersistentStore();
 }
 
@@ -356,17 +361,22 @@ function getMissedResultsStats() {
  * @returns {object} Meta with sizeBytes, total, uniqueArtists, etc.
  */
 function getMissedResultsPersistentMeta() {
-	const meta = loadMissedMeta();
-	if (!meta || typeof meta !== 'object') return createEmptyMissedMeta();
-	return {
-		storage: String(meta.storage || 'db'),
-		sizeBytes: Number(meta.sizeBytes) || 0,
-		lastSavedTs: Number(meta.lastSavedTs) || 0,
-		total: Number(meta.total) || 0,
-		uniqueArtists: Number(meta.uniqueArtists) || 0,
-		totalOccurrences: Number(meta.totalOccurrences) || 0,
-		avgPopularity: Number(meta.avgPopularity) || 0,
-	};
+	if (typeof app === 'undefined' || !app.getValue) return createEmptyMissedMeta();
+	try {
+		const raw = app.getValue(MISSED_META_STORAGE_KEY, {});
+		const meta = (raw && typeof raw === 'object') ? raw : createEmptyMissedMeta();
+		return {
+			storage: String(meta.storage || 'db'),
+			sizeBytes: Number(meta.sizeBytes) || 0,
+			lastSavedTs: Number(meta.lastSavedTs) || 0,
+			total: Number(meta.total) || 0,
+			uniqueArtists: Number(meta.uniqueArtists) || 0,
+			totalOccurrences: Number(meta.totalOccurrences) || 0,
+			avgPopularity: Number(meta.avgPopularity) || 0,
+		};
+	} catch (_) {
+		return createEmptyMissedMeta();
+	}
 }
 
 /**
@@ -508,14 +518,10 @@ function addMissedResultsBatch(results) {
 		}
 	});
 
-	if (errorCount > 0) {
-		logger?.warn('MissedResults', `Batch complete - ${successCount} succeeded, ${errorCount} failed`);
-		if (errorCount > 0 || skippedCount > 0) {
-			logger?.warn('MissedResults', `Batch complete - ${storedCount} stored, ${skippedCount} skipped, ${errorCount} failed`);
-		} else {
-			logger?.debug('MissedResults', `Batch complete - ${successCount} results added`);
-			logger?.debug('MissedResults', `Batch complete - ${storedCount} results stored`);
-		}
+	if (errorCount > 0 || skippedCount > 0) {
+		logger?.warn('MissedResults', `Batch complete - ${storedCount} stored, ${skippedCount} skipped, ${errorCount} failed`);
+	} else {
+		logger?.debug('MissedResults', `Batch complete - ${storedCount} results stored`);
 	}
 }
 function getMissedResultsByArtist(artist) {

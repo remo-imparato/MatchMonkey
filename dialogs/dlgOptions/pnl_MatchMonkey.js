@@ -411,8 +411,8 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setupMissedResults = function (UI) {
 	try {
 		// Ensure module is initialized before reading stats/meta
-		if (window.matchMonkeyMissedResults?.init) {
-			window.matchMonkeyMissedResults.init()
+		if (window.matchMonkeyMissedResults?.initMissedResults) {
+			window.matchMonkeyMissedResults.initMissedResults()
 				.then(() => this._updateMissedResultsCount(UI))
 				.catch(() => this._updateMissedResultsCount(UI));
 		} else {
@@ -451,8 +451,8 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._updateMissedResultsCount = f
 		var stats = null;
 
 		// Prefer live module (falls back to meta internally when store not loaded)
-		if (window.matchMonkeyMissedResults?.getStats) {
-			stats = window.matchMonkeyMissedResults.getStats();
+		if (window.matchMonkeyMissedResults?.getMissedResultsStats) {
+			stats = window.matchMonkeyMissedResults.getMissedResultsStats();
 		} else {
 			// Module not available — read meta directly
 			var meta = app.getValue('MatchMonkeyMissedMeta', {});
@@ -513,8 +513,8 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setupCacheSection = function
 		if (UI.btnClearCache && UI.btnClearCache.controlClass) {
 			app.listen(UI.btnClearCache, 'click', () => {
 				try {
-					if (window.matchMonkeyCache?.clear) {
-						window.matchMonkeyCache.clear();
+					if (window.matchMonkeyCache?.clearCache) {
+						window.matchMonkeyCache.clearCache();
 					} else {
 							// Fallback when cache module is unavailable — use async DB API
 							if (app.db && typeof app.db.executeQueryAsync === 'function') {
@@ -577,16 +577,16 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._updateStorageUsage = async f
 				// Never read full cache blob for options display; use lightweight metadata
 				var cacheMeta = null;
 				try {
-					if (window.matchMonkeyCache?.getPersistentMeta) {
-						cacheMeta = window.matchMonkeyCache.getPersistentMeta();
+					if (window.matchMonkeyCache?.getCachePersistentMeta) {
+						cacheMeta = window.matchMonkeyCache.getCachePersistentMeta();
 					} else {
 						cacheMeta = app.getValue('MatchMonkeyCacheMeta', {});
 					}
 					// Metadata is missing or stale — init the cache from DB so that
 					// updateMetaFromStore() runs and populates accurate counts/size.
-					if ((!cacheMeta || !cacheMeta.sizeBytes) && window.matchMonkeyCache?.init) {
-						await window.matchMonkeyCache.init();
-						cacheMeta = window.matchMonkeyCache.getPersistentMeta();
+					if ((!cacheMeta || !cacheMeta.sizeBytes) && window.matchMonkeyCache?.initCache) {
+						await window.matchMonkeyCache.initCache();
+						cacheMeta = window.matchMonkeyCache.getCachePersistentMeta();
 					}
 				} catch (e) {
 					cacheMeta = null;
@@ -598,18 +598,18 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._updateStorageUsage = async f
 				// Missed results are stored in DB; use lightweight metadata
 				var missedMeta = null;
 				try {
-					if (window.matchMonkeyMissedResults?.getPersistentMeta) {
-						missedMeta = window.matchMonkeyMissedResults.getPersistentMeta();
-					} else {
-						missedMeta = app.getValue('MatchMonkeyMissedMeta', {});
-					}
-					// Metadata is missing or stale — init from DB to populate accurate meta.
-					if ((!missedMeta || !missedMeta.total) && window.matchMonkeyMissedResults?.init) {
-						await window.matchMonkeyMissedResults.init();
-						if (window.matchMonkeyMissedResults.getPersistentMeta) {
-							missedMeta = window.matchMonkeyMissedResults.getPersistentMeta();
+					if (window.matchMonkeyMissedResults?.getMissedResultsPersistentMeta) {
+							missedMeta = window.matchMonkeyMissedResults.getMissedResultsPersistentMeta();
+						} else {
+							missedMeta = app.getValue('MatchMonkeyMissedMeta', {});
 						}
-					}
+						// Metadata is missing or stale — init from DB to populate accurate meta.
+						if ((!missedMeta || !missedMeta.total) && window.matchMonkeyMissedResults?.initMissedResults) {
+							await window.matchMonkeyMissedResults.initMissedResults();
+							if (window.matchMonkeyMissedResults.getMissedResultsPersistentMeta) {
+								missedMeta = window.matchMonkeyMissedResults.getMissedResultsPersistentMeta();
+							}
+						}
 				} catch (e) {
 					missedMeta = null;
 				}

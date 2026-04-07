@@ -23,9 +23,11 @@ const META_KEY = 'MatchMonkeyMissedMeta';
 
 async function loadResultsFromDb() {
 	try {
+		console.log(`dlgMissedResults: SQL CREATE TABLE IF NOT EXISTS ${DB_TABLE}`);
 		await app.db.executeQueryAsync(
 			`CREATE TABLE IF NOT EXISTS ${DB_TABLE} (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
 		);
+		console.log(`dlgMissedResults: SQL SELECT value FROM ${DB_TABLE} WHERE key='${DB_KEY}'`);
 		const rows = await app.db.getQueryResultAsync(
 			`SELECT value FROM ${DB_TABLE} WHERE key = '${DB_KEY}'`
 		);
@@ -43,9 +45,11 @@ async function loadResultsFromDb() {
 
 async function clearResultsFromDb() {
 	try {
+		console.log(`dlgMissedResults: SQL DELETE FROM ${DB_TABLE} WHERE key='${DB_KEY}'`);
 		await app.db.executeQueryAsync(
 			`DELETE FROM ${DB_TABLE} WHERE key = '${DB_KEY}'`
 		);
+		console.log(`dlgMissedResults: app.setValue ${META_KEY} cleared`);
 		try { app.setValue(META_KEY, {}); } catch (_) {}
 	} catch (e) {
 		console.error('dlgMissedResults: Error clearing from DB:', e);

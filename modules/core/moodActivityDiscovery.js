@@ -724,48 +724,58 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 	}
 
 	const tracksWithFeatures = [];
-	const batchSize = 20; // Process in batches to show progress
 
-	// Sort matched tracks so tracks from the same artist are grouped together.
-	// This maximises ReccoBeats cache hits: the first track triggers artist/album
-	// lookups, and subsequent tracks by the same artist reuse cached results.
+	// Sort matched tracks so all tracks from the same artist are grouped together.
+	// The grouped batch lookup performs one artist search per unique artist name,
+	// one album list fetch per artist ID, and one track fetch per album —
+	// dramatically reducing redundant API calls when the same artist appears many times.
 	matchedTracks.sort((a, b) => a.artist.toUpperCase().localeCompare(b.artist.toUpperCase()));
 
-	for (let i = 0; i < matchedTracks.length; i += batchSize) {
+	// Step 3a: Look up all track IDs grouped by artist (one artist search per unique artist)
+	const uniqueArtistCount = new Set(matchedTracks.map(t => t.artist.toUpperCase())).size;
+	const batchSeeds = matchedTracks.map(({ track, artist, title }) => ({
+		artist,
+		title,
+		album: track.album || track.Album || ''
+	}));
+
+	updateProgress(`ReccoBeats: Looking up ${matchedTracks.length} track(s) across ${uniqueArtistCount} artist(s)...`, 0.4);
+	const trackIdResults = await reccobeatsApi.findTrackIdsGroupedBatch(batchSeeds);
+
+	// Step 3b: Fetch audio features for resolved tracks
+	const foundTrackCount = trackIdResults.filter(r => r.trackId).length;
+	logger?.info('MoodActivity', `ReccoBeats: Found ${foundTrackCount}/${matchedTracks.length} track(s), fetching audio features...`);
+	updateProgress(`Fetching audio features for ${foundTrackCount} track(s)...`, 0.55);
+
+	for (let i = 0; i < matchedTracks.length; i++) {
 		checkCancelled();
-		const batch = matchedTracks.slice(i, i + batchSize);
-		const progress = 0.4 + ((i / matchedTracks.length) * 0.35);
-		updateProgress(`Analyzing audio features: ${Math.min(i + batchSize, matchedTracks.length)}/${matchedTracks.length}...`, progress);
+		const { track, artist, title } = matchedTracks[i];
+		const trackId = trackIdResults[i]?.trackId;
 
-		for (const { track, artist, title } of batch) {
-			checkCancelled();
-			try {
-				// Get album from track if available
-				const album = track.album || track.Album || '';
+		if (!trackId) {
+			logger?.debug('MoodActivity', `ReccoBeats: Track not found - "${artist} - ${title}"`);
+			continue;
+		}
 
-				// Look up track ID on ReccoBeats
-				const trackId = await reccobeatsApi.findTrackId(artist, title, album);
+		if (i % 20 === 0) {
+			const progress = 0.55 + ((i / matchedTracks.length) * 0.2);
+			updateProgress(`Analyzing audio features: ${Math.min(i + 1, matchedTracks.length)}/${matchedTracks.length}...`, progress);
+		}
 
-				if (!trackId) {
-					logger?.debug('MoodActivity', `ReccoBeats: Track not found - "${artist} - ${title}"`);
-					continue;
-				}
+		try {
+			const features = await reccobeatsApi.fetchTrackAudioFeatures(trackId);
 
-				// Fetch audio features
-				const features = await reccobeatsApi.fetchTrackAudioFeatures(trackId);
-
-				if (features) {
-					tracksWithFeatures.push({
-						track,
-						artist,
-						title,
-						audioFeatures: features
-					});
-				}
-			} catch (e) {
-				if (e?.message === '__CANCELLED__') throw e;
-				logger?.debug('MoodActivity', `Audio features error for "${artist} - ${title}": ${e.message}`);
+			if (features) {
+				tracksWithFeatures.push({
+					track,
+					artist,
+					title,
+					audioFeatures: features
+				});
 			}
+		} catch (e) {
+			if (e?.message === '__CANCELLED__') throw e;
+			logger?.debug('MoodActivity', `Audio features error for "${artist} - ${title}": ${e.message}`);
 		}
 	}
 

@@ -132,7 +132,7 @@ function isEntryValid(ts, ttl) {
  * All Map names that belong to each group.
  */
 const CACHE_STRUCTURE = {
-	lastfm: ['similarArtists', 'topTracks', 'similarTracks', 'artistInfo'],
+	lastfm: ['similarArtists', 'topTracks', 'similarTracks', 'artistInfo', 'tagArtists'],
 	reccobeats: ['lookups', 'audioFeatures', 'recommendations'],
 };
 
@@ -142,6 +142,7 @@ function createEmptyCacheCounts() {
 		topTracks: 0,
 		similarTracks: 0,
 		artistInfo: 0,
+		tagArtists: 0,
 		artistLookups: 0,
 		albumLookups: 0,
 		trackLookups: 0,
@@ -167,6 +168,7 @@ function computeCacheCountsFromStore(store) {
 	counts.topTracks = store.lastfm?.topTracks?.size || 0;
 	counts.similarTracks = store.lastfm?.similarTracks?.size || 0;
 	counts.artistInfo = store.lastfm?.artistInfo?.size || 0;
+	counts.tagArtists = store.lastfm?.tagArtists?.size || 0;
 	counts.audioFeatures = store.reccobeats?.audioFeatures?.size || 0;
 	counts.recommendations = store.reccobeats?.recommendations?.size || 0;
 
@@ -185,6 +187,7 @@ function computeCacheCountsFromStore(store) {
 
 function saveCacheMeta(meta) {
 	cachePersistentMeta = meta || createEmptyCacheMeta();
+	_getCacheLogger()?.debug('Cache', `Meta: sizeBytes=${cachePersistentMeta.sizeBytes || 0}, counts=${JSON.stringify(cachePersistentMeta.counts || {})}`);
 	if (typeof app === 'undefined' || !app.setValue) return;
 	try {
 		app.setValue(CACHE_META_STORAGE_KEY, cachePersistentMeta);
@@ -241,7 +244,9 @@ async function ensureCacheDbTableAsync() {
 	if (cacheDbTableReady) return true;
 	if (!hasCacheDbAsyncApi()) return false;
 	try {
-		await app.db.executeQueryAsync(`CREATE TABLE IF NOT EXISTS ${CACHE_DB_TABLE} (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+		const sql = `CREATE TABLE IF NOT EXISTS ${CACHE_DB_TABLE} (key TEXT PRIMARY KEY, value TEXT NOT NULL)`;
+		_getCacheLogger()?.debug('Cache', `SQL: ${sql}`);
+		await app.db.executeQueryAsync(sql);
 		cacheDbTableReady = true;
 		return true;
 	} catch (e) {
@@ -253,6 +258,7 @@ async function ensureCacheDbTableAsync() {
 async function saveCacheJsonToDbAsync(json) {
 	if (!(await ensureCacheDbTableAsync())) return false;
 	try {
+		_getCacheLogger()?.debug('Cache', `SQL: INSERT OR REPLACE INTO ${CACHE_DB_TABLE} (key='${CACHE_DB_KEY}', ${json.length} chars)`);
 		await app.db.executeQueryAsync(
 			`INSERT OR REPLACE INTO ${CACHE_DB_TABLE} (key, value) VALUES (${sqlCacheStringLiteral(CACHE_DB_KEY)}, ${sqlCacheStringLiteral(json)})`
 		);
@@ -266,6 +272,7 @@ async function saveCacheJsonToDbAsync(json) {
 async function loadCacheJsonFromDbAsync() {
 	if (!(await ensureCacheDbTableAsync())) return null;
 	try {
+		_getCacheLogger()?.debug('Cache', `SQL: SELECT value FROM ${CACHE_DB_TABLE} WHERE key='${CACHE_DB_KEY}'`);
 		const rows = await app.db.getQueryResultAsync(
 			`SELECT value FROM ${CACHE_DB_TABLE} WHERE key = ${sqlCacheStringLiteral(CACHE_DB_KEY)}`
 		);
@@ -283,6 +290,7 @@ async function loadCacheJsonFromDbAsync() {
 async function clearCacheDbAsync() {
 	if (!(await ensureCacheDbTableAsync())) return false;
 	try {
+		_getCacheLogger()?.debug('Cache', `SQL: DELETE FROM ${CACHE_DB_TABLE} WHERE key='${CACHE_DB_KEY}'`);
 		await app.db.executeQueryAsync(`DELETE FROM ${CACHE_DB_TABLE} WHERE key = ${sqlCacheStringLiteral(CACHE_DB_KEY)}`);
 		return true;
 	} catch (e) {
@@ -676,6 +684,7 @@ function getCacheStats() {
 			topTracks: cacheStore.lastfm.topTracks?.size || 0,
 			similarTracks: cacheStore.lastfm.similarTracks?.size || 0,
 			artistInfo: cacheStore.lastfm.artistInfo?.size || 0,
+			tagArtists: cacheStore.lastfm.tagArtists?.size || 0,
 		},
 		reccobeats: {
 			lookups: cacheStore.reccobeats.lookups?.size || 0,
@@ -699,6 +708,7 @@ function getDetailedStats() {
 			topTracks: cacheStore.lastfm.topTracks?.size || 0,
 			similarTracks: cacheStore.lastfm.similarTracks?.size || 0,
 			artistInfo: cacheStore.lastfm.artistInfo?.size || 0,
+			tagArtists: cacheStore.lastfm.tagArtists?.size || 0,
 		},
 		reccobeats: {
 			artistLookups: 0,

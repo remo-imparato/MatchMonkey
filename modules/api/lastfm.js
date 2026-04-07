@@ -62,9 +62,6 @@ async function fetchSimilarArtists(artistName, limit) {
 		const updateProgress = window.matchMonkeyNotifications?.updateProgress || (() => { });
 		const lim = Number(limit) || undefined;
 
-		// Log request URL before cache check so it's always visible in debug output
-		logger?.debug('Last.fm', `API GET ${API_BASE}?method=artist.getSimilar&artist=${encodeURIComponent(artistName)}${lim ? '&limit=' + lim : ''}&api_key=${MATCHMONKEY_API_KEY}&format=json&autocorrect=1`);
-
 		// Check cache first
 		if (cache?.getCachedSimilarArtists) {
 			const cached = cache.getCachedSimilarArtists(artistName);
@@ -82,6 +79,9 @@ async function fetchSimilarArtists(artistName, limit) {
 			cache?.cacheSimilarArtists?.(artistName, []);
 			return [];
 		}
+
+		// Log request URL before cache check so it's always visible in debug output
+		logger?.debug('Last.fm', `API GET ${API_BASE}?method=artist.getSimilar&artist=${encodeURIComponent(artistName)}${lim ? '&limit=' + lim : ''}&api_key=${MATCHMONKEY_API_KEY}&format=json&autocorrect=1`);
 
 		// Build API request (lim already computed above)
 		const params = new URLSearchParams({
@@ -183,9 +183,6 @@ async function fetchTopTracks(artistName, limit, includePlaycount = false) {
 		const updateProgress = window.matchMonkeyNotifications?.updateProgress || (() => { });
 		const lim = Number(limit) || undefined;
 
-		// Log request URL before cache check so it's always visible in debug output
-		logger?.debug('Last.fm', `API GET ${API_BASE}?method=artist.getTopTracks&artist=${encodeURIComponent(artistName)}${lim ? '&limit=' + lim : ''}&api_key=${MATCHMONKEY_API_KEY}&format=json&autocorrect=1`);
-
 		// Check cache first
 		if (cache?.getCachedTopTracks) {
 			const cached = cache.getCachedTopTracks(artistName, limit, includePlaycount);
@@ -203,6 +200,9 @@ async function fetchTopTracks(artistName, limit, includePlaycount = false) {
 			cache?.cacheTopTracks?.(artistName, limit, includePlaycount, []);
 			return [];
 		}
+
+		// Log request URL before cache check so it's always visible in debug output
+		logger?.debug('Last.fm', `API GET ${API_BASE}?method=artist.getTopTracks&artist=${encodeURIComponent(artistName)}${lim ? '&limit=' + lim : ''}&api_key=${MATCHMONKEY_API_KEY}&format=json&autocorrect=1`);
 
 		// Build API request (lim already computed above)
 		const params = new URLSearchParams({
@@ -323,9 +323,6 @@ async function fetchSimilarTracks(artistName, trackName, limit = 100) {
 		const updateProgress = window.matchMonkeyNotifications?.updateProgress || (() => { });
 		const lim = Number(limit) || undefined;
 
-		// Log request URL before cache check so it's always visible in debug output
-		logger?.debug('Last.fm', `API GET ${API_BASE}?method=track.getSimilar&artist=${encodeURIComponent(artistName)}&track=${encodeURIComponent(trackName)}${lim ? '&limit=' + lim : ''}&api_key=${MATCHMONKEY_API_KEY}&format=json&autocorrect=1`);
-
 		// Build cache key
 		const cacheKey = `track:${artistName}|${trackName}|${limit}`.toUpperCase();
 
@@ -344,6 +341,9 @@ async function fetchSimilarTracks(artistName, trackName, limit = 100) {
 			updateProgress('Last.fm: API key not configured - contact developer', undefined);
 			return [];
 		}
+
+		// Log request URL before cache check so it's always visible in debug output
+		logger?.debug('Last.fm', `API GET ${API_BASE}?method=track.getSimilar&artist=${encodeURIComponent(artistName)}&track=${encodeURIComponent(trackName)}${lim ? '&limit=' + lim : ''}&api_key=${MATCHMONKEY_API_KEY}&format=json&autocorrect=1`);
 
 		// Build API request (lim already computed above)
 		const params = new URLSearchParams({
@@ -486,6 +486,7 @@ async function fetchArtistInfo(artistName) {
 		if (!res || !res.ok) {
 			logger?.warn('Last.fm', `HTTP ${res?.status} for artist info: "${artistName}"`);
 			updateProgress(`Last.fm: Failed to get artist info (HTTP ${res?.status})`, undefined);
+			artistInfoMap?.set(cacheKey, null);
 			return null;
 		}
 
@@ -495,6 +496,7 @@ async function fetchArtistInfo(artistName) {
 		} catch (e) {
 			logger?.warn('Last.fm', `Invalid JSON for artist info: "${artistName}": ${e.toString()}`);
 			updateProgress(`Last.fm: Error parsing artist info for "${artistName}"`, undefined);
+			artistInfoMap?.set(cacheKey, null);
 			return null;
 		}
 
@@ -507,6 +509,7 @@ async function fetchArtistInfo(artistName) {
 				updateProgress(`Last.fm: Error getting artist info: ${data.message || 'Unknown error'}`, undefined);
 			}
 
+			artistInfoMap?.set(cacheKey, null);
 			return null;
 		}
 
@@ -514,6 +517,7 @@ async function fetchArtistInfo(artistName) {
 		if (!artist) {
 			logger?.debug('Last.fm', `No artist data in response for "${artistName}"`);
 			updateProgress(`Last.fm: No artist info available for "${artistName}"`, undefined);
+			artistInfoMap?.set(cacheKey, null);
 			return null;
 		}
 
@@ -562,7 +566,16 @@ async function fetchArtistsByTag(tag, limit = 30) {
 	try {
 		if (!tag) return [];
 
+		const cache = window.matchMonkeyCache;
 		const updateProgress = window.matchMonkeyNotifications?.updateProgress || (() => { });
+
+		const cacheKey = `tag:${tag}:${limit}`.toUpperCase();
+		const tagArtistsMap = cache?.getLastfmMap?.('tagArtists');
+		if (tagArtistsMap?.has(cacheKey)) {
+			const cached = tagArtistsMap.get(cacheKey);
+			logger?.debug('Last.fm', `Cache hit for tag artists: "${tag}" (${cached.length} artists)`);
+			return cached;
+		}
 
 		// Get API key
 		const apiKey = getApiKey();
@@ -625,6 +638,8 @@ async function fetchArtistsByTag(tag, limit = 30) {
 		} else {
 			updateProgress(`Last.fm: Found ${results.length} artists in "${tag}" genre`, undefined);
 		}
+
+		tagArtistsMap?.set(cacheKey, results);
 
 		return results;
 
