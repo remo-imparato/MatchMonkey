@@ -77,6 +77,12 @@ window.matchMonkeyOrchestration = {
 		const { showToast, updateProgress, createProgressTask, terminateProgressTask, isCancelled } = notifications;
 		const { formatError, shuffle: shuffleUtil, shuffleWithDispersion } = helpers;
 		const checkCancelled = () => { if (isCancelled()) throw new Error('__CANCELLED__'); };
+		const cache = window.matchMonkeyCache;
+		const missedResultsTracker = window.matchMonkeyMissedResults;
+		const persistRunData = async () => {
+			await cache?.saveCache?.();
+			await missedResultsTracker?.saveMissedResults?.();
+		};
 
 		// Get logger and discovery strategies
 		const logger = window.matchMonkeyLogger;
@@ -87,9 +93,15 @@ window.matchMonkeyOrchestration = {
 			return { success: false, error: 'Discovery strategies not loaded', tracksAdded: 0 };
 		}
 
-		// Initialize cache for this run
-		const cache = window.matchMonkeyCache;
-		cache?.init?.();
+		// Initialize cache and missed results for this run
+		try {
+			await cache?.initCache?.();
+			await missedResultsTracker?.initMissedResults?.();
+		} catch (initError) {
+			logger.error('Init', 'Failed to initialize cache/missed-results modules', initError);
+			showToast(`Initialization failed: ${formatError(initError)}`, { type: 'error', duration: 5000 });
+			return { success: false, error: formatError(initError), tracksAdded: 0 };
+		}
 
 		// Refresh settings from persistent store so any changes saved in the
 		// options panel are picked up without needing a restart.
@@ -198,9 +210,9 @@ window.matchMonkeyOrchestration = {
 				}
 
 				if (!seeds || seeds.length === 0) {
-					terminateProgressTask(taskId);
-					cache?.save?.();
-					const modeMsg = autoMode ? 'No tracks in Now Playing queue.' : 'Select tracks or play something first.';
+						terminateProgressTask(taskId);
+						await persistRunData();
+						const modeMsg = autoMode ? 'No tracks in Now Playing queue.' : 'Select tracks or play something first.';
 					showToast(`No seed tracks found. ${modeMsg}`, { type: 'warning', duration: 5000 });
 					logger.info('Seeds', 'No seed tracks found, exiting');
 					return { success: false, error: 'No seed tracks found.', tracksAdded: 0 };
@@ -236,18 +248,19 @@ window.matchMonkeyOrchestration = {
 					// Store for use in library matching step (skip normal matching)
 					config_._preMatchedLibraryTracks = discoveryResult.libraryTracks;
 				}
+			
 			} catch (discoveryError) {
 					if (discoveryError?.message === '__CANCELLED__') throw discoveryError;
 					logger.error('Discovery', 'Discovery failed', discoveryError);
 					terminateProgressTask(taskId);
-					cache?.save?.();
-					showToast(`Discovery failed: ${formatError(discoveryError)}`, { type: 'error', duration: 5000 });
+					await persistRunData();
+					showToast(`Discovery failed: ${formatError(discoveryError)}`);
 					return { success: false, error: formatError(discoveryError), tracksAdded: 0 };
 				}
 
 			if (!candidates || candidates.length === 0) {
 				terminateProgressTask(taskId);
-				cache?.save?.();
+				await persistRunData();
 
 				// Provide specific guidance based on discovery mode
 				let errorMsg = `No ${modeName} candidates found.`;
@@ -313,16 +326,16 @@ window.matchMonkeyOrchestration = {
 			} catch (matchError) {
 					if (matchError?.message === '__CANCELLED__') throw matchError;
 					logger.error('Library', 'Library matching error', matchError);
-					terminateProgressTask(taskId);
-					cache?.save?.();
-					showToast(`Library search failed: ${formatError(matchError)}`, { type: 'error', duration: 5000 });
+						terminateProgressTask(taskId);
+						await persistRunData();
+						showToast(`Library search failed: ${formatError(matchError)}`);
 					return { success: false, error: formatError(matchError), tracksAdded: 0 };
 				}
 
 			if (!results || results.length === 0) {
 				terminateProgressTask(taskId);
-				cache?.save?.();
-				showToast(`No matching tracks found in your library. Try different seeds or adjust filters.`, { type: 'info', duration: 5000 });
+				await persistRunData();
+				showToast(`No matching tracks found in your library. Try different seeds or adjust filters.`);
 				logger.info('Library', 'No tracks matched in library');
 				return { success: false, error: 'No matching tracks found.', tracksAdded: 0 };
 			}
@@ -522,8 +535,8 @@ window.matchMonkeyOrchestration = {
 			} catch (outputError) {
 				logger.error('Output', 'Output error', outputError);
 				terminateProgressTask(taskId);
-				cache?.save?.();
-				showToast(`Failed to create ${outputMode}: ${formatError(outputError)}`, { type: 'error', duration: 5000 });
+				await persistRunData();
+				showToast(`Failed to create ${outputMode}: ${formatError(outputError)}`);
 				return { success: false, error: formatError(outputError), tracksAdded: 0 };
 			}
 
@@ -534,13 +547,13 @@ window.matchMonkeyOrchestration = {
 			updateProgress(`Complete! Added ${actualTracksAdded} track(s)`, 1.0);
 
 			terminateProgressTask(taskId);
-			cache?.save?.();
+			await persistRunData();
 
 			// Build comprehensive stats for final summary
 			const notInLibraryCount = matchStats?.notInLibrary || 0;
 			const filteredByRatingCount = matchStats?.filteredByRating || 0;
 			const apiFilteredCount = discoveryStats?.apiFilteredCount || 0;
-			const missedCount = window.matchMonkeyMissedResults?.getCount?.() || 0;
+			const missedCount = missedResultsTracker?.getMissedResultsCount?.() || 0;
 
 			// Log human-readable final summary (always visible)
 			const summaryParts = [`${actualTracksAdded} tracks added in ${elapsed}s`];
@@ -584,15 +597,15 @@ window.matchMonkeyOrchestration = {
 		} catch (e) {
 			if (e?.message === '__CANCELLED__') {
 				terminateProgressTask(taskId);
-				cache?.save?.();
+				await persistRunData();
 				logger.info('Workflow', 'Cancelled by user');
 				showToast('Discovery cancelled.', { type: 'info', duration: 2000 });
 				return { success: false, error: 'Cancelled', tracksAdded: 0 };
 			}
 			logger.error('Workflow', 'Unexpected error', e);
 			terminateProgressTask(taskId);
-			cache?.save?.();
-			showToast(`Error: ${formatError(e)}`, { type: 'error', duration: 5000 });
+			await persistRunData();
+			showToast(`Error: ${formatError(e)}`);
 			return { success: false, error: formatError(e), tracksAdded: 0 };
 		}
 	},
@@ -799,7 +812,7 @@ window.matchMonkeyOrchestration = {
 		let totalTracksMatched = 0;
 
 		// Track missed results - separate counts for not-in-library vs filtered-by-rating
-		const missedResults = [];
+		const missedTracksToTrack = [];
 		let notInLibraryCount = 0;
 		let filteredByRatingCount = 0;
 
@@ -972,7 +985,7 @@ window.matchMonkeyOrchestration = {
 									return (Number.isFinite(num) ? num : 0);
 								};
 
-								missedResults.push({
+								missedTracksToTrack.push({
 									artist: String(candidate.artist || ''),
 									title: String(title || ''),
 									popularity: safeNumber(popularity || normalizedMatchForStorage),
@@ -1040,7 +1053,7 @@ window.matchMonkeyOrchestration = {
 								return (Number.isFinite(num) ? num : 0);
 							};
 
-							missedResults.push({
+							missedTracksToTrack.push({
 								artist: String(candidate.artist || ''),
 								title: String(trackTitle || ''),
 								popularity: safeNumber(popularity || normalizedMatchForStorage),
@@ -1079,10 +1092,10 @@ window.matchMonkeyOrchestration = {
 		}
 
 		// Batch add missed results - they already have normalized popularity
-		if (missedResults.length > 0 && window.matchMonkeyMissedResults?.addBatch) {
+		if (missedTracksToTrack.length > 0 && window.matchMonkeyMissedResults?.addMissedResultsBatch) {
 			// Filter missed results by configured API match threshold (applies to both sources)
 			const apiMinMatch = config.apiMinMatch;
-			const filteredMissedResults = missedResults.filter(r => {
+			const filteredMissedResults = missedTracksToTrack.filter(r => {
 				try {
 					const src = r.additionalInfo?.source || 'Last.fm';
 					if (src === 'ReccoBeats') {
@@ -1101,10 +1114,10 @@ window.matchMonkeyOrchestration = {
 			});
 
 			if (filteredMissedResults.length > 0) {
-				logger.debug('Library', `Adding ${filteredMissedResults.length} missed recommendations to tracker (filtered from ${missedResults.length})`);
-				window.matchMonkeyMissedResults.addBatch(filteredMissedResults);
+				logger.debug('Library', `Adding ${filteredMissedResults.length} missed recommendations to tracker (filtered from ${missedTracksToTrack.length})`);
+				window.matchMonkeyMissedResults.addMissedResultsBatch(filteredMissedResults);
 			} else {
-				logger.debug('Library', `No missed recommendations passed configured thresholds (${missedResults.length} filtered out)`);
+				logger.debug('Library', `No missed recommendations passed configured thresholds (${missedTracksToTrack.length} filtered out)`);
 			}
 		}
 

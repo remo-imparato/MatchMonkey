@@ -13,10 +13,44 @@
 requirejs('controls/gridview');
 requirejs('helpers/arraydatasource');
 
-const STORAGE_KEY = 'MatchMonkey_MissedResults';
-
 let UI = null;
 let dataSource = null;
+
+// Mirrors the storage layout in missedResults.js
+const DB_TABLE = 'MatchMonkeyData';
+const DB_KEY = 'missedResults';
+const META_KEY = 'MatchMonkeyMissedMeta';
+
+async function loadResultsFromDb() {
+	try {
+		await app.db.executeQueryAsync(
+			`CREATE TABLE IF NOT EXISTS ${DB_TABLE} (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+		);
+		const rows = await app.db.getQueryResultAsync(
+			`SELECT value FROM ${DB_TABLE} WHERE key = '${DB_KEY}'`
+		);
+		if (!rows || rows.count === 0 || rows.eof) return [];
+		const raw = rows.fields.getValue(0);
+		if (raw === null || raw === undefined || raw === '') return [];
+		if (Array.isArray(raw)) return raw;
+		if (typeof raw === 'string') return JSON.parse(raw);
+		return JSON.parse(String(raw));
+	} catch (e) {
+		console.error('dlgMissedResults: Error loading from DB:', e);
+		return [];
+	}
+}
+
+async function clearResultsFromDb() {
+	try {
+		await app.db.executeQueryAsync(
+			`DELETE FROM ${DB_TABLE} WHERE key = '${DB_KEY}'`
+		);
+		try { app.setValue(META_KEY, {}); } catch (_) {}
+	} catch (e) {
+		console.error('dlgMissedResults: Error clearing from DB:', e);
+	}
+}
 
 // Field definitions for GridView with sorting
 const fieldDefs = {
@@ -119,17 +153,16 @@ const columns = [
 	}
 ];
 
-function init(params) {
-	initDialog(params);
+async function init(params) {
+	await initDialog(params);
 }
 
-function initDialog(params) {
+async function initDialog(params) {
 	title = 'Missed Recommendations - MatchMonkey';
 
 	UI = getAllUIElements();
-	
-	// Get all missed results
-	const results = app.getValue(STORAGE_KEY, []) || [];
+
+	const results = await loadResultsFromDb();
 
 	console.log(`dlgMissedResults: Loaded ${results.length} missed results`);
 
@@ -138,7 +171,7 @@ function initDialog(params) {
 
 	// Create data source with ArrayDataSource for proper sorting
 	dataSource = new ArrayDataSource(results);
-	
+
 	// Configure grid view
 	const gridView = UI.gvMissedResults.controlClass;
 	gridView.dataSource = dataSource;
@@ -158,70 +191,44 @@ function initDialog(params) {
 		copySelectedToClipboard();
 	});
 
-	window.localListen(UI.btnClear, 'click', () => {
-		clearAllResults();
+	window.localListen(UI.btnClear, 'click', async () => {
+		await clearAllResults();
 	});
 
 	window.localListen(UI.btnClose, 'click', () => {
 		closeWindow();
 	});
 
-	// Listen for real-time updates
-	setupRealtimeUpdates();
-	
+	// Poll DB for updates while dialog is open (e.g. during a live MatchMonkey run)
+	setupRealtimeUpdates(results.length);
+
 	console.log('dlgMissedResults: Dialog initialized');
 }
 
 /**
  * Setup real-time updates when new missed results are added
  */
-function setupRealtimeUpdates() {
-	const onResultAdded = () => {
+function setupRealtimeUpdates(initialCount) {
+	let lastCount = initialCount;
+
+	const pollInterval = setInterval(async () => {
 		if (!dataSource) return;
-		
 		try {
-			// Reload data from storage
-			const results = app.getValue(STORAGE_KEY, []) || [];
-			
-			console.log(`dlgMissedResults: Real-time update - reloading ${results.length} results`);
-			
-			// Update data source - clear and re-add all items
+			const results = await loadResultsFromDb();
+			if (results.length === lastCount) return;
+			lastCount = results.length;
 			dataSource.beginUpdate();
 			dataSource.clear();
 			results.forEach(item => dataSource.add(item));
 			dataSource.endUpdate();
-			
-			// Update statistics
 			updateStatistics(results);
+			console.log(`dlgMissedResults: Refreshed - ${results.length} results`);
 		} catch (e) {
-			console.error('dlgMissedResults: Error in real-time update:', e);
+			// non-fatal polling error
 		}
-	};
+	}, 3000);
 
-	const onResultsCleared = () => {
-		if (!dataSource) return;
-		
-		try {
-			console.log('dlgMissedResults: Results cleared - updating grid');
-			
-			// Clear data source
-			dataSource.clear();
-			
-			// Update statistics
-			updateStatistics([]);
-		} catch (e) {
-			console.error('dlgMissedResults: Error clearing results:', e);
-		}
-	};
-
-	window.addEventListener('matchmonkey:missedresultadded', onResultAdded);
-	window.addEventListener('matchmonkey:missedresultscleared', onResultsCleared);
-	
-	// Cleanup on close
-	window.localListen(window, 'unload', () => {
-		window.removeEventListener('matchmonkey:missedresultadded', onResultAdded);
-		window.removeEventListener('matchmonkey:missedresultscleared', onResultsCleared);
-	});
+	window.localListen(window, 'unload', () => clearInterval(pollInterval));
 }
 
 /**
@@ -314,28 +321,12 @@ function copySelectedToClipboard() {
 /**
  * Clear all results
  */
-function clearAllResults() {
+async function clearAllResults() {
 	try {
 		console.log('dlgMissedResults: Clearing all results');
-		
-		// Clear storage
-		app.setValue(STORAGE_KEY, []);
-		
-		// Clear data source
-		if (dataSource) {
-			dataSource.clear();
-		}
-		
-		// Update statistics
+		await clearResultsFromDb();
+		if (dataSource) dataSource.clear();
 		updateStatistics([]);
-		
-		// Dispatch event for other listeners
-		try {
-			const event = new CustomEvent('matchmonkey:missedresultscleared');
-			window.dispatchEvent(event);
-		} catch (e) {
-			console.error('dlgMissedResults: Error dispatching clear event:', e);
-		}
 	} catch (e) {
 		console.error('dlgMissedResults: Error clearing results:', e);
 	}

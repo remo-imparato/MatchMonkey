@@ -6,10 +6,8 @@ These instructions define how Copilot should generate and modify code for my pro
 ---
 
 ## Development Stack & Technologies
-- Primary backend: **C# / .NET 8 / .NET Framework 4.7.2 (ASP.NET MVC)**  
-- Database: **MSSQL**, with strong preference for **stored procedures**  
+- Database: **SQLite**,
 - JavaScript: **vanilla JS only** unless I request otherwise  
-- Testing: **MSTest**  
 - HTML, CSS for UI  
 - Use **modern, industry-standard coding practices** for all languages
 
@@ -22,18 +20,14 @@ These instructions define how Copilot should generate and modify code for my pro
 - Avoid unnecessary abstraction or over‑engineering.  
 - Keep comments minimal unless necessary.
 
-### C# / .NET Guidelines
-- Avoid **LINQ** unless I specifically ask for it.  
-- Prefer explicit loops and conditionals instead of complex LINQ chains.  
-- Follow MVC conventions and keep code organized by standard project structure.  
-- Use async/await correctly and consistently.  
-- Favor dependency injection and SOLID principles (flexibly).  
-- When modifying files, make **minimal, targeted changes** and preserve existing structure.
-
 ### JavaScript Guidelines
 - Prefer **vanilla JavaScript**—no frameworks unless I request them.  
 - Keep JS simple, modular, and readable.  
-- Avoid unnecessary dependencies.
+- Avoid unnecessary dependencies.  
+- When using MM5 async DB APIs, prefer `await` with `executeQueryAsync()` for CREATE/INSERT/UPDATE/DELETE and `await` with `getQueryResultAsync()` for SELECT calls.
+
+### Function Naming
+- No fallback compatibility protections are needed for renamed MatchMonkey module functions; use only the finalized function names.
 
 ---
 
@@ -57,9 +51,9 @@ These instructions define how Copilot should generate and modify code for my pro
 Copilot should generate code that reflects:
 - My preferred tech stack  
 - My formatting and architecture preferences  
-- My SQL and EF rules  
 - My desire for simplicity and maintainability  
 - Modern industry standards  
 - Flexibility when justified  
+
 
 

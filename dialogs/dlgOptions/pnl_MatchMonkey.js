@@ -283,7 +283,13 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 		if (this._missedResultsListener) {
 			window.removeEventListener('matchmonkey:missedresultadded', this._missedResultsListener);
 			window.removeEventListener('matchmonkey:missedresultscleared', this._missedResultsListener);
+			window.removeEventListener('matchmonkey:missedresultssaved', this._missedResultsListener);
 			this._missedResultsListener = null;
+		}
+
+		if (this._cacheUpdatedListener) {
+			window.removeEventListener('matchmonkey:cacheupdated', this._cacheUpdatedListener);
+			this._cacheUpdatedListener = null;
 		}
 
 		const UI = getAllUIElements(this._pnl);
@@ -404,8 +410,14 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
  */
 optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setupMissedResults = function (UI) {
 	try {
-		// Update count
-		this._updateMissedResultsCount(UI);
+		// Ensure module is initialized before reading stats/meta
+		if (window.matchMonkeyMissedResults?.init) {
+			window.matchMonkeyMissedResults.init()
+				.then(() => this._updateMissedResultsCount(UI))
+				.catch(() => this._updateMissedResultsCount(UI));
+		} else {
+			this._updateMissedResultsCount(UI);
+		}
 
 		// Setup button click handler
 		if (UI.btnViewMissedResults && UI.btnViewMissedResults.controlClass) {
@@ -417,10 +429,12 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setupMissedResults = functio
 		// Listen for updates to the missed results
 		this._missedResultsListener = () => {
 			this._updateMissedResultsCount(UI);
+			this._updateStorageUsage(UI);
 		};
 
 		window.addEventListener('matchmonkey:missedresultadded', this._missedResultsListener);
 		window.addEventListener('matchmonkey:missedresultscleared', this._missedResultsListener);
+		window.addEventListener('matchmonkey:missedresultssaved', this._missedResultsListener);
 
 	} catch (e) {
 		console.error('Match Monkey Options: Error setting up missed results:', e);
@@ -434,18 +448,28 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._updateMissedResultsCount = f
 	try {
 		if (!UI.missedResultsCount) return;
 
-		if (window.matchMonkeyMissedResults?.getStats) {
-			const stats = window.matchMonkeyMissedResults.getStats();
+		var stats = null;
 
-			if (stats.total === 0) {
-				UI.missedResultsCount.innerText = 'No missed results';
-			} else {
-				const plural = stats.total === 1 ? '' : 's';
-				const occPlural = stats.totalOccurrences === 1 ? '' : 's';
-				UI.missedResultsCount.innerText = `${stats.total} unique track${plural}, ${stats.totalOccurrences} occurrence${occPlural}`;
-			}
+		// Prefer live module (falls back to meta internally when store not loaded)
+		if (window.matchMonkeyMissedResults?.getStats) {
+			stats = window.matchMonkeyMissedResults.getStats();
 		} else {
-			UI.missedResultsCount.innerText = 'Not available';
+			// Module not available — read meta directly
+			var meta = app.getValue('MatchMonkeyMissedMeta', {});
+			if (meta && typeof meta === 'object') {
+				stats = {
+					total: Number(meta.total) || 0,
+					totalOccurrences: Number(meta.totalOccurrences) || 0,
+				};
+			}
+		}
+
+		if (!stats || stats.total === 0) {
+			UI.missedResultsCount.innerText = 'No missed results';
+		} else {
+			var plural = stats.total === 1 ? '' : 's';
+			var occPlural = stats.totalOccurrences === 1 ? '' : 's';
+			UI.missedResultsCount.innerText = stats.total + ' unique track' + plural + ', ' + stats.totalOccurrences + ' occurrence' + occPlural;
 		}
 	} catch (e) {
 		console.error('Match Monkey Options: Error updating missed results count:', e);
@@ -479,15 +503,39 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._openMissedResultsDialog = fu
  */
 optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setupCacheSection = function (UI) {
 	try {
+		// Refresh storage summary whenever cache persistence updates
+		this._cacheUpdatedListener = () => {
+			this._updateStorageUsage(UI);
+		};
+		window.addEventListener('matchmonkey:cacheupdated', this._cacheUpdatedListener);
+
 		// Wire up Clear Cache button
 		if (UI.btnClearCache && UI.btnClearCache.controlClass) {
 			app.listen(UI.btnClearCache, 'click', () => {
 				try {
 					if (window.matchMonkeyCache?.clear) {
-							window.matchMonkeyCache.clear();
-						} else {
-							// Fallback: clear the storage key directly (null crashes MM5, use empty object)
-							app.setValue('MatchMonkeyCache', {});
+						window.matchMonkeyCache.clear();
+					} else {
+							// Fallback when cache module is unavailable — use async DB API
+							if (app.db && typeof app.db.executeQueryAsync === 'function') {
+								app.db.executeQueryAsync("DELETE FROM MatchMonkeyData WHERE key = 'cache'");
+							}
+							app.setValue('MatchMonkeyCacheMeta', {
+								storage: 'db',
+								sizeBytes: 0,
+								lastSavedTs: Date.now(),
+								counts: {
+									similarArtists: 0,
+									topTracks: 0,
+									similarTracks: 0,
+									artistInfo: 0,
+									artistLookups: 0,
+									albumLookups: 0,
+									trackLookups: 0,
+									audioFeatures: 0,
+									recommendations: 0,
+								}
+							});
 						}
 					console.log('Match Monkey Options: Cache cleared');
 					this._updateStorageUsage(UI);
@@ -507,7 +555,7 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._setupCacheSection = function
 /**
  * Calculate and display storage usage for all MatchMonkey persistent data.
  */
-optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._updateStorageUsage = function (UI) {
+optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._updateStorageUsage = async function (UI) {
 	try {
 		if (!UI.storageUsageInfo) return;
 
@@ -523,19 +571,65 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._updateStorageUsage = functio
 		for (var i = 0; i < storageKeys.length; i++) {
 			var entry = storageKeys[i];
 			var value = null;
-			try {
-				value = app.getValue(entry.key, {});
-			} catch (e) {
-				// ignore read errors
-			}
-
 			var sizeBytes = 0;
-			if (value !== null && value !== undefined) {
+
+			if (entry.key === 'MatchMonkeyCache') {
+				// Never read full cache blob for options display; use lightweight metadata
+				var cacheMeta = null;
 				try {
-					var json = JSON.stringify(value);
-					sizeBytes = json.length * 2; // JS strings are UTF-16 (2 bytes per char)
+					if (window.matchMonkeyCache?.getPersistentMeta) {
+						cacheMeta = window.matchMonkeyCache.getPersistentMeta();
+					} else {
+						cacheMeta = app.getValue('MatchMonkeyCacheMeta', {});
+					}
+					// Metadata is missing or stale — init the cache from DB so that
+					// updateMetaFromStore() runs and populates accurate counts/size.
+					if ((!cacheMeta || !cacheMeta.sizeBytes) && window.matchMonkeyCache?.init) {
+						await window.matchMonkeyCache.init();
+						cacheMeta = window.matchMonkeyCache.getPersistentMeta();
+					}
 				} catch (e) {
-					sizeBytes = 0;
+					cacheMeta = null;
+				}
+
+				value = cacheMeta;
+				sizeBytes = Number(cacheMeta?.sizeBytes) || 0;
+			} else if (entry.key === 'MatchMonkey_MissedResults') {
+				// Missed results are stored in DB; use lightweight metadata
+				var missedMeta = null;
+				try {
+					if (window.matchMonkeyMissedResults?.getPersistentMeta) {
+						missedMeta = window.matchMonkeyMissedResults.getPersistentMeta();
+					} else {
+						missedMeta = app.getValue('MatchMonkeyMissedMeta', {});
+					}
+					// Metadata is missing or stale — init from DB to populate accurate meta.
+					if ((!missedMeta || !missedMeta.total) && window.matchMonkeyMissedResults?.init) {
+						await window.matchMonkeyMissedResults.init();
+						if (window.matchMonkeyMissedResults.getPersistentMeta) {
+							missedMeta = window.matchMonkeyMissedResults.getPersistentMeta();
+						}
+					}
+				} catch (e) {
+					missedMeta = null;
+				}
+
+				value = missedMeta;
+				sizeBytes = Number(missedMeta?.sizeBytes) || 0;
+			} else {
+				try {
+					value = app.getValue(entry.key, {});
+				} catch (e) {
+					// ignore read errors
+				}
+
+				if (value !== null && value !== undefined) {
+					try {
+						var json = JSON.stringify(value);
+						sizeBytes = json.length * 2; // JS strings are UTF-16 (2 bytes per char)
+					} catch (e) {
+						sizeBytes = 0;
+					}
 				}
 			}
 
@@ -558,8 +652,16 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._updateStorageUsage = functio
 					counts.trackLookups + ' track IDs \u00b7 ' +
 					counts.audioFeatures + ' audio features'
 				);
-			} else if (entry.key === 'MatchMonkey_MissedResults' && Array.isArray(value)) {
-				lines.push(entry.label + ': ' + this._formatBytes(sizeBytes) + ' (' + value.length + ' tracks)');
+			} else if (entry.key === 'MatchMonkey_MissedResults') {
+				var missedTotal = (value && typeof value === 'object') ? (Number(value.total) || 0) : 0;
+				var missedOcc = (value && typeof value === 'object') ? (Number(value.totalOccurrences) || 0) : 0;
+				if (missedTotal > 0) {
+					var trackPlural = missedTotal === 1 ? '' : 's';
+					var occPlural = missedOcc === 1 ? '' : 's';
+					lines.push(entry.label + ': ' + this._formatBytes(sizeBytes) + ' (' + missedTotal + ' track' + trackPlural + ', ' + missedOcc + ' occurrence' + occPlural + ')');
+				} else {
+					lines.push(entry.label + ': ' + this._formatBytes(sizeBytes));
+				}
 			} else {
 				lines.push(entry.label + ': ' + this._formatBytes(sizeBytes));
 			}
@@ -579,8 +681,8 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._updateStorageUsage = functio
 /**
  * Get per-map cache entry counts.
  * Uses live in-memory detailed stats when the cache is active,
- * otherwise falls back to counting entries in the raw persistent store data.
- * @param {object} rawCacheValue - Raw value from app.getValue('MatchMonkeyCache')
+ * otherwise falls back to metadata counts, then raw persistent store data.
+ * @param {object} rawCacheValue - Cache metadata or raw cache object
  * @returns {object} Counts keyed by map name
  */
 optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._getCacheCounts = function (rawCacheValue) {
@@ -599,6 +701,21 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey._getCacheCounts = function (r
 				audioFeatures: live.reccobeats?.audioFeatures || 0,
 			};
 		}
+	}
+
+	// Next prefer lightweight persisted metadata
+	if (rawCacheValue && typeof rawCacheValue === 'object' && rawCacheValue.counts && typeof rawCacheValue.counts === 'object') {
+		var c = rawCacheValue.counts;
+		return {
+			similarArtists: Number(c.similarArtists) || 0,
+			topTracks: Number(c.topTracks) || 0,
+			similarTracks: Number(c.similarTracks) || 0,
+			artistInfo: Number(c.artistInfo) || 0,
+			artistLookups: Number(c.artistLookups) || 0,
+			albumLookups: Number(c.albumLookups) || 0,
+			trackLookups: Number(c.trackLookups) || 0,
+			audioFeatures: Number(c.audioFeatures) || 0,
+		};
 	}
 
 	// Fall back to counting from raw persistent store data

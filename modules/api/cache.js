@@ -2,7 +2,7 @@
  * MatchMonkey API Response Cache
  * 
  * Persistent cache for Last.fm and ReccoBeats API responses.
- * Survives MediaMonkey restarts via app.setValue / app.getValue.
+ * Survives MediaMonkey restarts via SQLite table `MatchMonkeyData`.
  * Each entry is timestamped; expired entries are evicted on load.
  * 
  * Cache Structure:
@@ -32,7 +32,10 @@
 
 'use strict';
 
-const CACHE_STORAGE_KEY = 'MatchMonkeyCache';
+const CACHE_STORAGE_KEY = 'MatchMonkeyCache'; // legacy app.setValue fallback/migration key
+const CACHE_META_STORAGE_KEY = 'MatchMonkeyCacheMeta';
+const CACHE_DB_TABLE = 'MatchMonkeyData';
+const CACHE_DB_KEY = 'cache';
 
 // Get logger reference
 const _getCacheLogger = () => window.matchMonkeyLogger;
@@ -43,6 +46,8 @@ const _getCacheLogger = () => window.matchMonkeyLogger;
  * Null when the cache has not been initialised yet.
  */
 let cacheStore = null;
+let cacheDbTableReady = false;
+let cachePersistentMeta = null;
 
 /**
  * Map category names that use a fixed 1-year TTL.
@@ -131,11 +136,162 @@ const CACHE_STRUCTURE = {
 	reccobeats: ['lookups', 'audioFeatures', 'recommendations'],
 };
 
-/**
- * Create an empty cache store with fresh Maps.
- * @returns {object} Empty cache store.
- */
-function createEmptyStore() {
+function createEmptyCacheCounts() {
+	return {
+		similarArtists: 0,
+		topTracks: 0,
+		similarTracks: 0,
+		artistInfo: 0,
+		artistLookups: 0,
+		albumLookups: 0,
+		trackLookups: 0,
+		audioFeatures: 0,
+		recommendations: 0,
+	};
+}
+
+function createEmptyCacheMeta() {
+	return {
+		storage: 'db',
+		sizeBytes: 0,
+		lastSavedTs: 0,
+		counts: createEmptyCacheCounts(),
+	};
+}
+
+function computeCacheCountsFromStore(store) {
+	const counts = createEmptyCacheCounts();
+	if (!store) return counts;
+
+	counts.similarArtists = store.lastfm?.similarArtists?.size || 0;
+	counts.topTracks = store.lastfm?.topTracks?.size || 0;
+	counts.similarTracks = store.lastfm?.similarTracks?.size || 0;
+	counts.artistInfo = store.lastfm?.artistInfo?.size || 0;
+	counts.audioFeatures = store.reccobeats?.audioFeatures?.size || 0;
+	counts.recommendations = store.reccobeats?.recommendations?.size || 0;
+
+	const lookupsMap = store.reccobeats?.lookups;
+	if (lookupsMap) {
+		for (const key of lookupsMap.keys()) {
+			const k = String(key).toUpperCase();
+			if (k.startsWith('TRACKID:')) counts.trackLookups++;
+			else if (k.startsWith('ALBUMID:') || k.startsWith('ALBUM:') || k.startsWith('ARTISTALBUMS:') || k.startsWith('ALBUMTRACKS:')) counts.albumLookups++;
+			else if (k.startsWith('ARTISTALL:')) counts.artistLookups++;
+		}
+	}
+
+	return counts;
+}
+
+function saveCacheMeta(meta) {
+	cachePersistentMeta = meta || createEmptyCacheMeta();
+	if (typeof app === 'undefined' || !app.setValue) return;
+	try {
+		app.setValue(CACHE_META_STORAGE_KEY, cachePersistentMeta);
+	} catch (_) {
+		// non-fatal
+	}
+}
+
+function loadCacheMeta() {
+	if (cachePersistentMeta) return cachePersistentMeta;
+	if (typeof app === 'undefined' || !app.getValue) {
+		cachePersistentMeta = createEmptyCacheMeta();
+		return cachePersistentMeta;
+	}
+	try {
+		const raw = app.getValue(CACHE_META_STORAGE_KEY, null);
+		cachePersistentMeta = (raw && typeof raw === 'object') ? raw : createEmptyCacheMeta();
+	} catch (_) {
+		cachePersistentMeta = createEmptyCacheMeta();
+	}
+	return cachePersistentMeta;
+}
+
+function updateCacheMetaFromStore(sizeBytes = 0) {
+	saveCacheMeta({
+		storage: 'db',
+		sizeBytes: Math.max(0, Number(sizeBytes) || 0),
+		lastSavedTs: Date.now(),
+		counts: computeCacheCountsFromStore(cacheStore),
+	});
+}
+
+function hasCacheDbApi() {
+	return typeof app !== 'undefined' && !!app.db;
+}
+
+function hasCacheDbAsyncApi() {
+	return typeof app !== 'undefined'
+		&& !!app.db
+		&& typeof app.db.executeQueryAsync === 'function'
+		&& typeof app.db.getQueryResultAsync === 'function';
+}
+
+function sqlCacheStringLiteral(value) {
+	return `'${String(value ?? '').replace(/'/g, "''")}'`;
+}
+
+function extractCacheDbValue(rows) {
+	if (!rows || rows.count === 0 || rows.eof) return null;
+	return rows.fields.getValue(0);
+}
+
+async function ensureCacheDbTableAsync() {
+	if (cacheDbTableReady) return true;
+	if (!hasCacheDbAsyncApi()) return false;
+	try {
+		await app.db.executeQueryAsync(`CREATE TABLE IF NOT EXISTS ${CACHE_DB_TABLE} (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+		cacheDbTableReady = true;
+		return true;
+	} catch (e) {
+		_getCacheLogger()?.warn('Cache', `Failed to ensure DB table: ${e}`);
+		return false;
+	}
+}
+
+async function saveCacheJsonToDbAsync(json) {
+	if (!(await ensureCacheDbTableAsync())) return false;
+	try {
+		await app.db.executeQueryAsync(
+			`INSERT OR REPLACE INTO ${CACHE_DB_TABLE} (key, value) VALUES (${sqlCacheStringLiteral(CACHE_DB_KEY)}, ${sqlCacheStringLiteral(json)})`
+		);
+		return true;
+	} catch (e) {
+		_getCacheLogger()?.warn('Cache', `Failed to save DB cache row: ${e}`);
+		return false;
+	}
+}
+
+async function loadCacheJsonFromDbAsync() {
+	if (!(await ensureCacheDbTableAsync())) return null;
+	try {
+		const rows = await app.db.getQueryResultAsync(
+			`SELECT value FROM ${CACHE_DB_TABLE} WHERE key = ${sqlCacheStringLiteral(CACHE_DB_KEY)}`
+		);
+		const value = extractCacheDbValue(rows);
+		if (value === null || value === undefined || value === '') return {};
+		if (typeof value === 'object') return value;
+		if (typeof value === 'string') return JSON.parse(value);
+		return JSON.parse(String(value));
+	} catch (err) {
+		_getCacheLogger()?.warn('Cache', `Failed to load DB cache row: ${err}`);
+		return null;
+	}
+}
+
+async function clearCacheDbAsync() {
+	if (!(await ensureCacheDbTableAsync())) return false;
+	try {
+		await app.db.executeQueryAsync(`DELETE FROM ${CACHE_DB_TABLE} WHERE key = ${sqlCacheStringLiteral(CACHE_DB_KEY)}`);
+		return true;
+	} catch (e) {
+		_getCacheLogger()?.warn('Cache', `Failed to clear DB cache row: ${e}`);
+		return false;
+	}
+}
+
+function createEmptyCacheStore() {
 	const store = {};
 	for (const [group, maps] of Object.entries(CACHE_STRUCTURE)) {
 		store[group] = {};
@@ -146,12 +302,7 @@ function createEmptyStore() {
 	return store;
 }
 
-/**
- * Serialise the in-memory cache to a plain object suitable for
- * app.setValue.  Maps are converted to arrays of [key, entry] pairs.
- * @returns {object|null}
- */
-function serialiseStore() {
+function serialiseCacheStore() {
 	if (!cacheStore) return null;
 	const out = {};
 	for (const [group, maps] of Object.entries(CACHE_STRUCTURE)) {
@@ -164,14 +315,8 @@ function serialiseStore() {
 	return out;
 }
 
-/**
- * Deserialise a plain object (from app.getValue) into Maps,
- * evicting any entries whose timestamp has expired.
- * @param {object} raw  Plain object previously written by serialiseStore.
- * @returns {object} Cache store with Maps.
- */
-function deserialiseStore(raw) {
-	const store = createEmptyStore();
+function deserialiseCacheStore(raw) {
+	const store = createEmptyCacheStore();
 	if (!raw || typeof raw !== 'object') return store;
 
 	const logger = _getCacheLogger();
@@ -204,40 +349,67 @@ function deserialiseStore(raw) {
 	return store;
 }
 
-/**
- * Save the in-memory cache to the persistent store.
- */
-function saveToPersistentStore() {
-	if (typeof app === 'undefined' || !app.setValue) return;
+async function saveCacheToPersistentStore() {
 	try {
-		const data = serialiseStore();
+		const data = serialiseCacheStore();
 		if (data === null) {
-			// cacheStore is null — nothing to save, skip to avoid writing null
 			_getCacheLogger()?.warn('Cache', 'saveToPersistentStore: skipped (cacheStore is null)');
 			return;
 		}
-		app.setValue(CACHE_STORAGE_KEY, data);
-		_getCacheLogger()?.debug('Cache', 'Saved cache to persistent store');
+
+		if (!hasCacheDbAsyncApi()) {
+			_getCacheLogger()?.warn('Cache', 'DB async API not available; cache was not persisted');
+			return;
+		}
+
+		const json = JSON.stringify(data);
+		const savedToDb = await saveCacheJsonToDbAsync(json);
+		if (savedToDb) {
+			updateCacheMetaFromStore(json.length * 2);
+			try {
+				window.dispatchEvent(new CustomEvent('matchmonkey:cacheupdated', {
+					detail: {
+						sizeBytes: json.length * 2,
+						lastSavedTs: Date.now(),
+					}
+				}));
+			} catch (_) {
+				// non-fatal
+			}
+			_getCacheLogger()?.debug('Cache', 'Saved cache to database');
+		}
 	} catch (e) {
 		_getCacheLogger()?.warn('Cache', `Failed to save cache: ${e}`);
 	}
 }
 
-/**
- * Load the cache from the persistent store into memory.
- * Evicts expired entries during load.
- */
-function loadFromPersistentStore() {
-	if (typeof app === 'undefined' || !app.getValue) {
-		cacheStore = createEmptyStore();
-		return;
-	}
+async function loadCacheFromPersistentStore() {
 	try {
-		const raw = app.getValue(CACHE_STORAGE_KEY, null);
-		cacheStore = deserialiseStore(raw);
+		if (!hasCacheDbAsyncApi()) {
+			_getCacheLogger()?.warn('Cache', 'DB async API not available; starting with empty cache');
+			cacheStore = createEmptyCacheStore();
+			updateCacheMetaFromStore(0);
+			return;
+		}
+
+		let raw = await loadCacheJsonFromDbAsync();
+		let persistedJsonLength = 0;
+
+		if (raw && typeof raw === 'object') {
+			try {
+				persistedJsonLength = JSON.stringify(raw).length;
+			} catch (_) {
+				persistedJsonLength = 0;
+			}
+		}
+
+		cacheStore = deserialiseCacheStore(raw);
+		updateCacheMetaFromStore(persistedJsonLength * 2);
+		_getCacheLogger()?.debug('Cache', `Load completed (fromDb=${!!raw}, size=${persistedJsonLength})`);
 	} catch (e) {
 		_getCacheLogger()?.warn('Cache', `Failed to load cache: ${e}`);
-		cacheStore = createEmptyStore();
+		cacheStore = createEmptyCacheStore();
+		updateCacheMetaFromStore(0);
 	}
 }
 
@@ -250,9 +422,9 @@ function loadFromPersistentStore() {
  * Loads persisted data (evicting expired entries) if available,
  * otherwise creates an empty store.
  */
-function initCache() {
+async function initCache() {
 	if (cacheStore) return; // already active
-	loadFromPersistentStore();
+	await loadCacheFromPersistentStore();
 }
 
 /**
@@ -260,7 +432,7 @@ function initCache() {
  * Called at the end of a discovery run so new entries survive restarts.
  */
 function saveCache() {
-	saveToPersistentStore();
+	return saveCacheToPersistentStore();
 }
 
 /**
@@ -277,14 +449,25 @@ function clearCache() {
 		}
 	}
 	cacheStore = null;
-	// Also wipe persistent copy (use empty object — null can crash MM5)
-	if (typeof app !== 'undefined' && app.setValue) {
-		try {
-			app.setValue(CACHE_STORAGE_KEY, {});
-		} catch (e) {
-			_getCacheLogger()?.warn('Cache', `Failed to clear persistent cache: ${e}`);
-		}
+
+	if (hasCacheDbAsyncApi()) {
+		clearCacheDbAsync().catch(e => {
+			_getCacheLogger()?.warn('Cache', `Failed to clear DB cache row: ${e}`);
+		});
 	}
+
+	saveCacheMeta(createEmptyCacheMeta());
+	try {
+		window.dispatchEvent(new CustomEvent('matchmonkey:cacheupdated', {
+			detail: {
+				sizeBytes: 0,
+				lastSavedTs: Date.now(),
+			}
+		}));
+	} catch (_) {
+		// non-fatal
+	}
+	_getCacheLogger()?.debug('Cache', 'Persistent cache cleared');
 }
 
 /**
@@ -293,6 +476,25 @@ function clearCache() {
  */
 function isCacheActive() {
 	return cacheStore !== null;
+}
+
+/**
+ * Get lightweight metadata about persisted cache payload.
+ * This avoids loading large cache JSON solely for UI summaries.
+ * @returns {object}
+ */
+function getCachePersistentMeta() {
+	const meta = loadCacheMeta();
+	if (!meta || typeof meta !== 'object') return createEmptyCacheMeta();
+	return {
+		storage: String(meta.storage || 'db'),
+		sizeBytes: Number(meta.sizeBytes) || 0,
+		lastSavedTs: Number(meta.lastSavedTs) || 0,
+		counts: {
+			...createEmptyCacheCounts(),
+			...(meta.counts || {}),
+		},
+	};
 }
 
 // =========================================================================
@@ -306,7 +508,7 @@ function isCacheActive() {
  * @param {string} key       Cache key.
  * @returns {*|undefined}    Cached data, or undefined if missing/expired.
  */
-function getEntry(groupName, mapName, key) {
+function getCacheEntry(groupName, mapName, key) {
 	const map = cacheStore?.[groupName]?.[mapName];
 	if (!map || !map.has(key)) return undefined;
 	const entry = map.get(key);
@@ -324,7 +526,7 @@ function getEntry(groupName, mapName, key) {
  * @param {string} key       Cache key.
  * @param {*}      data      Data to cache.
  */
-function setEntry(groupName, mapName, key, data) {
+function setCacheEntry(groupName, mapName, key, data) {
 	const map = cacheStore?.[groupName]?.[mapName];
 	if (!map) return;
 	map.set(key, { data, ts: Date.now() });
@@ -338,7 +540,7 @@ function setEntry(groupName, mapName, key, data) {
  * @param {string} mapName   Map name within the group.
  * @param {string} key       Cache key to remove.
  */
-function removeEntry(groupName, mapName, key) {
+function removeCacheEntry(groupName, mapName, key) {
 	const map = cacheStore?.[groupName]?.[mapName];
 	if (!map) return;
 	if (map.delete(key)) {
@@ -359,7 +561,7 @@ function removeEntry(groupName, mapName, key) {
  */
 function getLastfmMap(mapName) {
 	if (!cacheStore?.lastfm?.[mapName]) return null;
-	return _createMapWrapper('lastfm', mapName);
+	return createCacheMapWrapper('lastfm', mapName);
 }
 
 /**
@@ -370,7 +572,7 @@ function getLastfmMap(mapName) {
 function getCachedSimilarArtists(artistName) {
 	if (!cacheStore?.lastfm?.similarArtists) return null;
 	const key = cacheKeyArtist(artistName);
-	const cached = getEntry('lastfm', 'similarArtists', key);
+	const cached = getCacheEntry('lastfm', 'similarArtists', key);
 	if (cached === undefined) return null;
 	_getCacheLogger()?.debug('Cache', `HIT: Similar artists for "${artistName}" (${cached.length} artists)`);
 	return cached;
@@ -384,7 +586,7 @@ function getCachedSimilarArtists(artistName) {
 function cacheSimilarArtists(artistName, artists) {
 	if (!cacheStore?.lastfm?.similarArtists) return;
 	const key = cacheKeyArtist(artistName);
-	setEntry('lastfm', 'similarArtists', key, artists || []);
+	setCacheEntry('lastfm', 'similarArtists', key, artists || []);
 	_getCacheLogger()?.debug('Cache', `STORE: Similar artists for "${artistName}" (${(artists || []).length} artists)`);
 }
 
@@ -398,7 +600,7 @@ function cacheSimilarArtists(artistName, artists) {
 function getCachedTopTracks(artistName, limit, withPlaycount = false) {
 	if (!cacheStore?.lastfm?.topTracks) return null;
 	const key = cacheKeyTopTracks(artistName, limit, withPlaycount);
-	const cached = getEntry('lastfm', 'topTracks', key);
+	const cached = getCacheEntry('lastfm', 'topTracks', key);
 	if (cached === undefined) return null;
 	_getCacheLogger()?.debug('Cache', `HIT: Top tracks for "${artistName}" limit=${limit} withPlaycount=${withPlaycount} (${cached.length} tracks)`);
 	return cached;
@@ -414,7 +616,7 @@ function getCachedTopTracks(artistName, limit, withPlaycount = false) {
 function cacheTopTracks(artistName, limit, withPlaycount, tracks) {
 	if (!cacheStore?.lastfm?.topTracks) return;
 	const key = cacheKeyTopTracks(artistName, limit, withPlaycount);
-	setEntry('lastfm', 'topTracks', key, tracks || []);
+	setCacheEntry('lastfm', 'topTracks', key, tracks || []);
 	_getCacheLogger()?.debug('Cache', `STORE: Top tracks for "${artistName}" limit=${limit} withPlaycount=${withPlaycount} (${(tracks || []).length} tracks)`);
 }
 
@@ -430,12 +632,8 @@ function cacheTopTracks(artistName, limit, withPlaycount, tracks) {
  */
 function getReccobeatsMap(mapName) {
 	if (!cacheStore?.reccobeats?.[mapName]) return null;
-	return _createMapWrapper('reccobeats', mapName);
+	return createCacheMapWrapper('reccobeats', mapName);
 }
-
-// =========================================================================
-// MAP WRAPPER
-// =========================================================================
 
 /**
  * Create a Map-like wrapper that transparently handles { data, ts } entries.
@@ -444,19 +642,19 @@ function getReccobeatsMap(mapName) {
  * @param {string} mapName   Map name within the group.
  * @returns {object} Wrapper with has, get, set, delete methods.
  */
-function _createMapWrapper(groupName, mapName) {
+function createCacheMapWrapper(groupName, mapName) {
 	return {
 		has(key) {
-			return getEntry(groupName, mapName, key) !== undefined;
+			return getCacheEntry(groupName, mapName, key) !== undefined;
 		},
 		get(key) {
-			return getEntry(groupName, mapName, key);
+			return getCacheEntry(groupName, mapName, key);
 		},
 		set(key, value) {
-			setEntry(groupName, mapName, key, value);
+			setCacheEntry(groupName, mapName, key, value);
 		},
 		delete(key) {
-			removeEntry(groupName, mapName, key);
+			removeCacheEntry(groupName, mapName, key);
 		},
 	};
 }
@@ -524,19 +722,20 @@ function getDetailedStats() {
 
 // Export to window namespace
 window.matchMonkeyCache = {
-	init: initCache,
-	save: saveCache,
-	clear: clearCache,
-	isActive: isCacheActive,
-	getStats: getCacheStats,
+	initCache,
+	saveCache,
+	clearCache,
+	isCacheActive,
+	getCacheStats,
 	getDetailedStats,
+	getCachePersistentMeta,
 	getCachedSimilarArtists,
 	cacheSimilarArtists,
 	getCachedTopTracks,
 	cacheTopTracks,
 	getLastfmMap,
 	getReccobeatsMap,
-	removeEntry,
+	removeCacheEntry,
 };
 
 // Export cache key functions globally for other modules

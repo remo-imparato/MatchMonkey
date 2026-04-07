@@ -2,11 +2,16 @@
  * MatchMonkey Missed Results Tracker
  * 
  * Tracks recommendations from Last.fm and ReccoBeats that were not found in the local library.
- * Results persist across runs and can be viewed, copied, or cleared by the user.
+ * Results persist across runs via SQLite table `MatchMonkeyData` (key: 'missedResults')
+ * and can be viewed, copied, or cleared by the user.
  * 
  * Popularity is normalized to 0-100 scale:
  * - ReccoBeats: Uses native popularity (0-100)
  * - Last.fm: Converts playcount using logarithmic scale
+ * 
+ * Meta system:
+ * - Lightweight summary stored in `MatchMonkeyMissedMeta` via app.setValue()
+ * - Allows the options panel to display storage usage without loading all results
  * 
  * @author Remo Imparato
  */
@@ -16,8 +21,11 @@
 // Get logger reference
 const _getMissedLogger = () => window.matchMonkeyLogger;
 
-const STORAGE_KEY = 'MatchMonkey_MissedResults';
-const MAX_RESULTS = 50000; // Maximum number of missed results to store
+const MISSED_LEGACY_STORAGE_KEY = 'MatchMonkey_MissedResults';
+const MISSED_META_STORAGE_KEY = 'MatchMonkeyMissedMeta';
+const MISSED_DB_TABLE = 'MatchMonkeyData';
+const MISSED_DB_KEY = 'missedResults';
+const MISSED_MIN_POPULARITY = 30; // Minimum popularity threshold — below this is not relevant
 
 /**
  * Missed result structure:
@@ -37,79 +45,305 @@ const MAX_RESULTS = 50000; // Maximum number of missed results to store
  */
 
 /**
- * Initialize the missed results storage
+ * In-memory store. Null when not initialized.
+ * Loaded from DB on init(), persisted to DB on save().
  */
-function init() {
-	const logger = _getMissedLogger();
-	try {
-		// Get current value
-		const current = app.getValue(STORAGE_KEY, []);
+let missedStore = null;
+let missedDbTableReady = false;
+let missedPersistentMeta = null;
 
-		// If null, undefined, or not an array, initialize with empty array
-		if (!current || !Array.isArray(current)) {
-			app.setValue(STORAGE_KEY, []);
-			logger?.debug('MissedResults', 'Initialized with empty array');
-		} else {
-			logger?.debug('MissedResults', `Initialized with ${current.length} existing results`);
-		}
-	} catch (e) {
-		logger?.error('MissedResults', 'Initialization error: ' + e.toString());
-		// Try to set empty array as fallback
-		try {
-			app.setValue(STORAGE_KEY, []);
-		} catch (e2) {
-			logger?.error('MissedResults', 'Failed to initialize storage: ' + e2.toString());
-		}
+// =========================================================================
+// META HELPERS
+// =========================================================================
+
+function createEmptyMissedMeta() {
+	return {
+		storage: 'db',
+		sizeBytes: 0,
+		lastSavedTs: 0,
+		total: 0,
+		uniqueArtists: 0,
+		totalOccurrences: 0,
+		avgPopularity: 0,
+	};
+}
+
+function computeMissedMeta(results, sizeBytes) {
+	if (!Array.isArray(results) || results.length === 0) {
+		return { ...createEmptyMissedMeta(), lastSavedTs: Date.now() };
+	}
+	const artists = new Set();
+	let totalOcc = 0;
+	let totalPop = 0;
+	for (const r of results) {
+		if (r.artist) artists.add(r.artist);
+		totalOcc += (r.occurrences || 1);
+		totalPop += (r.popularity || 0);
+	}
+	return {
+		storage: 'db',
+		sizeBytes: Math.max(0, Number(sizeBytes) || 0),
+		lastSavedTs: Date.now(),
+		total: results.length,
+		uniqueArtists: artists.size,
+		totalOccurrences: totalOcc,
+		avgPopularity: results.length > 0 ? Math.round(totalPop / results.length) : 0,
+	};
+}
+
+function saveMissedMeta(meta) {
+	missedPersistentMeta = meta || createEmptyMissedMeta();
+	if (typeof app === 'undefined' || !app.setValue) return;
+	try {
+		app.setValue(MISSED_META_STORAGE_KEY, missedPersistentMeta);
+	} catch (_) {
+		// non-fatal
 	}
 }
 
+function loadMissedMeta() {
+	if (missedPersistentMeta) return missedPersistentMeta;
+	if (typeof app === 'undefined' || !app.getValue) {
+		missedPersistentMeta = createEmptyMissedMeta();
+		return missedPersistentMeta;
+	}
+	try {
+		const raw = app.getValue(MISSED_META_STORAGE_KEY, {});
+		missedPersistentMeta = (raw && typeof raw === 'object') ? raw : createEmptyMissedMeta();
+	} catch (_) {
+		missedPersistentMeta = createEmptyMissedMeta();
+	}
+	return missedPersistentMeta;
+}
+
+function updateMissedMetaFromStore(sizeBytes = 0) {
+	saveMissedMeta(computeMissedMeta(missedStore, sizeBytes));
+}
+
+// =========================================================================
+// DB HELPERS
+// =========================================================================
+
+function hasMissedDbAsyncApi() {
+	return typeof app !== 'undefined'
+		&& !!app.db
+		&& typeof app.db.executeQueryAsync === 'function'
+		&& typeof app.db.getQueryResultAsync === 'function';
+}
+
+function sqlMissedStringLiteral(value) {
+	return `'${String(value ?? '').replace(/'/g, "''")}'`;
+}
+
+function extractMissedDbValue(rows) {
+	if (!rows || rows.count === 0 || rows.eof) return null;
+	return rows.fields.getValue(0);
+}
+
+async function ensureMissedDbTableAsync() {
+	if (missedDbTableReady) return true;
+	if (!hasMissedDbAsyncApi()) return false;
+	try {
+		await app.db.executeQueryAsync(`CREATE TABLE IF NOT EXISTS ${MISSED_DB_TABLE} (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+		missedDbTableReady = true;
+		return true;
+	} catch (e) {
+		_getMissedLogger()?.warn('MissedResults', `Failed to ensure DB table: ${e}`);
+		return false;
+	}
+}
+
+async function saveMissedToDbAsync(json) {
+	if (!(await ensureMissedDbTableAsync())) return false;
+	try {
+		await app.db.executeQueryAsync(
+			`INSERT OR REPLACE INTO ${MISSED_DB_TABLE} (key, value) VALUES (${sqlMissedStringLiteral(MISSED_DB_KEY)}, ${sqlMissedStringLiteral(json)})`
+		);
+		return true;
+	} catch (e) {
+		_getMissedLogger()?.warn('MissedResults', `Failed to save to DB: ${e}`);
+		return false;
+	}
+}
+
+async function loadMissedFromDbAsync() {
+	if (!(await ensureMissedDbTableAsync())) return null;
+	try {
+		const rows = await app.db.getQueryResultAsync(
+			`SELECT value FROM ${MISSED_DB_TABLE} WHERE key = ${sqlMissedStringLiteral(MISSED_DB_KEY)}`
+		);
+		const value = extractMissedDbValue(rows);
+		if (value === null || value === undefined || value === '') return [];
+		if (Array.isArray(value)) return value;
+		if (typeof value === 'string') return JSON.parse(value);
+		return JSON.parse(String(value));
+	} catch (err) {
+		_getMissedLogger()?.warn('MissedResults', `Failed to load from DB: ${err}`);
+		return null;
+	}
+}
+
+async function clearMissedFromDbAsync() {
+	if (!(await ensureMissedDbTableAsync())) return false;
+	try {
+		await app.db.executeQueryAsync(`DELETE FROM ${MISSED_DB_TABLE} WHERE key = ${sqlMissedStringLiteral(MISSED_DB_KEY)}`);
+		return true;
+	} catch (e) {
+		_getMissedLogger()?.warn('MissedResults', `Failed to clear DB: ${e}`);
+		return false;
+	}
+}
+
+// =========================================================================
+// PERSISTENCE
+// =========================================================================
+
+async function saveMissedResultsToPersistentStore() {
+	try {
+		if (!missedStore) {
+			_getMissedLogger()?.warn('MissedResults', 'saveToPersistentStore: skipped (store is null)');
+			return;
+		}
+
+		if (!hasMissedDbAsyncApi()) {
+			_getMissedLogger()?.warn('MissedResults', 'DB async API not available; results were not persisted');
+			return;
+		}
+
+		const json = JSON.stringify(missedStore);
+		const saved = await saveMissedToDbAsync(json);
+		if (saved) {
+			updateMissedMetaFromStore(json.length * 2);
+			try {
+				window.dispatchEvent(new CustomEvent('matchmonkey:missedresultssaved', {
+					detail: {
+						sizeBytes: json.length * 2,
+						total: missedStore.length,
+						lastSavedTs: Date.now(),
+					}
+				}));
+			} catch (_) {
+				// non-fatal
+			}
+			_getMissedLogger()?.debug('MissedResults', `Saved ${missedStore.length} results to database`);
+		}
+	} catch (e) {
+		_getMissedLogger()?.warn('MissedResults', `Failed to save: ${e}`);
+	}
+}
+
+async function loadMissedResultsFromPersistentStore() {
+	try {
+		if (!hasMissedDbAsyncApi()) {
+			_getMissedLogger()?.warn('MissedResults', 'DB async API not available; starting with empty store');
+			missedStore = [];
+			updateMissedMetaFromStore(0);
+			return;
+		}
+
+		let raw = await loadMissedFromDbAsync();
+		if (raw === null) {
+			_getMissedLogger()?.debug('MissedResults', 'No missed-results row in DB yet; continuing with empty/legacy initialization');
+		}
+		let persistedJsonLength = 0;
+
+		// Migrate from legacy app.setValue storage if DB is empty
+		if (!raw || !Array.isArray(raw)) {
+			try {
+				const legacy = app.getValue(MISSED_LEGACY_STORAGE_KEY, []);
+				if (Array.isArray(legacy) && legacy.length > 0) {
+					_getMissedLogger()?.debug('MissedResults', `Migrating ${legacy.length} results from legacy storage to DB`);
+					raw = legacy;
+					app.setValue(MISSED_LEGACY_STORAGE_KEY, []);
+				}
+			} catch (_) {
+				// ignore migration errors
+			}
+		}
+
+		if (Array.isArray(raw)) {
+			missedStore = raw;
+			try {
+				persistedJsonLength = JSON.stringify(raw).length;
+			} catch (_) {
+				persistedJsonLength = 0;
+			}
+		} else {
+			missedStore = [];
+		}
+
+		updateMissedMetaFromStore(persistedJsonLength * 2);
+		_getMissedLogger()?.debug('MissedResults', `Loaded ${missedStore.length} results from persistent store`);
+	} catch (e) {
+		_getMissedLogger()?.warn('MissedResults', `Failed to load: ${e}`);
+		missedStore = [];
+		updateMissedMetaFromStore(0);
+	}
+}
+
+// =========================================================================
+// LIFECYCLE
+// =========================================================================
+
 /**
- * Get all missed results (always returns an array)
- * 
+ * Initialize the missed results store.
+ * Loads persisted data from the database (with legacy migration).
+ */
+async function initMissedResults() {
+	if (missedStore !== null) return; // already initialized
+	await loadMissedResultsFromPersistentStore();
+}
+
+/**
+ * Save the current missed results to the database.
+ * Called at the end of a discovery run so new entries survive restarts.
+ */
+function saveMissedResults() {
+	return saveMissedResultsToPersistentStore();
+}
+
+// =========================================================================
+// PUBLIC API
+// =========================================================================
+
+/**
+ * Get all missed results (always returns an array).
+ * Returns in-memory data; call init() first to load from DB.
  * @returns {Array} Array of missed results
  */
-function getAll() {
-	const logger = _getMissedLogger();
-	try {
-		const results = app.getValue(STORAGE_KEY, []);
-
-		// Ensure we always return an array
-		if (!results) {
-			return [];
-		}
-
-		if (!Array.isArray(results)) {
-			logger?.warn('MissedResults', 'Storage contained non-array, returning empty array');
-			return [];
-		}
-
-		return results;
-	} catch (e) {
-		logger?.error('MissedResults', 'Error getting results: ' + e.toString());
-		return [];
-	}
+function getAllMissedResults() {
+	return Array.isArray(missedStore) ? missedStore : [];
 }
 
 /**
- * Get statistics about missed results
- * 
+ * Get statistics about missed results.
+ * Returns live stats from in-memory store, or falls back to persisted meta.
  * @returns {object} Statistics {total, uniqueArtists, totalOccurrences, avgPopularity}
  */
-function getStats() {
+function getMissedResultsStats() {
 	const logger = _getMissedLogger();
 	try {
-		const results = getAll();
+		// Live in-memory data available
+		if (missedStore !== null) {
+			const results = missedStore;
+			return {
+				total: results.length,
+				uniqueArtists: new Set(results.map(r => r.artist)).size,
+				totalOccurrences: results.reduce((sum, r) => sum + (r.occurrences || 1), 0),
+				avgPopularity: results.length > 0
+					? Math.round(results.reduce((sum, r) => sum + (r.popularity || 0), 0) / results.length)
+					: 0
+			};
+		}
 
-		const stats = {
-			total: results.length,
-			uniqueArtists: new Set(results.map(r => r.artist)).size,
-			totalOccurrences: results.reduce((sum, r) => sum + (r.occurrences || 1), 0),
-			avgPopularity: results.length > 0
-				? Math.round(results.reduce((sum, r) => sum + (r.popularity || 0), 0) / results.length)
-				: 0
+		// Fall back to persisted meta
+		const meta = loadMissedMeta();
+		return {
+			total: Number(meta.total) || 0,
+			uniqueArtists: Number(meta.uniqueArtists) || 0,
+			totalOccurrences: Number(meta.totalOccurrences) || 0,
+			avgPopularity: Number(meta.avgPopularity) || 0,
 		};
-
-		return stats;
 	} catch (e) {
 		logger?.error('MissedResults', 'Error getting stats: ' + e.toString());
 		return { total: 0, uniqueArtists: 0, totalOccurrences: 0, avgPopularity: 0 };
@@ -117,7 +351,27 @@ function getStats() {
 }
 
 /**
- * Add a missed result
+ * Get lightweight metadata about persisted missed results.
+ * Reads from app.getValue without loading full data from DB.
+ * @returns {object} Meta with sizeBytes, total, uniqueArtists, etc.
+ */
+function getMissedResultsPersistentMeta() {
+	const meta = loadMissedMeta();
+	if (!meta || typeof meta !== 'object') return createEmptyMissedMeta();
+	return {
+		storage: String(meta.storage || 'db'),
+		sizeBytes: Number(meta.sizeBytes) || 0,
+		lastSavedTs: Number(meta.lastSavedTs) || 0,
+		total: Number(meta.total) || 0,
+		uniqueArtists: Number(meta.uniqueArtists) || 0,
+		totalOccurrences: Number(meta.totalOccurrences) || 0,
+		avgPopularity: Number(meta.avgPopularity) || 0,
+	};
+}
+
+/**
+ * Add a missed result to the in-memory store.
+ * Call save() after a run to persist to the database.
  * 
  * @param {string} artist - Artist name
  * @param {string} title - Track title
@@ -125,15 +379,13 @@ function getStats() {
  * @param {number} popularity - Popularity score 0-100 (normalized)
  * @param {object} additionalInfo - Optional additional information (source, playcount, etc.)
  */
-function add(artist, title, album = '', popularity = 0, additionalInfo = {}) {
+function addMissedResult(artist, title, album = '', popularity = 0, additionalInfo = {}) {
 	const logger = _getMissedLogger();
-	// Validate inputs
 	if (!artist || !title) {
 		logger?.warn('MissedResults', 'Cannot add result without artist and title');
-		return;
+		return false;
 	}
 
-	// Sanitize inputs to prevent storage corruption
 	try {
 		artist = String(artist).trim();
 		title = String(title).trim();
@@ -142,23 +394,22 @@ function add(artist, title, album = '', popularity = 0, additionalInfo = {}) {
 		additionalInfo = (typeof additionalInfo === 'object' && additionalInfo !== null) ? additionalInfo : {};
 	} catch (e) {
 		logger?.error('MissedResults', 'Error sanitizing inputs: ' + e.toString());
-		return;
+		return false;
 	}
 
 	if (!artist || !title) {
 		logger?.warn('MissedResults', 'Cannot add result - artist or title empty after sanitization');
-		return;
+		return false;
 	}
 
-	if (popularity < 40) {
-		return;
+	if (popularity < MISSED_MIN_POPULARITY) {
+		logger?.debug('MissedResults', `Skipping low-popularity missed result "${artist} - ${title}" (${popularity} < ${MISSED_MIN_POPULARITY})`);
+		return false;
 	}
 
 	try {
-		const results = getAll(); // Use getAll() which always returns an array
+		if (!Array.isArray(missedStore)) missedStore = [];
 
-		// Check for duplicates using canonical cleaners for robust matching
-		// This prevents duplicates caused by punctuation/casing/prefix variants
 		const cleanArtist = (typeof matchMonkeyHelpers?.cleanArtistName === 'function')
 			? matchMonkeyHelpers.cleanArtistName(artist).toUpperCase()
 			: artist.toUpperCase();
@@ -166,8 +417,7 @@ function add(artist, title, album = '', popularity = 0, additionalInfo = {}) {
 			? matchMonkeyHelpers.cleanTrackName(title).toUpperCase()
 			: title.toUpperCase();
 
-		// Pre-compute cleaned values for efficient comparison
-		const cleanedResults = results.map(r => ({
+		const cleanedResults = missedStore.map(r => ({
 			cleanArtist: (typeof matchMonkeyHelpers?.cleanArtistName === 'function')
 				? matchMonkeyHelpers.cleanArtistName(r.artist).toUpperCase()
 				: r.artist.toUpperCase(),
@@ -181,66 +431,48 @@ function add(artist, title, album = '', popularity = 0, additionalInfo = {}) {
 		);
 
 		if (existingIndex >= 0) {
-			// Update existing entry - increment occurrences and update popularity if higher
-			results[existingIndex].occurrences = (results[existingIndex].occurrences || 1) + 1;
-
-			// Update popularity if the new value is higher
-			if (popularity > (results[existingIndex].popularity || 0)) {
-				results[existingIndex].popularity = popularity;
+			missedStore[existingIndex].occurrences = (missedStore[existingIndex].occurrences || 1) + 1;
+			if (popularity > (missedStore[existingIndex].popularity || 0)) {
+				missedStore[existingIndex].popularity = popularity;
 			}
-
-			// Merge additional info
-			results[existingIndex].additionalInfo = {
-				...(results[existingIndex].additionalInfo || {}),
+			missedStore[existingIndex].additionalInfo = {
+				...(missedStore[existingIndex].additionalInfo || {}),
 				...additionalInfo
 			};
-
-			//console.log(`MatchMonkey Missed Results: Updated existing - ${artist} - ${title} (occurrences: ${results[existingIndex].occurrences}, popularity: ${popularity}%)`);
 		} else {
-			// Create new result object
-			const result = {
+			missedStore.unshift({
 				artist,
 				title,
 				popularity: popularity || 0,
 				occurrences: 1,
 				additionalInfo: additionalInfo || {}
-			};
-
-			// Add to beginning of array (most recent first)
-			results.unshift(result);
-
-			//console.log(`MatchMonkey Missed Results: Added new - ${artist} - ${title} (popularity: ${popularity}%)`);
+			});
 		}
-
-		// Limit size
-		if (results.length > MAX_RESULTS) {
-			results.length = MAX_RESULTS;
-		}
-
-		// Save
-		app.setValue(STORAGE_KEY, results);
 
 		// Dispatch event for UI updates
 		try {
-			const event = new CustomEvent('matchmonkey:missedresultadded', {
+			window.dispatchEvent(new CustomEvent('matchmonkey:missedresultadded', {
 				detail: { artist, title, album, popularity }
-			});
-			window.dispatchEvent(event);
+			}));
 		} catch (e) {
 			// Event dispatch not critical
 		}
 
+		return true;
+
 	} catch (e) {
 		logger?.error('MissedResults', 'Error adding result: ' + e.toString());
+		return false;
 	}
 }
 
 /**
- * Add multiple missed results
+ * Add multiple missed results to the in-memory store.
+ * Call save() after a run to persist to the database.
  * 
  * @param {Array} results - Array of result objects with {artist, title, album, popularity, additionalInfo}
  */
-function addBatch(results) {
+function addMissedResultsBatch(results) {
 	const logger = _getMissedLogger();
 	if (!Array.isArray(results) || results.length === 0) {
 		return;
@@ -248,32 +480,28 @@ function addBatch(results) {
 
 	logger?.debug('MissedResults', `Adding batch of ${results.length} results`);
 
-	let successCount = 0;
+	let storedCount = 0;
+	let skippedCount = 0;
 	let errorCount = 0;
 
 	results.forEach((result, index) => {
 		try {
-			// Validate result object
 			if (!result || typeof result !== 'object') {
-				logger?.warn('MissedResults', `Invalid result at index ${index} - not an object`);
-				errorCount++;
+				skippedCount++;
 				return;
 			}
-
 			if (!result.artist || !result.title) {
-				logger?.warn('MissedResults', `Invalid result at index ${index} - missing artist or title`);
-				errorCount++;
+				skippedCount++;
 				return;
 			}
-
-			add(
+			if (addMissedResult(
 				result.artist,
 				result.title,
 				result.album || '',
 				result.popularity || 0,
 				result.additionalInfo || {}
-			);
-			successCount++;
+			)) storedCount++;
+			else skippedCount++;
 		} catch (e) {
 			logger?.error('MissedResults', `Error adding result at index ${index}: ${e}`);
 			errorCount++;
@@ -282,56 +510,39 @@ function addBatch(results) {
 
 	if (errorCount > 0) {
 		logger?.warn('MissedResults', `Batch complete - ${successCount} succeeded, ${errorCount} failed`);
-	} else {
-		logger?.debug('MissedResults', `Batch complete - ${successCount} results added`);
-	}
-
-	// Log final storage size after batch
-	try {
-		const allResults = getAll();
-		const jsonSize = JSON.stringify(allResults).length;
-		const sizeKB = (jsonSize / 1024).toFixed(2);
-		const sizeMB = (jsonSize / (1024 * 1024)).toFixed(2);
-		if (jsonSize > 1024 * 1024) {
-			logger?.debug('MissedResults', `Total storage size: ${sizeMB} MB (${allResults.length} results)`);
+		if (errorCount > 0 || skippedCount > 0) {
+			logger?.warn('MissedResults', `Batch complete - ${storedCount} stored, ${skippedCount} skipped, ${errorCount} failed`);
 		} else {
-			logger?.debug('MissedResults', `Total storage size: ${sizeKB} KB (${allResults.length} results)`);
+			logger?.debug('MissedResults', `Batch complete - ${successCount} results added`);
+			logger?.debug('MissedResults', `Batch complete - ${storedCount} results stored`);
 		}
-	} catch (e) {
-		// Size monitoring not critical
 	}
 }
-
-/**
- * Get missed results by artist
- * 
- * @param {string} artist - Artist name
- * @returns {Array} Filtered results
- */
-function getByArtist(artist) {
-	const logger = _getMissedLogger();
+function getMissedResultsByArtist(artist) {
 	try {
-		const results = getAll();
-		return results.filter(r => r.artist === artist);
+		return getAllMissedResults().filter(r => r.artist === artist);
 	} catch (e) {
-		logger?.error('MissedResults', 'Error filtering by artist: ' + e.toString());
+		_getMissedLogger()?.error('MissedResults', 'Error filtering by artist: ' + e.toString());
 		return [];
 	}
 }
 
-/**
- * Clear all missed results
- */
-function clear() {
+function clearMissedResults() {
 	const logger = _getMissedLogger();
 	try {
 		logger?.debug('MissedResults', 'Clearing all results');
-		app.setValue(STORAGE_KEY, []);
+		missedStore = [];
 
-		// Dispatch event
+		if (hasMissedDbAsyncApi()) {
+			clearMissedFromDbAsync().catch(e => {
+				logger?.warn('MissedResults', `Failed to clear DB: ${e}`);
+			});
+		}
+
+		saveMissedMeta(createEmptyMissedMeta());
+
 		try {
-			const event = new CustomEvent('matchmonkey:missedresultscleared');
-			window.dispatchEvent(event);
+			window.dispatchEvent(new CustomEvent('matchmonkey:missedresultscleared'));
 		} catch (e) {
 			// Event dispatch not critical
 		}
@@ -340,29 +551,22 @@ function clear() {
 	}
 }
 
-/**
- * Get the total number of missed results
- * @returns {number} Total count
- */
-function getCount() {
-	try {
-		const results = getAll();
-		return results.length;
-	} catch (e) {
-		return 0;
-	}
+function getMissedResultsCount() {
+	if (missedStore !== null) return missedStore.length;
+	const meta = loadMissedMeta();
+	return Number(meta.total) || 0;
 }
 
 // Export to window namespace
 window.matchMonkeyMissedResults = {
-	init,
-	getAll,
-	getStats,
-	getCount,
-	add,
-	addBatch,
-	getByArtist,
-	clear,
-	STORAGE_KEY,
-	MAX_RESULTS,
+	initMissedResults,
+	saveMissedResults,
+	getAllMissedResults,
+	getMissedResultsStats,
+	getMissedResultsCount,
+	addMissedResult,
+	addMissedResultsBatch,
+	getMissedResultsByArtist,
+	clearMissedResults,
+	getMissedResultsPersistentMeta,
 };
