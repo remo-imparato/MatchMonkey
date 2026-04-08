@@ -456,7 +456,10 @@ function clearCache() {
 			}
 		}
 	}
-	cacheStore = null;
+	// Keep an empty (non-null) store so initCache()'s "if (cacheStore) return" guard
+	// prevents reloading stale DB data before the async delete completes.
+	// This mirrors clearMissedResults() which sets missedStore = [] for the same reason.
+	cacheStore = createEmptyCacheStore();
 
 	if (hasCacheDbAsyncApi()) {
 		clearCacheDbAsync().catch(e => {

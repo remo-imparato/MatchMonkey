@@ -644,62 +644,67 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 	logger?.info('MoodActivity', `Track-specific matching found ${trackSpecificCount} tracks`);
 
 	// Step 2b: Artist expansion — get ALL tracks from similar artists in the library
-	// This dramatically increases the pool available for mood filtering
-	// Cap the total pool to avoid spending excessive time on ReccoBeats lookups
-	// for tracks that will mostly be filtered out by audio feature matching.
+	// This increases the pool available for mood filtering.
+	// Skip expansion entirely when track-specific matching already found enough tracks
+	// to produce a good filtered result set, saving significant library + ReccoBeats API calls.
+	const expansionPoolLimit = config.expansionPoolLimit ?? 500;
+	const EXPANSION_SKIP_THRESHOLD = 100;
 	const expandedArtistList = Array.from(expandedArtists);
 	let expandedTrackCount = 0;
-	const expansionPoolLimit = config.expansionPoolLimit ?? 2000;
 
-	logger?.info('MoodActivity', `Expanding pool: searching library for all tracks by ${expandedArtistList.length} related artists (pool limit: ${expansionPoolLimit})`);
+	if (trackSpecificCount >= EXPANSION_SKIP_THRESHOLD) {
+		logger?.info('MoodActivity', `Skipping artist expansion: ${trackSpecificCount} track-specific matches exceeds threshold (${EXPANSION_SKIP_THRESHOLD})`);
+	} else {
+		logger?.info('MoodActivity', `Expanding pool: searching library for all tracks by ${expandedArtistList.length} related artists (pool limit: ${expansionPoolLimit})`);
 
-	for (let i = 0; i < expandedArtistList.length; i++) {
-		checkCancelled();
-		const artKey = expandedArtistList[i];
-		if (blacklist.has(artKey)) continue;
+		for (let i = 0; i < expandedArtistList.length; i++) {
+			checkCancelled();
+			const artKey = expandedArtistList[i];
+			if (blacklist.has(artKey)) continue;
 
-		// Stop expanding once we have enough tracks to work with
-		if (matchedTracks.length >= expansionPoolLimit) {
-			logger?.info('MoodActivity', `Pool limit reached (${matchedTracks.length} tracks), stopping artist expansion at ${i}/${expandedArtistList.length} artists`);
-			break;
-		}
+			// Stop expanding once we have enough tracks to work with
+			if (matchedTracks.length >= expansionPoolLimit) {
+				logger?.info('MoodActivity', `Pool limit reached (${matchedTracks.length} tracks), stopping artist expansion at ${i}/${expandedArtistList.length} artists`);
+				break;
+			}
 
-		if (i % 10 === 0) {
-			const progress = 0.3 + ((i / expandedArtistList.length) * 0.1);
-			updateProgress(`Expanding pool: ${i}/${expandedArtistList.length} artists (${matchedTracks.length} tracks)...`, progress);
-		}
+			if (i % 10 === 0) {
+				const progress = 0.3 + ((i / expandedArtistList.length) * 0.1);
+				updateProgress(`Expanding pool: ${i}/${expandedArtistList.length} artists (${matchedTracks.length} tracks)...`, progress);
+			}
 
-		try {
-			// Use the original casing from tracksByArtist if available, otherwise use the uppercase key
-			const artistName = tracksByArtist.get(artKey)?.artistName || artKey;
+			try {
+				// Use the original casing from tracksByArtist if available, otherwise use the uppercase key
+				const artistName = tracksByArtist.get(artKey)?.artistName || artKey;
 
-			// Fetch ALL tracks by this artist (null trackTitles = no title filter)
-			const libraryTracks = await db.findLibraryTracks(
-				artistName,
-				null,
-				config.tracksPerArtist ?? 10000,
-				{
-					formatPreference: config.formatPreference,
-					minRating: config.minRating,
-					allowUnknown: config.allowUnknown,
-					collection: config.localCollection || ''
-				}
-			);
+				// Fetch ALL tracks by this artist (null trackTitles = no title filter)
+				const libraryTracks = await db.findLibraryTracks(
+					artistName,
+					null,
+					config.tracksPerArtist ?? 10000,
+					{
+						formatPreference: config.formatPreference,
+						minRating: config.minRating,
+						allowUnknown: config.allowUnknown,
+						collection: config.localCollection || ''
+					}
+				);
 
-			if (libraryTracks && libraryTracks.length > 0) {
-				for (const track of libraryTracks) {
-					const title = track.title || track.SongTitle || track.Title || '';
-					const dedupKey = `${artistName.toUpperCase()}|${title.toUpperCase()}`;
-					if (!matchedTrackKeys.has(dedupKey)) {
-						matchedTrackKeys.add(dedupKey);
-						matchedTracks.push({ track, artist: artistName, title });
-						expandedTrackCount++;
+				if (libraryTracks && libraryTracks.length > 0) {
+					for (const track of libraryTracks) {
+						const title = track.title || track.SongTitle || track.Title || '';
+						const dedupKey = `${artistName.toUpperCase()}|${title.toUpperCase()}`;
+						if (!matchedTrackKeys.has(dedupKey)) {
+							matchedTrackKeys.add(dedupKey);
+							matchedTracks.push({ track, artist: artistName, title });
+							expandedTrackCount++;
+						}
 					}
 				}
+			} catch (e) {
+				if (e?.message === '__CANCELLED__') throw e;
+				logger?.warn('MoodActivity', `Library expansion error for artist "${artKey}": ${e.message}`);
 			}
-		} catch (e) {
-			if (e?.message === '__CANCELLED__') throw e;
-			logger?.warn('MoodActivity', `Library expansion error for artist "${artKey}": ${e.message}`);
 		}
 	}
 
@@ -731,55 +736,75 @@ async function discoverByMoodOrActivity(modules, seeds, config, type, value) {
 	// dramatically reducing redundant API calls when the same artist appears many times.
 	matchedTracks.sort((a, b) => a.artist.toUpperCase().localeCompare(b.artist.toUpperCase()));
 
-	// Step 3a: Look up all track IDs grouped by artist (one artist search per unique artist)
-	const uniqueArtistCount = new Set(matchedTracks.map(t => t.artist.toUpperCase())).size;
-	const batchSeeds = matchedTracks.map(({ track, artist, title }) => ({
+	// Step 3a: Cap unique artists sent to ReccoBeats to limit API call volume.
+	// Each new (uncached) artist requires: 1 artist search + N album pages + M track lists.
+	// Prioritise artists discovered via track.getSimilar (most relevant); fill remaining
+	// slots with artist-expansion artists up to the configured cap.
+	const RECCOBEATS_ARTIST_LIMIT = config.reccobeatsArtistLimit ?? 50;
+	const trackSpecificArtistSet = new Set(
+		Array.from(similarTracks.values()).map(t => t.artist.toUpperCase())
+	);
+	const selectedArtistSet = new Set();
+	for (const t of matchedTracks) {
+		const key = t.artist.toUpperCase();
+		if (trackSpecificArtistSet.has(key)) selectedArtistSet.add(key);
+	}
+	for (const t of matchedTracks) {
+		if (selectedArtistSet.size >= RECCOBEATS_ARTIST_LIMIT) break;
+		selectedArtistSet.add(t.artist.toUpperCase());
+	}
+	const lookupTracks = matchedTracks.filter(t => selectedArtistSet.has(t.artist.toUpperCase()));
+	if (lookupTracks.length < matchedTracks.length) {
+		logger?.info('MoodActivity', `ReccoBeats: Limited to ${selectedArtistSet.size} artists (${lookupTracks.length} tracks) from ${new Set(matchedTracks.map(t => t.artist.toUpperCase())).size} unique artists`);
+	}
+
+	const uniqueArtistCount = selectedArtistSet.size;
+	const batchSeeds = lookupTracks.map(({ track, artist, title }) => ({
 		artist,
 		title,
 		album: track.album || track.Album || ''
 	}));
 
-	updateProgress(`ReccoBeats: Looking up ${matchedTracks.length} track(s) across ${uniqueArtistCount} artist(s)...`, 0.4);
+	updateProgress(`ReccoBeats: Looking up ${lookupTracks.length} track(s) across ${uniqueArtistCount} artist(s)...`, 0.4);
 	const trackIdResults = await reccobeatsApi.findTrackIdsGroupedBatch(batchSeeds);
 
-	// Step 3b: Fetch audio features for resolved tracks
+	// Step 3b: Fetch audio features in concurrent batches.
+	// The rate-limiter spaces requests 200ms apart; batching allows cache-hit requests
+	// to complete immediately without blocking others in the same batch.
 	const foundTrackCount = trackIdResults.filter(r => r.trackId).length;
-	logger?.info('MoodActivity', `ReccoBeats: Found ${foundTrackCount}/${matchedTracks.length} track(s), fetching audio features...`);
+	logger?.info('MoodActivity', `ReccoBeats: Found ${foundTrackCount}/${lookupTracks.length} track(s), fetching audio features...`);
 	updateProgress(`Fetching audio features for ${foundTrackCount} track(s)...`, 0.55);
 
-	for (let i = 0; i < matchedTracks.length; i++) {
-		checkCancelled();
-		const { track, artist, title } = matchedTracks[i];
+	const pendingFeatures = [];
+	for (let i = 0; i < lookupTracks.length; i++) {
 		const trackId = trackIdResults[i]?.trackId;
+		if (trackId) pendingFeatures.push({ ...lookupTracks[i], trackId });
+	}
 
-		if (!trackId) {
-			logger?.debug('MoodActivity', `ReccoBeats: Track not found - "${artist} - ${title}"`);
-			continue;
-		}
-
+	const AUDIO_FEATURE_CONCURRENCY = 5;
+	for (let i = 0; i < pendingFeatures.length; i += AUDIO_FEATURE_CONCURRENCY) {
+		checkCancelled();
 		if (i % 20 === 0) {
-			const progress = 0.55 + ((i / matchedTracks.length) * 0.2);
-			updateProgress(`Analyzing audio features: ${Math.min(i + 1, matchedTracks.length)}/${matchedTracks.length}...`, progress);
+			const progress = 0.55 + ((i / Math.max(pendingFeatures.length, 1)) * 0.2);
+			updateProgress(`Analyzing audio features: ${Math.min(i + AUDIO_FEATURE_CONCURRENCY, pendingFeatures.length)}/${pendingFeatures.length}...`, progress);
 		}
-
-		try {
-			const features = await reccobeatsApi.fetchTrackAudioFeatures(trackId);
-
-			if (features) {
-				tracksWithFeatures.push({
-					track,
-					artist,
-					title,
-					audioFeatures: features
-				});
+		const batch = pendingFeatures.slice(i, i + AUDIO_FEATURE_CONCURRENCY);
+		const batchResults = await Promise.all(batch.map(async ({ track, artist, title, trackId }) => {
+			try {
+				const features = await reccobeatsApi.fetchTrackAudioFeatures(trackId);
+				return features ? { track, artist, title, audioFeatures: features } : null;
+			} catch (e) {
+				if (e?.message === '__CANCELLED__') throw e;
+				logger?.debug('MoodActivity', `Audio features error for "${artist} - ${title}": ${e.message}`);
+				return null;
 			}
-		} catch (e) {
-			if (e?.message === '__CANCELLED__') throw e;
-			logger?.debug('MoodActivity', `Audio features error for "${artist} - ${title}": ${e.message}`);
+		}));
+		for (const r of batchResults) {
+			if (r) tracksWithFeatures.push(r);
 		}
 	}
 
-	logger?.info('MoodActivity', `Retrieved audio features for ${tracksWithFeatures.length}/${matchedTracks.length} tracks`);
+	logger?.info('MoodActivity', `Retrieved audio features for ${tracksWithFeatures.length}/${lookupTracks.length} tracks`);
 
 	if (tracksWithFeatures.length === 0) {
 		logger?.info('MoodActivity', 'No audio features available for matched tracks');

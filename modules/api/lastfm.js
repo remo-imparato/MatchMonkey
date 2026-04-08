@@ -80,9 +80,6 @@ async function fetchSimilarArtists(artistName, limit) {
 			return [];
 		}
 
-		// Log request URL before cache check so it's always visible in debug output
-		logger?.debug('Last.fm', `API GET ${API_BASE}?method=artist.getSimilar&artist=${encodeURIComponent(artistName)}${lim ? '&limit=' + lim : ''}&api_key=${MATCHMONKEY_API_KEY}&format=json&autocorrect=1`);
-
 		// Build API request (lim already computed above)
 		const params = new URLSearchParams({
 			method: 'artist.getSimilar',
@@ -200,9 +197,6 @@ async function fetchTopTracks(artistName, limit, includePlaycount = false) {
 			cache?.cacheTopTracks?.(artistName, limit, includePlaycount, []);
 			return [];
 		}
-
-		// Log request URL before cache check so it's always visible in debug output
-		logger?.debug('Last.fm', `API GET ${API_BASE}?method=artist.getTopTracks&artist=${encodeURIComponent(artistName)}${lim ? '&limit=' + lim : ''}&api_key=${MATCHMONKEY_API_KEY}&format=json&autocorrect=1`);
 
 		// Build API request (lim already computed above)
 		const params = new URLSearchParams({
@@ -341,9 +335,6 @@ async function fetchSimilarTracks(artistName, trackName, limit = 100) {
 			updateProgress('Last.fm: API key not configured - contact developer', undefined);
 			return [];
 		}
-
-		// Log request URL before cache check so it's always visible in debug output
-		logger?.debug('Last.fm', `API GET ${API_BASE}?method=track.getSimilar&artist=${encodeURIComponent(artistName)}&track=${encodeURIComponent(trackName)}${lim ? '&limit=' + lim : ''}&api_key=${MATCHMONKEY_API_KEY}&format=json&autocorrect=1`);
 
 		// Build API request (lim already computed above)
 		const params = new URLSearchParams({
