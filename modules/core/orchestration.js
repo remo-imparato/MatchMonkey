@@ -1387,6 +1387,10 @@ window.matchMonkeyOrchestration = {
 				actionText = 'Tracks';
 			} else if (config.discoveryMode === 'acoustics') {
 				actionText = 'Acoustics';
+			} else if (config.discoveryMode === 'besttracks') {
+				actionText = 'Popular Artist Tracks';
+			} else if (config.discoveryMode === 'popularsimilar') {
+				actionText = 'Popular Similar Tracks';
 			} else {
 				// Artist mode (default)
 				actionText = 'Artists';

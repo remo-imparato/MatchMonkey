@@ -83,6 +83,44 @@ actions.similarGenreRun = {
 	getTracklist: uitools.getSelectedTracklist
 };
 
+/**
+ * Run Best Tracks action (Last.fm)
+ */
+actions.bestTracksRun = {
+	title: _('Popular &Artist Tracks'),
+	icon: 'song',
+	hotkeyAble: true,
+	visible: true,
+	disabled: uitools.notMediaListSelected,
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'besttracks');
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	},
+	getTracklist: uitools.getSelectedTracklist
+};
+
+/**
+ * Run Popular Similar Tracks action (Last.fm)
+ */
+actions.popularSimilarTracksRun = {
+	title: _('Popular Similar Trac&ks'),
+	icon: 'song',
+	hotkeyAble: true,
+	visible: true,
+	disabled: uitools.notMediaListSelected,
+	execute: function () {
+		if (window.matchMonkey && window.matchMonkey.runMatchMonkey) {
+			window.matchMonkey.runMatchMonkey(false, 'popularsimilar');
+		} else {
+			console.error('Match Monkey: Add-on not loaded');
+		}
+	},
+	getTracklist: uitools.getSelectedTracklist
+};
+
 // ============================================================================
 // ACTION DEFINITIONS - ReccoBeats Based
 // ============================================================================
@@ -685,7 +723,10 @@ _menuItems.tools.action.submenu.push({
 			{ action: actions.similarArtistsRun, order: 20 },
 			{ action: actions.similarGenreRun, order: 30 },
 			{ separator: true, order: 40 },
-			{ action: actions.similarReccoRun, order: 50 },
+			{ action: actions.bestTracksRun, order: 45 },
+			{ action: actions.popularSimilarTracksRun, order: 46 },
+			{ separator: true, order: 50 },
+			{ action: actions.similarReccoRun, order: 51 },
 			{
 				action: {
 					title: _('&Mood'),
@@ -737,7 +778,10 @@ if (!window.menus) {
 				{ action: actions.similarArtistsRun, order: 20 },
 				{ action: actions.similarGenreRun, order: 30 },
 				{ separator: true, order: 40 },
-				{ action: actions.similarReccoRun, order: 50 },
+				{ action: actions.bestTracksRun, order: 45 },
+				{ action: actions.popularSimilarTracksRun, order: 46 },
+				{ separator: true, order: 50 },
+				{ action: actions.similarReccoRun, order: 51 },
 				{
 					action: {
 						title: _('&Mood'),

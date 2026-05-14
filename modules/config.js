@@ -19,6 +19,8 @@ const MENU_RUN_ID = `${SCRIPT_ID}.menu.run`;
 const MENU_AUTO_ID = `${SCRIPT_ID}.menu.toggleAuto`;
 const ACTION_RUN_ID = `${SCRIPT_ID}.run`;
 const ACTION_AUTO_ID = `${SCRIPT_ID}.toggleAuto`;
+const ACTION_BESTTRACKS_ID = `${SCRIPT_ID}.besttracks`;
+const ACTION_POPULARSIMILAR_ID = `${SCRIPT_ID}.popularsimilar`;
 
 // Toolbar button identifiers.
 const TOOLBAR_RUN_ID = 'sa-run';
@@ -37,6 +39,8 @@ window.matchMonkeyConfig = {
 	MENU_AUTO_ID,
 	ACTION_RUN_ID,
 	ACTION_AUTO_ID,
+	ACTION_BESTTRACKS_ID,
+	ACTION_POPULARSIMILAR_ID,
 	TOOLBAR_RUN_ID,
 	TOOLBAR_AUTO_ID,
 	SETTINGS_SHEET_ID,

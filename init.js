@@ -125,6 +125,12 @@ function start() {
 		TracksPerArtist: 20,            // Max tracks per artist from library
 		MaxPlaylistTracks: 0,           // Final limit (0 = unlimited, add all found)
 
+		// === Best Tracks Mode ===
+		BestTracksLimit: 20,            // Max tracks per artist in best tracks mode
+
+		// === Popular Similar Tracks Mode ===
+		PopularSimilarLimit: 50,        // Max similar tracks to fetch before filtering for popular ones
+
 		// === Track Selection ===
 		UseLastfmRanking: true,         // Sort by Last.fm popularity
 		PreferHighQuality: true,        // Prefer higher bitrate/rating versions
@@ -346,7 +352,4 @@ function start() {
 
 //-- make it named function so we can register it for debugging
 start();
-
-
-
 

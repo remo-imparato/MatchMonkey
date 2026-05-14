@@ -74,6 +74,22 @@
 					</div>
 
 					<div class="uiRow">
+						<label class="inline">Popular artist tracks:</label>
+						<div data-id="BestTracksLimit"
+							 data-control-class="Edit"
+							 data-tip="Maximum number of best/most popular tracks to fetch per artist in Best Tracks mode."
+							 data-init-params="{type:'number',min:1,max:100}"></div>
+					</div>
+
+					<div class="uiRow">
+						<label class="inline">Popular similar tracks limit:</label>
+						<div data-id="PopularSimilarLimit"
+							 data-control-class="Edit"
+							 data-tip="Maximum number of similar tracks to fetch before filtering for the most popular ones."
+							 data-init-params="{type:'number',min:10,max:500}"></div>
+					</div>
+
+					<div class="uiRow">
 						<label class="inline">API min match (%):</label>
 						<div data-id="ApiMinMatch"
 							 data-control-class="Edit"

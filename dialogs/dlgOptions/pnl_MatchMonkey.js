@@ -106,6 +106,10 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.load = async function (sett, 
 		UI.MaxPlaylistTracks.controlClass.value = cfg.MaxPlaylistTracks || 0; // 0 = unlimited
 		UI.UseLastfmRanking.controlClass.checked = cfg.UseLastfmRanking !== false; // Default true
 
+		// === New Discovery Modes (Best Tracks & Popular Similar) ===
+		UI.BestTracksLimit.controlClass.value = cfg.BestTracksLimit || 20;
+		UI.PopularSimilarLimit.controlClass.value = cfg.PopularSimilarLimit || 50;
+
 		// Audio format preference: 'Mixed (all formats)' | 'Lossless only' | 'Lossy only'
 		// Map from stored value (if using legacy PreferHighQuality boolean, migrate to Mixed)
 		let audioFormatPref = cfg.AudioFormatPreference || 'Mixed (all formats)';
@@ -311,6 +315,10 @@ optionPanels.pnl_Library.subPanels.pnl_MatchMonkey.save = function (sett) {
 		this.config.TracksPerArtist = parseInt(UI.TracksPerArtist.controlClass.value, 10) || 30;
 		this.config.MaxPlaylistTracks = parseInt(UI.MaxPlaylistTracks.controlClass.value, 10) || 0;
 		this.config.UseLastfmRanking = UI.UseLastfmRanking.controlClass.checked;
+
+		// === New Discovery Modes (Best Tracks & Popular Similar) ===
+		this.config.BestTracksLimit = parseInt(UI.BestTracksLimit.controlClass.value, 10) || 10;
+		this.config.PopularSimilarLimit = parseInt(UI.PopularSimilarLimit.controlClass.value, 10) || 50;
 
 		// Audio format preference: 'Mixed (all formats)' | 'Lossless only' | 'Lossy only'
 		this.config.AudioFormatPreference = UI.AudioFormatPreference.controlClass.value || 'Mixed (all formats)';

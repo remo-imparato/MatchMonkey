@@ -98,6 +98,8 @@
 		 * - 'acoustics': Use ReccoBeats to find recommendations based on seed tracks
 		 * - 'mood': Use predefined mood audio profiles
 		 * - 'activity': Use predefined activity audio profiles
+		 * - 'besttracks': Use Last.fm artist.getTopTracks for selected artists only
+		 * - 'popularsimilar': Use Last.fm track.getSimilar ranked by popularity
 		 */
 		const DISCOVERY_MODES = {
 			ARTIST: 'artist',
@@ -105,7 +107,9 @@
 			GENRE: 'genre',
 			ACOUSTICS: 'acoustics',
 			MOOD: 'mood',
-			ACTIVITY: 'activity'
+			ACTIVITY: 'activity',
+			BEST_TRACKS: 'besttracks',
+			POPULAR_SIMILAR: 'popularsimilar'
 		};
 
 		// ============================================================================

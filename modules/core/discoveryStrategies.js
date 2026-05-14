@@ -34,7 +34,9 @@ const DISCOVERY_MODES = {
 	GENRE: 'genre',
 	ACOUSTICS: 'acoustics',    // ReccoBeats with seed tracks
 	MOOD: 'mood',      // Mood preset
-	ACTIVITY: 'activity' // Activity preset
+	ACTIVITY: 'activity', // Activity preset
+	BEST_TRACKS: 'besttracks', // Top tracks for selected artists
+	POPULAR_SIMILAR: 'popularsimilar' // Most popular tracks similar to selected tracks
 };
 
 // ============================================================================
@@ -724,6 +726,227 @@ async function discoverByActivity(modules, seeds, config) {
 }
 
 // ============================================================================
+// BEST TRACKS DISCOVERY
+// ============================================================================
+
+/**
+ * Best tracks discovery strategy.
+ * 
+ * Fetches the top-ranked tracks for selected seed artists using Last.fm playcount.
+ * Ranks by playcount and optionally by local library rating if available.
+ * Best for building playlists of objectively popular tracks from favorite artists.
+ * 
+ * @param {object} modules - Module dependencies
+ * @param {Array} seeds - Seed objects [{artist, title, genre}, ...]
+ * @param {object} config - Configuration settings
+ * @returns {Promise<object>} { candidates, stats }
+ */
+async function discoverByBestTracks(modules, seeds, config) {
+	const { api: { lastfmApi }, settings: { prefixes }, ui: { notifications } } = modules;
+	const { fetchTopTracks } = lastfmApi;
+	const { fixPrefixes } = prefixes;
+	const { updateProgress } = notifications;
+
+	const candidates = [];
+	const blacklist = buildBlacklist(modules);
+	const bestTracksLimit = config.bestTracksLimit ?? 10;
+	const uniqueArtists = extractSeedArtists(seeds, config.seedLimit ?? 20);
+	const artistCount = uniqueArtists.length;
+	const logger = _getLogger();
+
+	logger.info('BestTracks', `Processing ${artistCount} artist(s), fetching up to ${bestTracksLimit} best tracks per artist`);
+	updateProgress(`Querying Last.fm for best tracks from ${artistCount} artist(s)...`, 0.2);
+
+	let totalTracksFound = 0;
+
+	for (let i = 0; i < artistCount; i++) {
+		if (window.matchMonkeyNotifications?.isCancelled?.()) throw new Error('__CANCELLED__');
+		const artistName = uniqueArtists[i];
+		const progress = 0.2 + ((i + 1) / artistCount) * 0.4;
+		updateProgress(`Last.fm: Fetching best tracks for "${artistName}" (${i + 1}/${artistCount})...`, progress);
+
+		const artKey = artistName.toUpperCase();
+		if (blacklist.has(artKey)) {
+			logger.debug('BestTracks', `Artist "${artistName}" is blacklisted, skipping`);
+			continue;
+		}
+
+		try {
+			const fixedName = fixPrefixes(artistName);
+			// Fetch 3x limit to account for possible filtering
+			const topTracks = await fetchTopTracks(fixedName, bestTracksLimit * 3, true);
+
+			if (!topTracks || topTracks.length === 0) {
+				logger.debug('BestTracks', `No tracks found for "${artistName}"`);
+				updateProgress(`Last.fm: No tracks found for "${artistName}"`, progress);
+				continue;
+			}
+
+			// Convert to candidate format, sorted by playcount
+			const tracks = topTracks
+				.slice(0, bestTracksLimit)
+				.map(t => ({
+					title: typeof t === 'string' ? t : (t.title || ''),
+					playcount: typeof t === 'object' ? (t.playcount || 0) : 0,
+					rank: typeof t === 'object' ? (t.rank || 0) : 0
+				}))
+				.filter(t => t.title);
+
+			if (tracks.length > 0) {
+				candidates.push({
+					artist: artistName,
+					tracks: tracks
+				});
+				totalTracksFound += tracks.length;
+				logger.debug('BestTracks', `Found ${tracks.length} tracks for "${artistName}"`);
+				updateProgress(`Last.fm: Found ${tracks.length} best tracks for "${artistName}"`, progress);
+			}
+
+		} catch (e) {
+			logger.error('BestTracks', `Error for "${artistName}": ${e.message}`);
+		}
+	}
+
+	logger.summary('BestTracks', 'Discovery complete', {
+		candidates: candidates.length,
+		totalTracks: totalTracksFound
+	});
+	updateProgress(`Last.fm: Retrieved ${totalTracksFound} best tracks from ${candidates.length} artists`, 0.6);
+
+	return {
+		candidates,
+		stats: {
+			totalTracksFound,
+			artistCount: candidates.length
+		}
+	};
+}
+
+// ============================================================================
+// POPULAR SIMILAR TRACKS DISCOVERY
+// ============================================================================
+
+/**
+ * Popular similar tracks discovery strategy.
+ * 
+ * Finds tracks similar to seed tracks and returns only the most popular ones.
+ * Uses Last.fm track.getSimilar API and ranks by playcount.
+ * Best for discovering popular music related to songs you like.
+ * 
+ * @param {object} modules - Module dependencies
+ * @param {Array} seeds - Seed objects [{artist, title, genre}, ...]
+ * @param {object} config - Configuration settings
+ * @returns {Promise<object>} { candidates, stats }
+ */
+async function discoverByPopularSimilar(modules, seeds, config) {
+	const { api: { lastfmApi }, settings: { prefixes }, ui: { notifications } } = modules;
+	const { fetchSimilarTracks } = lastfmApi;
+	const { fixPrefixes } = prefixes;
+	const { updateProgress } = notifications;
+
+	const candidates = [];
+	const seenArtists = new Set();
+	const tracksByArtist = new Map();
+	const blacklist = buildBlacklist(modules);
+
+	const seedLimit = Math.min(seeds.length, config.seedLimit ?? 10);
+	const similarLimit = config.popularSimilarLimit ?? 50;
+	const tracksPerArtist = config.bestTracksLimit ?? 10;
+	const logger = _getLogger();
+
+	logger.info('PopularSimilar', `Processing ${seedLimit} seed track(s), fetching up to ${similarLimit} similar per track`);
+	updateProgress(`Querying Last.fm for popular similar tracks to ${seedLimit} seed(s)...`, 0.2);
+
+	let totalSimilarTracks = 0;
+
+	for (let i = 0; i < seedLimit; i++) {
+		if (window.matchMonkeyNotifications?.isCancelled?.()) throw new Error('__CANCELLED__');
+		const seed = seeds[i];
+		if (!seed?.artist || !seed?.title) continue;
+
+		const progress = 0.2 + ((i + 1) / seedLimit) * 0.4;
+		updateProgress(`Last.fm: Finding popular tracks similar to "${seed.title}" (${i + 1}/${seedLimit})...`, progress);
+
+		// Split artists by ';' and query each separately
+		const artists = seed.artist.split(';').map(a => a.trim()).filter(Boolean);
+
+		for (const artistName of artists) {
+			const fixedArtistName = fixPrefixes(artistName);
+
+			try {
+				const similarTracks = await fetchSimilarTracks(fixedArtistName, seed.title, similarLimit);
+
+				if (!similarTracks || similarTracks.length === 0) {
+					logger.debug('PopularSimilar', `No similar tracks for "${fixedArtistName} - ${seed.title}"`);
+					continue;
+				}
+
+				totalSimilarTracks += similarTracks.length;
+				logger.debug('PopularSimilar', `Found ${similarTracks.length} similar to "${seed.title}"`);
+				updateProgress(`Last.fm: Found ${similarTracks.length} tracks similar to "${seed.title}"`, progress);
+
+				// Group by artist, sorted by playcount (popularity)
+				for (const simTrack of similarTracks) {
+					if (!simTrack?.artist || !simTrack?.title) continue;
+
+					const artKey = simTrack.artist.toUpperCase();
+
+					// Skip blacklisted artists
+					if (blacklist.has(artKey)) continue;
+
+					if (!tracksByArtist.has(artKey)) {
+						tracksByArtist.set(artKey, {
+							artistName: simTrack.artist,
+							tracks: []
+						});
+					}
+
+					const entry = tracksByArtist.get(artKey);
+					const trackKey = simTrack.title.toUpperCase();
+
+					// Avoid duplicate tracks
+					if (!entry.tracks.some(t => t.title.toUpperCase() === trackKey)) {
+						entry.tracks.push({
+							title: simTrack.title,
+							playcount: simTrack.playcount || 0,
+							match: simTrack.match || 0
+						});
+					}
+				}
+
+			} catch (e) {
+				logger.error('PopularSimilar', `Error for "${fixedArtistName} - ${seed.title}": ${e.message}`);
+			}
+		}
+	}
+
+	// Convert to candidate format, sorted by playcount (popularity)
+	for (const [artKey, data] of tracksByArtist) {
+		// Sort tracks by playcount (highest first - most popular)
+		data.tracks.sort((a, b) => (b.playcount || 0) - (a.playcount || 0));
+
+		candidates.push({
+			artist: data.artistName,
+			tracks: data.tracks.slice(0, tracksPerArtist)
+		});
+	}
+
+	logger.summary('PopularSimilar', 'Discovery complete', {
+		candidates: candidates.length,
+		totalSimilarTracks
+	});
+	updateProgress(`Last.fm: Retrieved ${totalSimilarTracks} similar tracks from ${candidates.length} artists`, 0.6);
+
+	return {
+		candidates,
+		stats: {
+			totalSimilarTracks,
+			artistCount: candidates.length
+		}
+	};
+}
+
+// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 
@@ -956,6 +1179,10 @@ function getDiscoveryStrategy(mode) {
 			return discoverByMood;
 		case DISCOVERY_MODES.ACTIVITY:
 			return discoverByActivity;
+		case DISCOVERY_MODES.BEST_TRACKS:
+			return discoverByBestTracks;
+		case DISCOVERY_MODES.POPULAR_SIMILAR:
+			return discoverByPopularSimilar;
 		case DISCOVERY_MODES.ARTIST:
 		default:
 			return discoverByArtist;
@@ -982,6 +1209,10 @@ function getDiscoveryModeName(mode) {
 			return 'Mood';
 		case DISCOVERY_MODES.ACTIVITY:
 			return 'Activity';
+		case DISCOVERY_MODES.BEST_TRACKS:
+			return 'Best Tracks';
+		case DISCOVERY_MODES.POPULAR_SIMILAR:
+			return 'Popular Similar Tracks';
 		default: return 'Similar';
 	}
 }
@@ -1039,6 +1270,8 @@ window.matchMonkeyDiscoveryStrategies = {
 	discoverByRecco,
 	discoverByMood,
 	discoverByActivity,
+	discoverByBestTracks,
+	discoverByPopularSimilar,
 	getDiscoveryStrategy,
 	getDiscoveryModeName,
 	buildBlacklist,
