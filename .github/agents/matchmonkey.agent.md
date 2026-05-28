@@ -1,9 +1,9 @@
 ﻿---
 name: MatchMonkey
-description: Agent for MatchMonkey MediaMonkey 5 add-on development in MM5 JavaScript sandbox.
+description: Agent for MatchMonkey MediaMonkey 2024 add-on development in MM2024 JavaScript sandbox.
 keywords:
   - mediamonkey
-  - mm5
+  - MM2024
   - matchmonkey
   - lastfm
   - reccobeats
@@ -16,17 +16,17 @@ keywords:
 
 ## Project Identity
 
-**MatchMonkey** is a MediaMonkey 2024/5 (MM5) add-on that discovers and builds playlists of similar music using Last.fm and ReccoBeats APIs. It runs entirely inside the MM5 JavaScript sandbox — no Node.js, no bundler, no browser DOM. All files are plain vanilla JS loaded via MM5's 'localRequirejs()'.
+**MatchMonkey** is a MediaMonkey 2024 (MM2024) add-on that discovers and builds playlists of similar music using Last.fm and ReccoBeats APIs. It runs entirely inside the MM2024 JavaScript sandbox — no Node.js, no bundler, no browser DOM. All files are plain vanilla JS loaded via MM2024's 'localRequirejs()'.
 
 ---
 
 ## Technology Stack
 
-- **Runtime**: MediaMonkey 5 JS sandbox (Chromium-based, but no browser APIs like 'localStorage')
+- **Runtime**: MediaMonkey 2024 JS sandbox (Chromium-based, but no browser APIs like 'localStorage')
 - **Language**: Vanilla JavaScript (ES2020+), 'use strict' in every module
 - **Database**: SQLite via 'app.db.executeQueryAsync()' / 'app.db.getQueryResultAsync()'
 - **HTTP**: Native 'fetch()' with 'AbortController' for timeouts
-- **UI**: MM5 'uitools', 'app.actions', 'app.playlists', 'app.player'
+- **UI**: MM2024 'uitools', 'app.actions', 'app.playlists', 'app.player'
 - **No frameworks** — no React, no jQuery, no npm packages
 
 ---
@@ -44,7 +44,7 @@ keywords:
 | 'modules/core/discoveryStrategies.js' | 'window.matchMonkeyDiscoveryStrategies' | Strategy dispatch: artist / track / genre / acoustics / mood / activity |
 | 'modules/core/moodActivityDiscovery.js' | 'window.matchMonkeyMoodActivityDiscovery' | Hybrid Last.fm + ReccoBeats mood/activity discovery |
 | 'modules/core/autoMode.js' | 'window.matchMonkeyAutoMode' | Auto-queue mode: triggers near end of Now Playing |
-| 'modules/core/mm5Integration.js' | 'window.matchMonkeyMM5Integration' | MM5 UI: toolbar icons, action state |
+| 'modules/core/MM2024Integration.js' | 'window.matchMonkeyMM2024Integration' | MM2024 UI: toolbar icons, action state |
 | 'modules/db/index.js' | 'window.matchMonkeyDB' | DB facade: exposes library, playlist, queue |
 | 'modules/db/library.js' | (via DB index) | 'findLibraryTracks()', 'findLibraryTracksBatch()' |
 | 'modules/db/playlist.js' | (via DB index) | 'findPlaylist()', 'resolveTargetPlaylist()', 'addTracksToPlaylist()' |
@@ -107,7 +107,7 @@ Mood/Activity hybrid also returns { libraryTracks } which bypasses matchCandidat
 ## Cache Architecture
 
 - **Provider**: 'modules/api/cache.js' -> SQLite table 'MatchMonkeyData'
-- **Persistence**: Survives MM5 restarts via 'initCache()' and 'saveCache()'
+- **Persistence**: Survives MM2024 restarts via 'initCache()' and 'saveCache()'
 - **Maps**: lastfm.* and reccobeats.* with configurable TTL (default 72h, lookups 1-yr)
 - **Usage**: Always check 'getCache(mapName)?.has(key)' before API calls
 
@@ -228,11 +228,11 @@ Audio features are only fetched for tracks confirmed in the local library.
 
 ---
 
-## MediaMonkey 2024+ Best Practices (MM5)
+## MediaMonkey 2024+ Best Practices (MM2024)
 
-- Runtime is MM5 sandbox only: avoid Node.js/browser storage APIs and npm dependencies.
+- Runtime is MM2024 sandbox only: avoid Node.js/browser storage APIs and npm dependencies.
 - Keep modules plain vanilla JS and `'use strict'`.
-- Prefer MM5 async DB APIs:
+- Prefer MM2024 async DB APIs:
   - `await app.db.getQueryResultAsync()` for SELECT
   - `await app.db.executeQueryAsync()` for INSERT/UPDATE/DELETE/DDL
 - For network calls, use existing API wrappers (`lastfmFetch`, `rateLimitedFetch`) and cache layer.
@@ -261,7 +261,7 @@ When adding a new mode or user-visible feature, follow this order:
    - Load/save the new settings.
 8. Optional as needed:
    - `modules/api/lastfm.js`, `modules/api/reccobeats.js`, `modules/api/cache.js`,
-     `modules/db/*`, `modules/settings/storage.js`, `modules/core/mm5Integration.js`.
+     `modules/db/*`, `modules/settings/storage.js`, `modules/core/MM2024Integration.js`.
 
 ## Ranked Modes Ordering Rule
 

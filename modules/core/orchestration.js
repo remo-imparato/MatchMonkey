@@ -151,6 +151,8 @@ window.matchMonkeyOrchestration = {
 					similarLimit: intSetting('SimilarArtistsLimit', 20),
 					trackSimilarLimit: intSetting('TrackSimilarLimit', 100),
 					tracksPerArtist: intSetting('TracksPerArtist', 10000), // High limit for manual mode (capped at 10k by database)
+					bestTracksLimit: intSetting('BestTracksLimit', 20),
+					popularSimilarLimit: intSetting('PopularSimilarLimit', 50),
 					totalLimit: maxTracks > 0 ? maxTracks : 100000,
 					includeSeedArtist: boolSetting('IncludeSeedArtist', true),
 					rankEnabled: boolSetting('UseLastfmRanking', true),
